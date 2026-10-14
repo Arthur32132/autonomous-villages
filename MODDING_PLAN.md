@@ -7,6 +7,8 @@ Separate server mod using the existing Navigation AI villager API. No production
 
 Completed 2026-10-14: all six stages below are implemented. The final unchanged release JAR passed 19 real-server scenarios, seven unit tests, restart with empty-server auto-pause enabled, and corrupt-metadata preservation. See VALIDATION.md and docs/validation/2026-10-14/summary.json. The installation bundle contains the two tested release mods and documentation; the validation mod is excluded.
 
+0.1.1 follow-up: corrected the library's Fabric environment so single-player can load it; required library >=0.1.1. Repeated server checks and added an actual client test with the user's copied mod set, fresh world creation and reopening, native villager tracking, and exact backpack preservation. Evidence: docs/validation/2026-10-14-0.1.1/.
+
 1. Select a populated village near the command source using beds and real villagers; bound the managed territory, reject overlapping claims, preserve vanilla identities/trades. Commands: `/avillage claim <name> [radius]`, `status`, `pause`, `resume`, `release`, `storage`.
 2. Persist village metadata atomically, restore membership after restart, maintain nonpersistent chunk simulation tickets while active, safely release control/tickets on pause/release. Leave native sleep, trades and breeding available.
 3. Coordinate shared work through real chests, per-block reservations and bounded incremental world scans. Residents physically walk to work/storage; no remote inventory transfers.

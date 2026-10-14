@@ -10,7 +10,7 @@ for folder in ['libraries','versions','.fabric/server']:shutil.copytree(template
 launcher=next(template.glob('fabric-server-*-loader.0.19.5-*.jar'));shutil.copy2(launcher,lab)
 shutil.copy2(template/'eula.txt',lab/'eula.txt')
 mods=lab/'mods';mods.mkdir()
-for jar in [next((template/'mods').glob('fabric-api-*.jar')),ROOT.parent/'MinecraftmodNavigationAi/build/libs/navigation-ai-0.1.0.jar',ROOT/'build/libs/autonomous-villages-0.1.0.jar',ROOT/'build/libs/autonomous-villages-validation-0.1.0.jar']:
+for jar in [next((template/'mods').glob('fabric-api-*.jar')),ROOT.parent/'MinecraftmodNavigationAi/build/libs/navigation-ai-0.1.1.jar',ROOT/'build/libs/autonomous-villages-0.1.1.jar',ROOT/'build/libs/autonomous-villages-validation-0.1.1.jar']:
  shutil.copy2(jar,mods/jar.name)
 (lab/'server.properties').write_text('server-ip=127.0.0.1\nserver-port=25589\nonline-mode=false\nlevel-name=validation-world\nlevel-seed=8675309\nlevel-type=minecraft:normal\ndifficulty=peaceful\nspawn-protection=0\nview-distance=3\nsimulation-distance=3\npause-when-empty-seconds=0\nenable-rcon=false\nmax-tick-time=120000\n',encoding='utf8')
 home=nav.java_home(None);binary=home/'bin/java.exe'

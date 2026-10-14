@@ -1,13 +1,13 @@
 plugins { id 'net.fabricmc.fabric-loom' version "${loom_version}" }
 group = 'dev.autonomousvillages'
-version = '0.1.0'
+version = project.findProperty('version')
 base { archivesName = 'autonomous-villages' }
 loom { splitEnvironmentSourceSets(); mods { 'autonomous_villages' { sourceSet sourceSets.main } } }
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-    implementation files('../MinecraftmodNavigationAi/build/libs/navigation-ai-0.1.0.jar')
+    implementation files('../MinecraftmodNavigationAi/build/libs/navigation-ai-0.1.1.jar')
     testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
 }
@@ -18,11 +18,21 @@ sourceSets {
         compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
         runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
     }
+    clientValidation {
+        java.srcDir('tools/client-validation/java')
+        resources.srcDir('tools/client-validation/resources')
+        compileClasspath += sourceSets.client.compileClasspath + sourceSets.main.output
+    }
 }
 tasks.register('validationJar', Jar) {
     dependsOn tasks.validationClasses
     from sourceSets.validation.output
     archiveBaseName = 'autonomous-villages-validation'
+}
+tasks.register('clientValidationJar', Jar) {
+    dependsOn tasks.clientValidationClasses
+    from sourceSets.clientValidation.output
+    archiveBaseName = 'autonomous-villages-client-validation'
 }
 processResources {
     inputs.property 'version', project.version
@@ -35,7 +45,7 @@ tasks.register('assembleDistribution', Sync) {
     dependsOn tasks.build
     into layout.buildDirectory.dir('distribution')
     from(tasks.jar)
-    from('../MinecraftmodNavigationAi/build/libs/navigation-ai-0.1.0.jar')
+    from('../MinecraftmodNavigationAi/build/libs/navigation-ai-0.1.1.jar')
     from('README.md', 'LICENSE', 'MODDING_PLAN.md', 'VALIDATION.md')
     from('docs') { into 'docs' }
 }

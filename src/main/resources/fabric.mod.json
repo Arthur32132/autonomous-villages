@@ -9,5 +9,5 @@
   "environment": "*",
   "entrypoints": {"main": ["dev.autonomousvillages.AutonomousVillagesMod"]},
   "mixins": ["autonomous_villages.mixins.json"],
-  "depends": {"fabricloader": ">=0.19.5", "minecraft": "~26.2", "java": ">=25", "fabric-api": "*", "navigation_ai": ">=0.1.0"}
+  "depends": {"fabricloader": ">=0.19.5", "minecraft": "~26.2", "java": ">=25", "fabric-api": "*", "navigation_ai": ">=0.1.1"}
 }

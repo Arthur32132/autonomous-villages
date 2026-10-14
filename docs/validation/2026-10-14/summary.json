@@ -1,0 +1,57 @@
+{
+  "success": true,
+  "output": "C:\\minecraftWorkflow\\AutonomousVillages\\build\\validation\\20261014-172739",
+  "jars": {
+    "autonomous-villages-0.1.0.jar": "10ba39ac379437f65aa0136d78fcf59fc3e130e976ab94ff5e07e3780e81eecd",
+    "autonomous-villages-validation-0.1.0.jar": "34e55d0742fc80b3380c2618457d9ccc02c5ec285013fbe30a1c1a7a54678806",
+    "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+    "navigation-ai-0.1.0.jar": "7eb18d6fb03437f33848e5a78674c6236b024268e049eb1bf9efb571edae6d6f"
+  },
+  "corruptStatePreserved": true,
+  "checks": [
+    "[17:28:03] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+    "[17:28:04] [Server thread/INFO]: VILLAGE_TEST PASS native_identity_recipe_material_conservation",
+    "[17:28:04] [Server thread/INFO]: VILLAGE_TEST PASS shared_storage_conservation_and_full_capacity",
+    "[17:28:06] [Server thread/INFO]: VILLAGE_TEST PASS walk_harvest_pickup_and_replant",
+    "[17:28:08] [Server thread/INFO]: VILLAGE_TEST PASS walk_mine_collect_and_tool_wear",
+    "[17:28:21] [Server thread/INFO]: VILLAGE_TEST PASS bounded_staircase_mine_collection_and_return",
+    "[17:28:25] [Server thread/INFO]: VILLAGE_TEST PASS real_furnace_timing_and_fuel",
+    "[17:28:25] [Server thread/INFO]: VILLAGE_TEST PASS full_backpack_furnace_output_has_no_partial_duplicate",
+    "[17:28:25] [Server thread/INFO]: VILLAGE_TEST PASS native_food_and_breeding_prerequisites",
+    "[17:28:26] [Server thread/INFO]: VILLAGE_TEST PASS native_resident_defense",
+    "[17:28:36] [Server thread/INFO]: VILLAGE_TEST PASS physical_shelter_build_with_beds_door_and_light",
+    "[17:28:37] [Server thread/INFO]: VILLAGE_TEST PASS native_night_return_and_sleep",
+    "[17:28:37] [Server thread/INFO]: VILLAGE_TEST PASS native_profession_window_releases_work_controller",
+    "[17:28:37] [Server thread/INFO]: VILLAGE_TEST PASS pause_preserves_inventory_and_releases_tickets",
+    "[17:30:00] [Server thread/INFO]: VILLAGE_TEST PASS empty_backpacks_autonomous_wood_crafting_storage_farming_food_without_players",
+    "[17:30:00] [Server thread/INFO]: VILLAGE_TEST PASS pause_cancels_active_job_and_resume",
+    "[17:30:18] [Server thread/INFO]: VILLAGE_TEST PASS restart_metadata_native_backpack",
+    "[17:30:18] [Server thread/INFO]: VILLAGE_TEST PASS release_keeps_bodies",
+    "[17:30:18] [Server thread/INFO]: VILLAGE_TEST PASS active_village_resumes_after_restart"
+  ],
+  "junit": {
+    "tests": 7,
+    "failures": 0,
+    "errors": 0
+  },
+  "sourceSha256": {
+    "src\\test\\java\\dev\\autonomousvillages\\VillageRulesTest.java": "31026c68fd96b56f7152807832bbf5decf732714374136fb2afaa07e201d92e7",
+    "src\\main\\resources\\autonomous_villages.mixins.json": "aa17cb0a06d6e7adf4e826594a25c4314e55504401fe93ca7766ee6084dfad49",
+    "src\\main\\resources\\fabric.mod.json": "51084382e160093d64d7a5775b618b0d6a8696e686a5b85b5f32dd64cc6e47ac",
+    "src\\main\\java\\dev\\autonomousvillages\\AutonomousVillagesMod.java": "9dec4f4b4e345276293c3726a3a3543acce623e303ff6cfc00b0b66f844dead2",
+    "src\\main\\java\\dev\\autonomousvillages\\Construction.java": "d0751ce68c9b0fae64ec516483cb18266d9af515ec78fbb4daf024bbd7833b50",
+    "src\\main\\java\\dev\\autonomousvillages\\Reservations.java": "dc56799b18ff9f4466c001a3f000f3283d2d5b2bf997b8da32ba7ca1b035125f",
+    "src\\main\\java\\dev\\autonomousvillages\\Resident.java": "c6ae137b88603e3a2804003200d99e12966538849bb3c02081252ad685febc0c",
+    "src\\main\\java\\dev\\autonomousvillages\\Supplies.java": "18246604810f72b6a6a781d3db60546c66d6c03f68e623be1a11904e21fadd89",
+    "src\\main\\java\\dev\\autonomousvillages\\Village.java": "307b4228464eddf855004f42e65408844288944310af8ad2bbb0ab9dfe65c88a",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageIndex.java": "27a915a1af9db524c2a820b810bfc5328a942fd0cf0b7118abcbefcb783c8ad5",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageRuntime.java": "369fef18bd8919c83a914dee419f0d5bfa9e10010bc0531f15aced09fd096d36",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageState.java": "bd38d419d61955518e882904fd6fafbdb735ac794f2d26d947f5b076db5054f6",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageWorkshop.java": "873b43307134a40cb42e9a4944d73b0f0c5a079410f2f8eb8c4fab10dbfd6f47",
+    "src\\main\\java\\dev\\autonomousvillages\\mixin\\ServerEmptyPauseMixin.java": "bc92af38c7f2301d645de17986191e88c8e8cc70fdae7f27d677f159de66cfcc",
+    "tools\\validation\\run.py": "7ca5ac09170b161f0559c3a4f9b364cb0cf01a8440bb1cee45b9dbfbe36f7a50",
+    "tools\\validation\\resources\\fabric.mod.json": "17c4fd9f75d63dce2ff98e3a50176a37877c17a67cc7b14f898c7a639fa07b14",
+    "tools\\validation\\java\\dev\\autonomousvillages\\VillageProbeMod.java": "cb9b32cde3e1dc137919a91a83e9825d63e1f058de397e3c7603fb376a9ae5f4",
+    "tools\\validation\\java\\dev\\autonomousvillages\\VillageSelfTest.java": "bfe88df683c9f7910fef45cb56be8b5167903498f52b9ffe971827b5212559ad"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "autonomous_villages_validation",
+  "version": "1.0.0",
+  "name": "Autonomous Villages Isolated Validation",
+  "environment": "server",
+  "entrypoints": {"main": ["dev.autonomousvillages.VillageProbeMod"]},
+  "depends": {"autonomous_villages": "*", "fabric-api": "*", "navigation_ai": "*"}
+}

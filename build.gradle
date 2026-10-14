@@ -1,0 +1,49 @@
+plugins { id 'net.fabricmc.fabric-loom' version "${loom_version}" }
+group = 'dev.autonomousvillages'
+version = '0.1.0'
+base { archivesName = 'autonomous-villages' }
+loom { splitEnvironmentSourceSets(); mods { 'autonomous_villages' { sourceSet sourceSets.main } } }
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    implementation files('../MinecraftmodNavigationAi/build/libs/navigation-ai-0.1.0.jar')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
+}
+sourceSets {
+    validation {
+        java.srcDir('tools/validation/java')
+        resources.srcDir('tools/validation/resources')
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+tasks.register('validationJar', Jar) {
+    dependsOn tasks.validationClasses
+    from sourceSets.validation.output
+    archiveBaseName = 'autonomous-villages-validation'
+}
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand 'version': project.version }
+}
+tasks.withType(JavaCompile).configureEach { options.release = 25; options.encoding = 'UTF-8' }
+java { withSourcesJar(); sourceCompatibility = JavaVersion.VERSION_25; targetCompatibility = JavaVersion.VERSION_25 }
+tasks.test { useJUnitPlatform() }
+tasks.register('assembleDistribution', Sync) {
+    dependsOn tasks.build
+    into layout.buildDirectory.dir('distribution')
+    from(tasks.jar)
+    from('../MinecraftmodNavigationAi/build/libs/navigation-ai-0.1.0.jar')
+    from('README.md', 'LICENSE', 'MODDING_PLAN.md', 'VALIDATION.md')
+    from('docs') { into 'docs' }
+}
+tasks.register('bundleDistribution', Zip) {
+    dependsOn tasks.assembleDistribution
+    from layout.buildDirectory.dir('distribution')
+    destinationDirectory = layout.buildDirectory
+    archiveFileName = "autonomous-villages-${project.version}-bundle.zip"
+    reproducibleFileOrder = true
+    preserveFileTimestamps = false
+}

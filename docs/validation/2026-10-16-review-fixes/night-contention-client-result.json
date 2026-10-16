@@ -1,0 +1,109 @@
+{
+  "success": false,
+  "reason": "resident_lost_during_live_observation",
+  "ticks": 70784,
+  "screenshots": 589,
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 2,
+    "newExpeditionItemsUnloaded": 129,
+    "observedNightTicks": 29601,
+    "observedSleepTicks": 34478,
+    "naturalThreatsSeen": 1759,
+    "clockTime": 70600,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": true,
+    "knownMineWallOres": [
+      "-419, 49, -233 Block{minecraft:copper_ore}",
+      "-409, 39, -233 Block{minecraft:copper_ore}",
+      "-409, 40, -234 Block{minecraft:copper_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": true,
+    "peakWool": 0,
+    "currentStock": {
+      "coal": 0,
+      "cobblestone": 72,
+      "rawIron": 0,
+      "iron": 5
+    },
+    "sharedChestContents": [
+      {
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}",
+        "items": [
+          "5 minecraft:dirt",
+          "3 minecraft:egg",
+          "2 minecraft:brown_egg",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ]
+      },
+      {
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}",
+        "items": [
+          "3 minecraft:birch_slab",
+          "17 minecraft:dirt",
+          "2 minecraft:oak_slab",
+          "1 minecraft:rotten_flesh",
+          "2 minecraft:acacia_sign",
+          "56 minecraft:cobblestone",
+          "7 minecraft:granite",
+          "2 minecraft:raw_copper",
+          "8 minecraft:cobblestone",
+          "1 minecraft:brown_egg"
+        ]
+      },
+      {
+        "pos": "BlockPos{x\u003d-275, y\u003d65, z\u003d-282}",
+        "items": []
+      },
+      {
+        "pos": "BlockPos{x\u003d-273, y\u003d65, z\u003d-282}",
+        "items": []
+      },
+      {
+        "pos": "BlockPos{x\u003d-271, y\u003d65, z\u003d-282}",
+        "items": []
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true,
+    "miningExpeditionsReturnedAndUnloaded": 2,
+    "expeditionItemsUnloaded": 129,
+    "verifiedMineralDeposits": {
+      "6f3560df-30f8-44c5-b907-21961b921d17": 94,
+      "17c04ec5-7b94-4242-95d6-06d2889f9e76": 7
+    },
+    "warehouseBlocks": 161,
+    "warehouseOrigin": -75591425585088,
+    "damagedHouseBlocks": [
+      -84937274662831,
+      -83288007221167,
+      -84112640921523,
+      -82188495495091
+    ],
+    "lostOriginalResidents": [
+      "6f3560df-30f8-44c5-b907-21961b921d17"
+    ]
+  }
+}

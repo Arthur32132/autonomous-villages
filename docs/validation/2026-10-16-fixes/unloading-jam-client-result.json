@@ -1,0 +1,129 @@
+{
+  "success": false,
+  "reason": "stopped_for_diagnosis",
+  "ticks": 59458,
+  "screenshots": 494,
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 2,
+    "newExpeditionItemsUnloaded": 165,
+    "observedNightTicks": 20000,
+    "observedSleepTicks": 23974,
+    "naturalThreatsSeen": 1550,
+    "clockTime": 59400,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [
+      "-189, 64, -312 Block{minecraft:coal_ore}",
+      "-189, 63, -311 Block{minecraft:coal_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "iron": 0,
+      "rawIron": 0,
+      "cobblestone": 115,
+      "coal": 7
+    },
+    "sharedChestContents": [
+      {
+        "items": [
+          "3 minecraft:acacia_stairs",
+          "6 minecraft:dirt",
+          "2 minecraft:rotten_flesh",
+          "1 minecraft:brown_egg",
+          "3 minecraft:wheat",
+          "3 minecraft:acacia_sign",
+          "1 minecraft:egg",
+          "3 minecraft:acacia_planks",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ],
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}"
+      },
+      {
+        "items": [
+          "5 minecraft:acacia_slab",
+          "1 minecraft:rotten_flesh",
+          "2 minecraft:egg",
+          "2 minecraft:acacia_sign",
+          "2 minecraft:coal",
+          "32 minecraft:dirt",
+          "64 minecraft:cobblestone",
+          "45 minecraft:cobblestone",
+          "1 minecraft:crafting_table",
+          "1 minecraft:brown_egg",
+          "2 minecraft:stick"
+        ],
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}"
+      },
+      {
+        "items": [],
+        "pos": "BlockPos{x\u003d-275, y\u003d65, z\u003d-282}"
+      },
+      {
+        "items": [],
+        "pos": "BlockPos{x\u003d-273, y\u003d65, z\u003d-282}"
+      },
+      {
+        "items": [],
+        "pos": "BlockPos{x\u003d-271, y\u003d65, z\u003d-282}"
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true,
+    "miningExpeditionsReturnedAndUnloaded": 2,
+    "expeditionItemsUnloaded": 165,
+    "verifiedMineralDeposits": {
+      "eed5afa7-87f1-4275-897d-d9ffd6bec8a1": 142
+    },
+    "warehouseBlocks": 161,
+    "warehouseOrigin": -75591425585088,
+    "damagedHouseBlocks": [
+      -84937274662831,
+      -83288007221167,
+      -84112640921523,
+      -82188495495091
+    ],
+    "repairTicks": 2578,
+    "repairedBlocks": [
+      {
+        "original": "Block{minecraft:oak_planks}",
+        "actual": "Block{minecraft:acacia_planks}"
+      },
+      {
+        "original": "Block{minecraft:oak_planks}",
+        "actual": "Block{minecraft:acacia_planks}"
+      },
+      {
+        "original": "Block{minecraft:oak_door}[facing\u003dnorth,half\u003dlower,hinge\u003dright,open\u003dfalse,powered\u003dfalse]",
+        "actual": "Block{minecraft:acacia_door}[facing\u003dnorth,half\u003dlower,hinge\u003dright,open\u003dtrue,powered\u003dfalse]"
+      },
+      {
+        "original": "Block{minecraft:white_terracotta}",
+        "actual": "Block{minecraft:cobblestone}"
+      }
+    ]
+  }
+}

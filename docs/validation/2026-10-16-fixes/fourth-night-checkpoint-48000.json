@@ -1,0 +1,96 @@
+{
+  "ticks": 48000,
+  "complete": false,
+  "status": "Observed | работает | центр -321, 73, -319 | территория -401,-392 — -242,-246 | жителей загружено 6, работников 6, кроватей 5 | сундуков 4, еды 4 | строительство склад 158/161 | хозяйство работает\nспит, отдых и сон по правилам Minecraft",
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 2,
+    "newExpeditionItemsUnloaded": 85,
+    "observedNightTicks": 20000,
+    "observedSleepTicks": 22219,
+    "naturalThreatsSeen": 1120,
+    "clockTime": 48000,
+    "raining": true,
+    "thundering": true,
+    "darkOutside": true,
+    "knownMineWallOres": [
+      "-189, 63, -311 Block{minecraft:coal_ore}",
+      "-190, 64, -311 Block{minecraft:coal_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "iron": 0,
+      "rawIron": 0,
+      "cobblestone": 37,
+      "coal": 2
+    },
+    "sharedChestContents": [
+      {
+        "items": [
+          "3 minecraft:acacia_planks",
+          "6 minecraft:dirt",
+          "1 minecraft:rotten_flesh",
+          "2 minecraft:oak_log",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ],
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}"
+      },
+      {
+        "items": [
+          "1 minecraft:wheat",
+          "1 minecraft:oak_slab",
+          "2 minecraft:oak_door",
+          "22 minecraft:dirt",
+          "27 minecraft:cobblestone",
+          "4 minecraft:acacia_slab",
+          "1 minecraft:rotten_flesh",
+          "1 minecraft:brown_egg",
+          "1 minecraft:egg"
+        ],
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}"
+      },
+      {
+        "items": [],
+        "pos": "BlockPos{x\u003d-275, y\u003d65, z\u003d-282}"
+      },
+      {
+        "items": [],
+        "pos": "BlockPos{x\u003d-273, y\u003d65, z\u003d-282}"
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true,
+    "miningExpeditionsReturnedAndUnloaded": 2,
+    "expeditionItemsUnloaded": 85,
+    "verifiedMineralDeposits": {
+      "88ea9406-e232-4ee4-b519-5a9515099e40": 53,
+      "5c2d9ec2-6e04-4ff2-8c08-1f51c5acf3fd": 3
+    }
+  },
+  "warehouse": false,
+  "repair": false,
+  "upgrade": false,
+  "growth": false
+}

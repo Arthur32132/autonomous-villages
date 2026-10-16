@@ -7,7 +7,7 @@ dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-    implementation files('../MinecraftmodNavigationAi/build/libs/navigation-ai-0.1.1.jar')
+    implementation project(':navigationAi')
     testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
 }
@@ -41,13 +41,42 @@ processResources {
 tasks.withType(JavaCompile).configureEach { options.release = 25; options.encoding = 'UTF-8' }
 java { withSourcesJar(); sourceCompatibility = JavaVersion.VERSION_25; targetCompatibility = JavaVersion.VERSION_25 }
 tasks.test { useJUnitPlatform() }
+tasks.register('sourceTree', Zip) {
+    archiveFileName = "autonomous-villages-${project.version}-source.zip"
+    destinationDirectory = layout.buildDirectory.dir('sources')
+    reproducibleFileOrder = true
+    preserveFileTimestamps = false
+    from(projectDir) {
+        into 'AutonomousVillages'
+        include 'src/**','tools/**','gradle/**','gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','LICENSE','README.md','MODDING_PLAN.md','VALIDATION.md','docs/release/**'
+        exclude '**/__pycache__/**','**/lab/**'
+    }
+    from(project(':navigationAi').projectDir) {
+        into 'MinecraftmodNavigationAi'
+        include 'src/**','tools/regression/**','gradle/**','gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','LICENSE'
+        exclude '**/__pycache__/**','tools/regression/results/**'
+    }
+}
 tasks.register('assembleDistribution', Sync) {
-    dependsOn tasks.build
+    dependsOn tasks.build, project(':navigationAi').tasks.named('build'), tasks.sourceTree
     into layout.buildDirectory.dir('distribution')
     from(tasks.jar)
-    from('../MinecraftmodNavigationAi/build/libs/navigation-ai-0.1.1.jar')
+    from(project(':navigationAi').tasks.named('jar'))
     from('README.md', 'LICENSE', 'MODDING_PLAN.md', 'VALIDATION.md')
-    from('docs') { into 'docs' }
+    from('docs/release') { into 'docs/release' }
+    from(tasks.sourceTree) { into 'sources' }
+    doLast {
+        def sha = { File f -> java.security.MessageDigest.getInstance('SHA-256').digest(f.bytes).encodeHex().toString() }
+        def folder = layout.buildDirectory.dir('distribution').get().asFile
+        def artifacts = fileTree(folder).matching { include '*.jar' }.files.sort { it.name }.collectEntries { [(it.name):sha(it)] }
+        def sources = [:]
+        [project,project(':navigationAi')].each { p ->
+            def prefix=p==project?'AutonomousVillages':'MinecraftmodNavigationAi'
+            p.fileTree('src').matching { include '**/*.java','**/*.json' }.files.sort { it.path }.each { f -> sources[prefix+'/'+p.relativePath(f).replace(File.separator,'/')] = sha(f) }
+            ['build.gradle','settings.gradle','gradle.properties'].each { n -> if(p.file(n).exists())sources[prefix+'/'+n]=sha(p.file(n)) }
+        }
+        new File(folder,'build-manifest.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([version:project.version.toString(),jars:artifacts,sources:sources]))
+    }
 }
 tasks.register('bundleDistribution', Zip) {
     dependsOn tasks.assembleDistribution

@@ -1,0 +1,475 @@
+{
+  "groups": [
+    {
+      "source": "latest.log",
+      "message": "[ForkJoinPool-1-worker-12/WARN]: Mod dev_isxander_sdl_sdl-backend-ffm uses the version release-3.4.12-4 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version",
+      "count": 1,
+      "first": "[05:42:59] [ForkJoinPool-1-worker-12/WARN]: Mod dev_isxander_sdl_sdl-backend-ffm uses the version release-3.4.12-4 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version",
+      "last": "[05:42:59] [ForkJoinPool-1-worker-12/WARN]: Mod dev_isxander_sdl_sdl-backend-ffm uses the version release-3.4.12-4 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version"
+    },
+    {
+      "source": "latest.log",
+      "message": "[ForkJoinPool-1-worker-15/WARN]: Mod dev_isxander_sdl_sdl-api uses the version release-3.4.12-4 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version",
+      "count": 1,
+      "first": "[05:42:59] [ForkJoinPool-1-worker-15/WARN]: Mod dev_isxander_sdl_sdl-api uses the version release-3.4.12-4 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version",
+      "last": "[05:42:59] [ForkJoinPool-1-worker-15/WARN]: Mod dev_isxander_sdl_sdl-api uses the version release-3.4.12-4 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Stream injection failed; legacy loggers may retain blocking behavior.",
+      "count": 1,
+      "first": "[05:43:03] [main/WARN]: Stream injection failed; legacy loggers may retain blocking behavior.",
+      "last": "[05:43:03] [main/WARN]: Stream injection failed; legacy loggers may retain blocking behavior."
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'entityculling.refmap.mixins.json' for entityculling.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'entityculling.refmap.mixins.json' for entityculling.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'entityculling.refmap.mixins.json' for entityculling.mixins.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'ixeris.mixins.refmap.json' for ixeris.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'ixeris.mixins.refmap.json' for ixeris.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'ixeris.mixins.refmap.json' for ixeris.mixins.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'mixintrace-refmap.json' for mixintrace.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'mixintrace-refmap.json' for mixintrace.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'mixintrace-refmap.json' for mixintrace.mixins.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'modernfix.refmap.json' for modernfix-fabric.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'modernfix.refmap.json' for modernfix-fabric.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'modernfix.refmap.json' for modernfix-fabric.mixins.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'modernfix.refmap.json' for modernfix-common.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'modernfix.refmap.json' for modernfix-common.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'modernfix.refmap.json' for modernfix-common.mixins.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'reeses-sodium-options.refmap.json' for reeses-sodium-options.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'reeses-sodium-options.refmap.json' for reeses-sodium-options.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'reeses-sodium-options.refmap.json' for reeses-sodium-options.mixins.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'sspb.refmap.json' for sspb.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'sspb.refmap.json' for sspb.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'sspb.refmap.json' for sspb.mixins.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl.mixins.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl-fabric.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl-fabric.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "last": "[05:43:04] [main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl-fabric.mixins.json could not be read. If this is a development environment you can ignore this message"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Force disabled MC-122477 because it only applies to OS: LINUX",
+      "count": 1,
+      "first": "[05:43:04] [main/WARN]: Force disabled MC-122477 because it only applies to OS: LINUX",
+      "last": "[05:43:04] [main/WARN]: Force disabled MC-122477 because it only applies to OS: LINUX"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children",
+      "count": 1,
+      "first": "[05:43:05] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children",
+      "last": "[05:43:05] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]",
+      "count": 1,
+      "first": "[05:43:05] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]",
+      "last": "[05:43:05] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.",
+      "count": 1,
+      "first": "[05:43:05] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.",
+      "last": "[05:43:05] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver."
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:",
+      "count": 1,
+      "first": "[05:43:06] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:",
+      "last": "[05:43:06] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "count": 1,
+      "first": "[05:43:06] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "last": "[05:43:06] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "count": 1,
+      "first": "[05:43:06] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "last": "[05:43:06] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8"
+    },
+    {
+      "source": "latest.log",
+      "message": "[main/WARN]: Method overwrite conflict for getTemperature in modernfix-common.mixins.json:perf.remove_biome_temperature_cache.BiomeMixin from mod modernfix, previously written by net.caffeinemc.mods.lithium.mixin.world.temperature_cache.BiomeMixin. Skipping method.",
+      "count": 1,
+      "first": "[05:43:08] [main/WARN]: Method overwrite conflict for getTemperature in modernfix-common.mixins.json:perf.remove_biome_temperature_cache.BiomeMixin from mod modernfix, previously written by net.caffeinemc.mods.lithium.mixin.world.temperature_cache.BiomeMixin. Skipping method.",
+      "last": "[05:43:08] [main/WARN]: Method overwrite conflict for getTemperature in modernfix-common.mixins.json:perf.remove_biome_temperature_cache.BiomeMixin from mod modernfix, previously written by net.caffeinemc.mods.lithium.mixin.world.temperature_cache.BiomeMixin. Skipping method."
+    },
+    {
+      "source": "latest.log",
+      "message": "[Download-2/ERROR]: Failed to fetch user properties",
+      "count": 1,
+      "first": "[05:43:10] [Download-2/ERROR]: Failed to fetch user properties",
+      "last": "[05:43:10] [Download-2/ERROR]: Failed to fetch user properties"
+    },
+    {
+      "source": "latest.log",
+      "message": "[ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.",
+      "count": 1,
+      "first": "[05:43:12] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.",
+      "last": "[05:43:12] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping."
+    },
+    {
+      "source": "latest.log",
+      "message": "[Render thread/ERROR]: Controlify has prevented Remove Reloading Screen (rrls) mod from removing the initial loading screen due to an incompatibility.",
+      "count": 1,
+      "first": "[05:43:12] [Render thread/ERROR]: Controlify has prevented Remove Reloading Screen (rrls) mod from removing the initial loading screen due to an incompatibility.",
+      "last": "[05:43:12] [Render thread/ERROR]: Controlify has prevented Remove Reloading Screen (rrls) mod from removing the initial loading screen due to an incompatibility."
+    },
+    {
+      "source": "latest.log",
+      "message": "[Render thread/WARN]: Dynamic FPS config missing or corrupted! Using defaults.",
+      "count": 1,
+      "first": "[05:43:12] [Render thread/WARN]: Dynamic FPS config missing or corrupted! Using defaults.",
+      "last": "[05:43:12] [Render thread/WARN]: Dynamic FPS config missing or corrupted! Using defaults."
+    },
+    {
+      "source": "latest.log",
+      "message": "[Download-1/ERROR]: Failed to fetch Realms feature flags",
+      "count": 1,
+      "first": "[05:43:12] [Download-1/ERROR]: Failed to fetch Realms feature flags",
+      "last": "[05:43:12] [Download-1/ERROR]: Failed to fetch Realms feature flags"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Download-3/ERROR]: Failed to retrieve profile key pair",
+      "count": 1,
+      "first": "[05:43:12] [Download-3/ERROR]: Failed to retrieve profile key pair",
+      "last": "[05:43:12] [Download-3/ERROR]: Failed to retrieve profile key pair"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Download-2/ERROR]: Couldn't connect to realms",
+      "count": 1,
+      "first": "[05:43:13] [Download-2/ERROR]: Couldn't connect to realms",
+      "last": "[05:43:13] [Download-2/ERROR]: Couldn't connect to realms"
+    },
+    {
+      "source": "latest.log",
+      "message": "[pool-5-thread-8/WARN]: Failed to parse mod name from fabric.mod.json of basic-math-0.6.1.jar",
+      "count": 1,
+      "first": "[05:43:13] [pool-5-thread-8/WARN]: Failed to parse mod name from fabric.mod.json of basic-math-0.6.1.jar",
+      "last": "[05:43:13] [pool-5-thread-8/WARN]: Failed to parse mod name from fabric.mod.json of basic-math-0.6.1.jar"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Render thread/ERROR]: [SteamDeckUtil] Skipping Steam Deck checks as steamOS has temporarily broken the enhanced driver.",
+      "count": 1,
+      "first": "[05:43:15] [Render thread/ERROR]: [SteamDeckUtil] Skipping Steam Deck checks as steamOS has temporarily broken the enhanced driver.",
+      "last": "[05:43:15] [Render thread/ERROR]: [SteamDeckUtil] Skipping Steam Deck checks as steamOS has temporarily broken the enhanced driver."
+    },
+    {
+      "source": "latest.log",
+      "message": "[Render thread/WARN]: Initial datapack load took 518.3 ms",
+      "count": 1,
+      "first": "[05:43:15] [Render thread/WARN]: Initial datapack load took 518.3 ms",
+      "last": "[05:43:15] [Render thread/WARN]: Initial datapack load took 518.3 ms"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Render thread/WARN]: @ModifyVariable(@At(\"HEAD\")) Shift.BY=1 on sspb.mixins.json:sodium.SmoothLightPipelineMixin from mod sspb::localvar$fdb000$sspb$modifyApplyInsetPartialFaceVertexN2d exceeds the maximum allowed value: 0. Increase the value of maxShiftBy to suppress this warning.",
+      "count": 1,
+      "first": "[05:43:19] [Render thread/WARN]: @ModifyVariable(@At(\"HEAD\")) Shift.BY=1 on sspb.mixins.json:sodium.SmoothLightPipelineMixin from mod sspb::localvar$fdb000$sspb$modifyApplyInsetPartialFaceVertexN2d exceeds the maximum allowed value: 0. Increase the value of maxShiftBy to suppress this warning.",
+      "last": "[05:43:19] [Render thread/WARN]: @ModifyVariable(@At(\"HEAD\")) Shift.BY=1 on sspb.mixins.json:sodium.SmoothLightPipelineMixin from mod sspb::localvar$fdb000$sspb$modifyApplyInsetPartialFaceVertexN2d exceeds the maximum allowed value: 0. Increase the value of maxShiftBy to suppress this warning."
+    },
+    {
+      "source": "latest.log",
+      "message": "[Render thread/WARN]: Game took 21.137 seconds to start",
+      "count": 1,
+      "first": "[05:43:19] [Render thread/WARN]: Game took 21.137 seconds to start",
+      "last": "[05:43:19] [Render thread/WARN]: Game took 21.137 seconds to start"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Render thread/WARN]: Time from main menu to in-game was 3.8438983 seconds",
+      "count": 1,
+      "first": "[05:43:19] [Render thread/WARN]: Time from main menu to in-game was 3.8438983 seconds",
+      "last": "[05:43:19] [Render thread/WARN]: Time from main menu to in-game was 3.8438983 seconds"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Render thread/WARN]: Total time to load game and open world was 24.980898 seconds",
+      "count": 1,
+      "first": "[05:43:19] [Render thread/WARN]: Total time to load game and open world was 24.980898 seconds",
+      "last": "[05:43:19] [Render thread/WARN]: Total time to load game and open world was 24.980898 seconds"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-304.5, 77.0, -341.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.1931452473204112E-4, -0.0784000015258789, -0.0)",
+      "count": 1,
+      "first": "[05:43:34] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-304.5, 77.0, -341.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.1931452473204112E-4, -0.0784000015258789, -0.0)",
+      "last": "[05:43:34] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-304.5, 77.0, -341.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.1931452473204112E-4, -0.0784000015258789, -0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-303.5, 77.0, -341.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.285306386087668E-4, -0.0784000015258789, -0.0)",
+      "count": 1,
+      "first": "[05:43:42] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-303.5, 77.0, -341.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.285306386087668E-4, -0.0784000015258789, -0.0)",
+      "last": "[05:43:42] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-303.5, 77.0, -341.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.285306386087668E-4, -0.0784000015258789, -0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-303.5, 77.0, -342.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.1931451233732749E-4, -0.0784000015258789, -0.0)",
+      "count": 1,
+      "first": "[05:43:50] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-303.5, 77.0, -342.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.1931451233732749E-4, -0.0784000015258789, -0.0)",
+      "last": "[05:43:50] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-303.5, 77.0, -342.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.1931451233732749E-4, -0.0784000015258789, -0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-302.5, 77.0, -342.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.1931451233732749E-4, -0.0784000015258789, -0.0)",
+      "count": 1,
+      "first": "[05:43:58] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-302.5, 77.0, -342.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.1931451233732749E-4, -0.0784000015258789, -0.0)",
+      "last": "[05:43:58] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-346.50237255823134, 66.0, -324.48750001192093) next=BlockPos{x=-347, y=66, z=-324} goal=PositionGoal[position=(-302.5, 77.0, -342.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(1.1931451233732749E-4, -0.0784000015258789, -0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-306.5068406014373, 77.0, -339.5827366973217) next=BlockPos{x=-308, y=76, z=-340} goal=PositionGoal[position=(-306.5, 76.0, -345.5), tolerance=0.35] pathIndex=1 pathSize=19 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:44:12] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-306.5068406014373, 77.0, -339.5827366973217) next=BlockPos{x=-308, y=76, z=-340} goal=PositionGoal[position=(-306.5, 76.0, -345.5), tolerance=0.35] pathIndex=1 pathSize=19 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:44:12] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-306.5068406014373, 77.0, -339.5827366973217) next=BlockPos{x=-308, y=76, z=-340} goal=PositionGoal[position=(-306.5, 76.0, -345.5), tolerance=0.35] pathIndex=1 pathSize=19 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-306.5692492535939, 77.0, -339.57935879243905) next=BlockPos{x=-308, y=76, z=-340} goal=PositionGoal[position=(-307.5, 76.0, -345.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:44:13] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-306.5692492535939, 77.0, -339.57935879243905) next=BlockPos{x=-308, y=76, z=-340} goal=PositionGoal[position=(-307.5, 76.0, -345.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:44:13] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-306.5692492535939, 77.0, -339.57935879243905) next=BlockPos{x=-308, y=76, z=-340} goal=PositionGoal[position=(-307.5, 76.0, -345.5), tolerance=0.35] pathIndex=1 pathSize=18 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-277.60084084468116, 64.0, -286.6107250188299) next=BlockPos{x=-278, y=64, z=-283} goal=PositionGoal[position=(-277.5, 64.0, -282.5), tolerance=0.15] pathIndex=1 pathSize=2 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:44:54] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-277.60084084468116, 64.0, -286.6107250188299) next=BlockPos{x=-278, y=64, z=-283} goal=PositionGoal[position=(-277.5, 64.0, -282.5), tolerance=0.15] pathIndex=1 pathSize=2 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:44:54] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-277.60084084468116, 64.0, -286.6107250188299) next=BlockPos{x=-278, y=64, z=-283} goal=PositionGoal[position=(-277.5, 64.0, -282.5), tolerance=0.15] pathIndex=1 pathSize=2 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.5032454349084, 65.0, -285.6059079274921) next=BlockPos{x=-274, y=65, z=-285} goal=PositionGoal[position=(-273.5, 65.0, -284.5), tolerance=0.15] pathIndex=1 pathSize=2 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:48:05] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.5032454349084, 65.0, -285.6059079274921) next=BlockPos{x=-274, y=65, z=-285} goal=PositionGoal[position=(-273.5, 65.0, -284.5), tolerance=0.15] pathIndex=1 pathSize=2 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:48:05] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.5032454349084, 65.0, -285.6059079274921) next=BlockPos{x=-274, y=65, z=-285} goal=PositionGoal[position=(-273.5, 65.0, -284.5), tolerance=0.15] pathIndex=1 pathSize=2 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-294.38011034750645, 70.0, -352.5) next=BlockPos{x=-294, y=70, z=-353} goal=PositionGoal[position=(-274.5, 64.0, -290.5), tolerance=1.0] pathIndex=1 pathSize=20 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:53:10] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-294.38011034750645, 70.0, -352.5) next=BlockPos{x=-294, y=70, z=-353} goal=PositionGoal[position=(-274.5, 64.0, -290.5), tolerance=1.0] pathIndex=1 pathSize=20 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:53:10] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-294.38011034750645, 70.0, -352.5) next=BlockPos{x=-294, y=70, z=-353} goal=PositionGoal[position=(-274.5, 64.0, -290.5), tolerance=1.0] pathIndex=1 pathSize=20 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-293.56014139285355, 71.0, -351.66048979845925) next=BlockPos{x=-294, y=70, z=-353} goal=PositionGoal[position=(-274.5, 64.0, -290.5), tolerance=1.0] pathIndex=1 pathSize=22 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:53:10] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-293.56014139285355, 71.0, -351.66048979845925) next=BlockPos{x=-294, y=70, z=-353} goal=PositionGoal[position=(-274.5, 64.0, -290.5), tolerance=1.0] pathIndex=1 pathSize=22 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:53:10] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-293.56014139285355, 71.0, -351.66048979845925) next=BlockPos{x=-294, y=70, z=-353} goal=PositionGoal[position=(-274.5, 64.0, -290.5), tolerance=1.0] pathIndex=1 pathSize=22 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-273.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=4 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:56:23] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-273.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=4 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:56:23] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-273.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=4 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-273.5, 65.0, -283.5), tolerance=0.35] pathIndex=1 pathSize=6 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:56:24] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-273.5, 65.0, -283.5), tolerance=0.35] pathIndex=1 pathSize=6 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:56:24] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-273.5, 65.0, -283.5), tolerance=0.35] pathIndex=1 pathSize=6 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-274.5, 65.0, -283.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:56:25] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-274.5, 65.0, -283.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:56:25] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-274.5, 65.0, -283.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-272.5, 65.0, -282.5), tolerance=0.35] pathIndex=1 pathSize=8 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:56:25] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-272.5, 65.0, -282.5), tolerance=0.35] pathIndex=1 pathSize=8 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:56:25] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-272.5, 65.0, -282.5), tolerance=0.35] pathIndex=1 pathSize=8 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-274.5, 65.0, -282.5), tolerance=0.35] pathIndex=1 pathSize=6 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:56:26] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-274.5, 65.0, -282.5), tolerance=0.35] pathIndex=1 pathSize=6 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:56:26] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-274.5, 65.0, -282.5), tolerance=0.35] pathIndex=1 pathSize=6 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-273.5, 65.0, -281.5), tolerance=0.35] pathIndex=1 pathSize=8 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:56:27] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-273.5, 65.0, -281.5), tolerance=0.35] pathIndex=1 pathSize=8 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:56:27] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.35854511411185, 65.0, -287.5090026206787) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-273.5, 65.0, -281.5), tolerance=0.35] pathIndex=1 pathSize=8 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.3625092299774, 65.0, -287.5713767803724) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-272.5, 65.0, -281.5), tolerance=0.35] pathIndex=1 pathSize=8 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:56:28] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.3625092299774, 65.0, -287.5713767803724) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-272.5, 65.0, -281.5), tolerance=0.35] pathIndex=1 pathSize=8 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:56:28] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.3625092299774, 65.0, -287.5713767803724) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-272.5, 65.0, -281.5), tolerance=0.35] pathIndex=1 pathSize=8 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.3199760595455, 65.0, -287.61717175165967) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-274.5, 65.0, -281.5), tolerance=0.35] pathIndex=1 pathSize=7 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:56:29] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.3199760595455, 65.0, -287.61717175165967) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-274.5, 65.0, -281.5), tolerance=0.35] pathIndex=1 pathSize=7 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:56:29] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-273.3199760595455, 65.0, -287.61717175165967) next=BlockPos{x=-274, y=65, z=-287} goal=PositionGoal[position=(-274.5, 65.0, -281.5), tolerance=0.35] pathIndex=1 pathSize=7 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=4 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:57:01] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=4 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:57:01] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=4 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-270.5, 65.0, -285.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:57:01] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-270.5, 65.0, -285.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:57:01] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-270.5, 65.0, -285.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-270.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:57:02] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-270.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:57:02] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-270.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 65.0, -283.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:57:03] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 65.0, -283.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:57:03] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 65.0, -283.5), tolerance=0.35] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-270.5, 65.0, -282.5), tolerance=0.35] pathIndex=1 pathSize=7 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:57:04] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-270.5, 65.0, -282.5), tolerance=0.35] pathIndex=1 pathSize=7 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:57:04] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.640967796272, 65.0, -287.498102019034) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-270.5, 65.0, -282.5), tolerance=0.35] pathIndex=1 pathSize=7 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.583092507132, 65.0, -287.50066521636586) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 65.0, -283.5), tolerance=0.15] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:57:08] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.583092507132, 65.0, -287.50066521636586) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 65.0, -283.5), tolerance=0.15] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:57:08] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.583092507132, 65.0, -287.50066521636586) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 65.0, -283.5), tolerance=0.15] pathIndex=1 pathSize=5 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.583092507132, 65.0, -287.50066521636586) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-272.5, 65.0, -282.5), tolerance=0.15] pathIndex=1 pathSize=4 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:57:09] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.583092507132, 65.0, -287.50066521636586) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-272.5, 65.0, -282.5), tolerance=0.15] pathIndex=1 pathSize=4 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:57:09] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.583092507132, 65.0, -287.50066521636586) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-272.5, 65.0, -282.5), tolerance=0.15] pathIndex=1 pathSize=4 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.583092507132, 65.0, -287.50066521636586) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 66.0, -282.5), tolerance=0.15] pathIndex=1 pathSize=6 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[05:57:09] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.583092507132, 65.0, -287.50066521636586) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 66.0, -282.5), tolerance=0.15] pathIndex=1 pathSize=6 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[05:57:09] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-272.583092507132, 65.0, -287.50066521636586) next=BlockPos{x=-273, y=65, z=-287} goal=PositionGoal[position=(-271.5, 66.0, -282.5), tolerance=0.15] pathIndex=1 pathSize=6 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    },
+    {
+      "source": "latest.log",
+      "message": "[Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-346.49490140176323, 66.0, -324.2706489287822) next=BlockPos{x=-347, y=66, z=-326} goal=PositionGoal[position=(-346.5, 66.0, -326.5), tolerance=0.35] pathIndex=1 pathSize=3 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "first": "[06:08:24] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-346.49490140176323, 66.0, -324.2706489287822) next=BlockPos{x=-347, y=66, z=-326} goal=PositionGoal[position=(-346.5, 66.0, -326.5), tolerance=0.35] pathIndex=1 pathSize=3 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "last": "[06:08:24] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-346.49490140176323, 66.0, -324.2706489287822) next=BlockPos{x=-347, y=66, z=-326} goal=PositionGoal[position=(-346.5, 66.0, -326.5), tolerance=0.35] pathIndex=1 pathSize=3 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)"
+    }
+  ],
+  "overflowEvents": 0,
+  "note": "Raw severity retained; offline authentication, third-party and deliberate corrupt-state errors require separate interpretation."
+}

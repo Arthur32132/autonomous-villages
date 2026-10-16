@@ -25,6 +25,9 @@ final class Supplies {
     static boolean tool(ItemStack stack) { return stack.is(ItemTags.PICKAXES) || stack.is(ItemTags.AXES) || stack.is(ItemTags.SWORDS) || stack.is(ItemTags.HOES) || stack.is(Items.SHEARS) || stack.is(Items.SHIELD); }
     static boolean food(ItemStack stack) { return stack.is(Items.BREAD) || stack.is(Items.CARROT) || stack.is(Items.POTATO) || stack.is(Items.BEETROOT); }
     static boolean insert(List<ItemStack> slots, ItemStack incoming) {
+        return insertPartial(slots,incoming)==incoming.getCount();
+    }
+    static int insertPartial(List<ItemStack> slots, ItemStack incoming) {
         int n = incoming.getCount();
         for (ItemStack slot : slots) if (!slot.isEmpty() && ItemStack.isSameItemSameComponents(slot, incoming)) {
             int take = Math.min(n, Math.max(0, slot.getMaxStackSize() - slot.getCount())); slot.grow(take); n -= take;
@@ -32,7 +35,7 @@ final class Supplies {
         for (int i = 0; i < slots.size() && n > 0; i++) if (slots.get(i).isEmpty()) {
             int take = Math.min(n, incoming.getMaxStackSize()); slots.set(i, incoming.copyWithCount(take)); n -= take;
         }
-        return n == 0;
+        return incoming.getCount()-n;
     }
     static boolean matches(List<ItemStack> a, List<ItemStack> b) {
         if (a.size() != b.size()) return false;
@@ -57,7 +60,8 @@ final class Supplies {
             int amount = Math.min(stack.getCount(), limit - moved);
             // A partial insertion must never consume the source: try a disposable target first.
             List<ItemStack> attempt = copy(to);
-            if (!insert(attempt, stack.copyWithCount(amount))) continue;
+            amount=insertPartial(attempt,stack.copyWithCount(amount));
+            if(amount==0)continue;
             for (int j = 0; j < to.size(); j++) to.set(j, attempt.get(j));
             stack.shrink(amount); moved += amount;
         }

@@ -1,0 +1,90 @@
+{
+  "ticks": 48000,
+  "complete": false,
+  "status": "Observed | работает | центр -321, 73, -319 | территория -401,-392 — -242,-246 | жителей загружено 6, работников 6, кроватей 5 | сундуков 2, еды 8 | строительство склад 133/161 | хозяйство работает\nспит, общение, торговля и размножение",
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 1,
+    "newExpeditionItemsUnloaded": 90,
+    "observedNightTicks": 20000,
+    "observedSleepTicks": 23974,
+    "naturalThreatsSeen": 1131,
+    "clockTime": 48000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [
+      "-419, 49, -233 Block{minecraft:copper_ore}",
+      "-409, 39, -233 Block{minecraft:copper_ore}",
+      "-409, 40, -234 Block{minecraft:copper_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "iron": 0,
+      "coal": 2,
+      "cobblestone": 57,
+      "rawIron": 10
+    },
+    "sharedChestContents": [
+      {
+        "items": [
+          "5 minecraft:cobblestone",
+          "5 minecraft:dirt",
+          "1 minecraft:brown_egg",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ],
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}"
+      },
+      {
+        "items": [
+          "1 minecraft:acacia_slab",
+          "4 minecraft:oak_planks",
+          "3 minecraft:dirt",
+          "51 minecraft:cobblestone",
+          "7 minecraft:granite",
+          "10 minecraft:raw_iron",
+          "2 minecraft:raw_copper",
+          "2 minecraft:coal",
+          "1 minecraft:apple",
+          "1 minecraft:acacia_log",
+          "4 minecraft:acacia_planks",
+          "1 minecraft:egg"
+        ],
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}"
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true,
+    "miningExpeditionsReturnedAndUnloaded": 1,
+    "expeditionItemsUnloaded": 90,
+    "verifiedMineralDeposits": {
+      "bc30fd2b-a33b-47d3-8537-9f7ebd01fb30": 93
+    }
+  },
+  "warehouse": false,
+  "repair": false,
+  "upgrade": false,
+  "growth": false
+}

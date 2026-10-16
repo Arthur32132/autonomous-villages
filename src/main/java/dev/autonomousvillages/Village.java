@@ -16,6 +16,9 @@ final class Village {
     final VillageRuntime runtime;
     final VillageState state;
     final VillageIndex index = new VillageIndex();
+    final TownPlanner town;
+    final VillagePresentation presentation;
+    final ExpeditionManager expeditions;
     final Reservations reservations = new Reservations();
     final Map<UUID, Resident> workers = new LinkedHashMap<>();
     final Map<Long, Long> rejected = new HashMap<>();
@@ -23,19 +26,56 @@ final class Village {
     boolean ticketed;
     String problem = "осмотр территории";
     private int rotation;
-    Village(VillageRuntime runtime, VillageState state) { this.runtime = runtime; this.state = state; this.level = runtime.server.overworld(); }
+    private final Set<Long> leases=new HashSet<>();
+    private long nextTickets;
+    private long nextSurvey;
+    private long nextAlarm;
+    private final ArrayDeque<String> history=new ArrayDeque<>();
+    Village(VillageRuntime runtime, VillageState state) { this.runtime = runtime; this.state = state; this.level = runtime.server.overworld();this.town=new TownPlanner(this);this.presentation=new VillagePresentation(this);this.expeditions=new ExpeditionManager(this);
+        if(state.nextExpedition==0)state.nextExpedition=level.getGameTime()+1200;
+    }
     void ticket(boolean enabled) {
-        if (ticketed == enabled) return;
-        ChunkPos chunk = new ChunkPos(state.x >> 4, state.z >> 4);
-        // Cover the claim even if its center lies on a chunk edge. Ticket radius 1 = entity-ticking center.
-        int radius = (state.radius + 15) / 16 + 2;
-        if (enabled) level.getChunkSource().addTicketWithRadius(AutonomousVillagesMod.TICKET, chunk, radius);
-        else level.getChunkSource().removeTicketWithRadius(AutonomousVillagesMod.TICKET, chunk, radius);
+        if(enabled&&state.bounds!=null&&VillageState.footprintChunks(state.bounds)>VillageState.MAX_TICKET_CHUNKS){state.active=false;stop(false);problem="пауза: территория превышает бюджет активных чанков";return;}
+        if(enabled&&ticketed&&level.getGameTime()<nextTickets)return;
+        nextTickets=level.getGameTime()+100;
+        Set<Long> wanted=new HashSet<>();
+        if(enabled){
+            rememberResidents();
+            int minX=state.bounds==null?state.x-state.radius:state.bounds.minX,maxX=state.bounds==null?state.x+state.radius:state.bounds.maxX;
+            int minZ=state.bounds==null?state.z-state.radius:state.bounds.minZ,maxZ=state.bounds==null?state.z+state.radius:state.bounds.maxZ;
+            for(int x=minX>>4;x<=maxX>>4;x++)for(int z=minZ>>4;z<=maxZ>>4;z++)wanted.add(new ChunkPos(x,z).pack());
+            wanted.addAll(expeditions.chunks());
+            // An expedition timeout must not unload a traveller before they walk home.
+            for(long position:state.residentPositions.values()){BlockPos p=BlockPos.of(position);wanted.add(ChunkPos.pack(p.getX()>>4,p.getZ()>>4));}
+            for(long position:state.sheepPastures){BlockPos p=BlockPos.of(position);wanted.add(ChunkPos.pack(p.getX()>>4,p.getZ()>>4));}
+            for(long planted:state.plantedTrees)wanted.add(new ChunkPos(BlockPos.of(planted).getX()>>4,BlockPos.of(planted).getZ()>>4).pack());
+        }
+        for(long p:List.copyOf(leases))if(!wanted.contains(p)){runtime.lease(ChunkPos.unpack(p),false);leases.remove(p);}
+        for(long p:wanted)if(leases.add(p))runtime.lease(ChunkPos.unpack(p),true);
         ticketed = enabled;
     }
+    void rememberResidents(){
+        state.residentPositions.keySet().retainAll(state.residents);
+        for(UUID id:state.residents){
+            var entity=level.getEntity(id);
+            if(entity==null)entity=runtime.bots.find(id).map(dev.navigationai.api.BotHandle::entity).orElse(null);
+            if(entity instanceof Villager resident&&resident.isAlive()&&resident.level()==level)state.residentPositions.put(id,resident.blockPosition().asLong());
+        }
+    }
     void tick() {
+        if(state.bounds==null){try{var survey=VillageDiscovery.survey(level,state.center());VillageDiscovery.apply(state,survey);town.capture(survey);event("Границы обновлены по всей деревне");runtime.save();}catch(IllegalArgumentException ignored){}}
         ticket(true); long time = level.getGameTime(); index.tick(level, state, time);
+        if(time>=nextSurvey){
+            nextSurvey=time+2400;
+            try{
+                var survey=VillageDiscovery.survey(level,state.center());
+                if(expand(survey.bounds())){town.capture(survey);runtime.save();}
+            }catch(IllegalArgumentException ignored){}
+        }
         if (time % 100 == 0 || workers.isEmpty()) sync();
+        town.tick();
+        expeditions.tick();
+        SupplyRuns.tick(this);
         List<Resident> order = List.copyOf(workers.values()); long deadline = System.nanoTime() + 2_000_000L;
         for (int n = 0; n < order.size(); n++) {
             Resident r = order.get(Math.floorMod(n + rotation, order.size()));
@@ -45,7 +85,11 @@ final class Village {
             catch (RuntimeException error) { r.fail("повторит действие позже"); if (time % 200 < 10) AutonomousVillagesMod.LOG.warn("Resident {}", r.id, error); }
         }
         rotation++;
+        presentation.tick();
         if (time % 200 == 0) {
+            state.temporaryWorkbenches.removeIf(p->level.hasChunkAt(BlockPos.of(p))&&!level.getBlockState(BlockPos.of(p)).is(net.minecraft.world.level.block.Blocks.CRAFTING_TABLE));
+            state.plantedTrees.removeIf(p->{var pos=BlockPos.of(p);return level.hasChunkAt(pos)&&!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.SaplingBlock)
+                    &&!level.getBlockState(pos).is(net.minecraft.tags.BlockTags.LOGS)&&!state.fellingTrees.contains(p)&&!state.reforestation.contains(p);});
             state.furnaces.removeIf(p->level.hasChunkAt(BlockPos.of(p))&&!(level.getBlockEntity(BlockPos.of(p)) instanceof net.minecraft.world.level.block.entity.FurnaceBlockEntity));
             rejected.values().removeIf(expiry -> expiry <= time);
             if (count(s -> s.is(ItemTags.LOGS) || s.is(ItemTags.PLANKS)) == 0 && index.trees.isEmpty()) problem = "нужна древесина: деревья или материалы на складе";
@@ -60,10 +104,12 @@ final class Village {
         }
     }
     void sync() {
-        var area = new AABB(Vec3.atCenterOf(state.center()), Vec3.atCenterOf(state.center())).inflate(state.radius, 48, state.radius);
-        for (Villager v : level.getEntitiesOfClass(Villager.class, area, v -> v.isAlive() && state.contains(v.blockPosition()))) {
+        var area = VillageDiscovery.area(state,64);
+        for (Villager v : level.getEntitiesOfClass(Villager.class, area, v -> v.isAlive() && (state.contains(v.blockPosition())
+                ||v.getBrain().getMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.HOME)
+                .filter(home->home.dimension().equals(level.dimension())&&state.contains(home.pos())).isPresent()))) {
             boolean foreign = runtime.villages.values().stream().anyMatch(other -> other != this && other.state.residents.contains(v.getUUID()));
-            if (!foreign && state.residents.size() < 64 && (runtime.bots.find(v.getUUID()).isEmpty() || state.residents.contains(v.getUUID()))) state.residents.add(v.getUUID());
+            if (!foreign && state.residents.size()<1024 && (runtime.bots.find(v.getUUID()).isEmpty() || state.residents.contains(v.getUUID()))) state.residents.add(v.getUUID());
         }
         for (UUID id : List.copyOf(state.residents)) {
             var e = level.getEntity(id);
@@ -79,6 +125,18 @@ final class Village {
             if (bot != null && bot.state() == BotState.DEAD) { state.residents.remove(entry.getKey()); reservations.release(entry.getKey()); return true; }
             return false;
         });
+    }
+    boolean expand(VillageState.Bounds addition){
+        if(state.bounds==null)return false;
+        var old=state.bounds;
+        var combined=new VillageState.Bounds(Math.min(old.minX,addition.minX),Math.min(old.minZ,addition.minZ),Math.max(old.maxX,addition.maxX),Math.max(old.maxZ,addition.maxZ));
+        if(VillageState.footprintChunks(combined)>VillageState.MAX_TICKET_CHUNKS)return false;
+        if((long)combined.maxX-combined.minX>4096||(long)combined.maxZ-combined.minZ>4096)return false;
+        state.bounds=combined;
+        if(runtime.villages.values().stream().anyMatch(other->other!=this&&state.overlaps(other.state))){state.bounds=old;return false;}
+        state.x=(combined.minX+combined.maxX)/2;state.z=(combined.minZ+combined.maxZ)/2;
+        state.radius=Math.max(24,(int)Math.ceil(Math.hypot(combined.maxX-combined.minX,combined.maxZ-combined.minZ)/2));
+        nextTickets=0;return true;
     }
     List<ChestBlockEntity> chests() {
         List<ChestBlockEntity> result = new ArrayList<>();
@@ -101,17 +159,46 @@ final class Village {
         return n;
     }
     boolean ready(BlockPos p, UUID worker) {
-        return state.contains(p) && rejected.getOrDefault(p.asLong(), 0L) <= level.getGameTime()
+        return canWork(p) && rejected.getOrDefault(p.asLong(), 0L) <= level.getGameTime()
                 && reservations.available(p.asLong(), worker, level.getGameTime());
     }
+    boolean canWork(BlockPos p){return state.recordedWork(p)||expeditions.permits(p);}
     boolean steward(UUID id) { return workers.keySet().stream().min(Comparator.comparing(UUID::toString)).map(id::equals).orElse(false); }
+    int roleIndex(UUID id){var ids=workers.keySet().stream().sorted(Comparator.comparing(UUID::toString)).toList();return Math.max(0,ids.indexOf(id));}
+    boolean builder(UUID id){return workers.size()<3||roleIndex(id)%6<=1;}
+    String role(UUID id){if(workers.size()<3)return "мастер";return switch(roleIndex(id)%6){case 0->"завхоз";case 1->"строитель";case 2->"фермер";case 3,5->"лесоруб";default->"шахтёр";};}
+    long activeJobs(String... kinds){var names=Set.of(kinds);return workers.values().stream().filter(r->r.job!=null&&names.contains(r.job)).count();}
+    void raiseAlarm(Resident caller,net.minecraft.world.entity.monster.Monster enemy){
+        long now=level.getGameTime();if(now<nextAlarm)return;nextAlarm=now+40;
+        workers.values().stream().filter(r->r!=caller&&r.bot()!=null&&r.body().isAlive()&&!r.body().isSleeping()&&r.body().getHealth()>=16
+                &&r.body().distanceToSqr(enemy)<24*24&&r.body().hasLineOfSight(enemy)
+                &&(r.combat==null||r.combat.completion().isDone())&&VillageWorkshop.hasDefensiveSword(r.bot()))
+                .sorted(Comparator.comparingDouble(r->r.body().distanceToSqr(enemy))).limit(2).toList().forEach(r->r.defend(enemy));
+    }
+    void event(String message){history.addLast(message);while(history.size()>12)history.removeFirst();AutonomousVillagesMod.LOG.info("SETTLEMENT {}: {}",state.name,message);}
     boolean safeFeet(BlockPos p) {
         var feet = level.getBlockState(p); var head = level.getBlockState(p.above()); var ground = level.getBlockState(p.below());
-        var support=ground.getCollisionShape(level,p.below());
-        return state.contains(p) && level.hasChunkAt(p) && feet.getCollisionShape(level,p).isEmpty() && feet.getFluidState().isEmpty()
-                && head.getCollisionShape(level,p.above()).isEmpty() && head.getFluidState().isEmpty()
-                && !support.isEmpty() && support.max(Direction.Axis.Y)>=.875 && !ground.is(net.minecraft.world.level.block.Blocks.MAGMA_BLOCK)
-                && !feet.is(net.minecraft.world.level.block.Blocks.FIRE);
+        var support=ground.getCollisionShape(level,p.below());var footShape=feet.getCollisionShape(level,p);
+        boolean low=!footShape.isEmpty()&&footShape.max(Direction.Axis.Y)<1;
+        if(!canWork(p)||!level.hasChunkAt(p)||VillageIndex.hazard(feet)||VillageIndex.hazard(ground)||VillageIndex.hazard(head)
+                ||!feet.getFluidState().isEmpty()||!head.getFluidState().isEmpty()||!low&&(support.isEmpty()||support.max(Direction.Axis.Y)<.5))return false;
+        Vec3 point=feetPosition(p);var body=new AABB(point.x-.3,point.y+.0001,point.z-.3,point.x+.3,point.y+1.95,point.z+.3);
+        for(BlockPos block:BlockPos.betweenClosed(BlockPos.containing(body.minX,body.minY,body.minZ),BlockPos.containing(body.maxX,body.maxY,body.maxZ)))
+            for(var box:level.getBlockState(block).getCollisionShape(level,block).toAabbs())if(box.move(block).intersects(body))return false;
+        return true;
+    }
+    Vec3 feetPosition(BlockPos p){
+        var feet=level.getBlockState(p).getCollisionShape(level,p);var below=level.getBlockState(p.below()).getCollisionShape(level,p.below());
+        double offset=!feet.isEmpty()&&feet.max(Direction.Axis.Y)<1?feet.max(Direction.Axis.Y):!below.isEmpty()?below.max(Direction.Axis.Y)-1:0;
+        return Vec3.atBottomCenterOf(p).add(0,offset,0);
+    }
+    BlockPos meetingPoint(){
+        var depot=state.buildings.stream().filter(b->b.kind.equals("warehouse")).findFirst().orElse(null);
+        if(depot!=null)return BlockPos.of(depot.origin).offset(3,1,-2);
+        int[] heights=index.beds.stream().mapToInt(BlockPos::getY).sorted().toArray();int height=heights.length==0?state.y:heights[heights.length/2];
+        var chest=chests().stream().min(Comparator.comparingInt(c->Math.abs(c.getBlockPos().getY()-height))).orElse(null);if(chest!=null)return chest.getBlockPos();
+        for(var b:state.buildings)for(var p:b.blocks)if(p.block().getBlock() instanceof net.minecraft.world.level.block.DoorBlock)return p.position();
+        return new BlockPos(state.x,level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,state.x,state.z),state.z);
     }
     BlockPos stand(BlockPos target, Vec3 from) {
         return stand(target,from,3.0);
@@ -127,17 +214,20 @@ final class Village {
         for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) for (int dy = -6; dy <= 1; dy++) {
             BlockPos p = target.offset(dx,dy,dz);
             if(rejectedPositions.contains(p))continue;
-            if (p.equals(target) || p.above().equals(target)) continue;
-            Vec3 eye=Vec3.atBottomCenterOf(p).add(0,1.62,0);
+            if (p.equals(target) || p.above().equals(target)||p.below().equals(target)) continue;
+            Vec3 eye=feetPosition(p).add(0,1.62,0);
             if (!safeFeet(p) || eye.distanceToSqr(Vec3.atCenterOf(target)) > (reach-.65)*(reach-.65)) continue;
             var hit=level.clip(new net.minecraft.world.level.ClipContext(eye,Vec3.atCenterOf(target),
                     net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,net.minecraft.world.phys.shapes.CollisionContext.empty()));
             if(sight&&hit.getType()!=HitResult.Type.MISS&&!hit.getBlockPos().equals(target))continue;
-            double d = from.distanceToSqr(Vec3.atBottomCenterOf(p)); if (d < distance) { best = p; distance = d; }
+            double d = from.distanceToSqr(feetPosition(p)); if (d < distance) { best = p; distance = d; }
         }
         return best;
     }
     void stop(boolean detach) {
+        rememberResidents();
+        expeditions.stop();
+        presentation.close();
         for (Resident r : workers.values()) {
             BotHandle b = r.bot(); if (b != null && b.state() == BotState.ACTIVE) { b.stopAll(); if (detach) b.detach(); }
             reservations.release(r.id);
@@ -149,8 +239,9 @@ final class Village {
     String status() {
         long living = state.residents.stream().filter(id -> level.getEntity(id) instanceof Villager v && v.isAlive()).count();
         String jobs = String.join(", ", workers.values().stream().map(r -> r.status).distinct().toList());
-        return state.name + " | " + (state.active ? "работает" : "пауза") + " | центр " + state.center().toShortString() + ", R=" + state.radius
+        return state.name + " | " + (state.active ? "работает" : "пауза") + " | центр " + state.center().toShortString()
+                +(state.bounds==null?" | осмотр границ":" | территория "+state.bounds.minX+","+state.bounds.minZ+" — "+state.bounds.maxX+","+state.bounds.maxZ)
                 + " | жителей загружено " + living + ", работников " + workers.size() + ", кроватей " + index.beds.size()
-                + " | складов " + chests().size() + ", еды " + count(Supplies::food) + " | " + problem + (jobs.isEmpty() ? "" : "\n" + jobs);
+                + " | сундуков " + chests().size() + ", еды " + count(Supplies::food) + " | " + town.stage + " | " + problem + (jobs.isEmpty() ? "" : "\n" + jobs);
     }
 }

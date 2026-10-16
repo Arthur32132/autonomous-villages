@@ -1,0 +1,87 @@
+{
+  "ticks": 48000,
+  "complete": false,
+  "status": "Observed | работает | центр -321, 73, -319 | территория -401,-392 — -242,-246 | жителей загружено 6, работников 6, кроватей 5 | сундуков 4, еды 12 | строительство склад 154/161 | хозяйство работает\nспит, общение, торговля и размножение, поход в шахту • ночует дома, груз сохранён",
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 0,
+    "newExpeditionItemsUnloaded": 0,
+    "observedNightTicks": 20000,
+    "observedSleepTicks": 23946,
+    "naturalThreatsSeen": 1250,
+    "clockTime": 48000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [
+      "-189, 64, -312 Block{minecraft:coal_ore}",
+      "-189, 63, -311 Block{minecraft:coal_ore}",
+      "-190, 64, -311 Block{minecraft:coal_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "iron": 0,
+      "rawIron": 0,
+      "cobblestone": 79,
+      "coal": 2
+    },
+    "sharedChestContents": [
+      {
+        "items": [
+          "1 minecraft:acacia_log",
+          "6 minecraft:dirt",
+          "8 minecraft:acacia_planks",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ],
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}"
+      },
+      {
+        "items": [
+          "5 minecraft:acacia_slab",
+          "1 minecraft:wheat",
+          "1 minecraft:egg",
+          "3 minecraft:stick",
+          "4 minecraft:birch_planks",
+          "5 minecraft:dirt"
+        ],
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}"
+      },
+      {
+        "items": [],
+        "pos": "BlockPos{x\u003d-275, y\u003d65, z\u003d-282}"
+      },
+      {
+        "items": [],
+        "pos": "BlockPos{x\u003d-273, y\u003d65, z\u003d-282}"
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true
+  },
+  "warehouse": false,
+  "repair": false,
+  "upgrade": false,
+  "growth": false
+}

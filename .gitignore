@@ -3,3 +3,4 @@ build/
 run/
 tools/validation/lab/
 *.log
+__pycache__/

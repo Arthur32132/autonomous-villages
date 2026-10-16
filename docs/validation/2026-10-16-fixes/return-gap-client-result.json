@@ -1,0 +1,133 @@
+{
+  "success": false,
+  "reason": "production_observation_timeout",
+  "ticks": 96001,
+  "screenshots": 798,
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 2,
+    "newExpeditionItemsUnloaded": 186,
+    "observedNightTicks": 40000,
+    "observedSleepTicks": 47683,
+    "naturalThreatsSeen": 2049,
+    "clockTime": 96000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [
+      "-189, 63, -311 Block{minecraft:coal_ore}",
+      "-190, 64, -311 Block{minecraft:coal_ore}",
+      "-188, 37, -283 Block{minecraft:coal_ore}",
+      "-188, 36, -283 Block{minecraft:coal_ore}",
+      "-188, 37, -282 Block{minecraft:coal_ore}",
+      "-188, 36, -282 Block{minecraft:coal_ore}",
+      "-188, 35, -282 Block{minecraft:coal_ore}",
+      "-188, 36, -281 Block{minecraft:coal_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "coal": 24,
+      "cobblestone": 218,
+      "rawIron": 0,
+      "iron": 0
+    },
+    "sharedChestContents": [
+      {
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}",
+        "items": [
+          "4 minecraft:wheat",
+          "2 minecraft:brown_egg",
+          "4 minecraft:egg",
+          "3 minecraft:rotten_flesh",
+          "4 minecraft:dirt",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ]
+      },
+      {
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}",
+        "items": [
+          "2 minecraft:torch",
+          "4 minecraft:oak_slab",
+          "7 minecraft:acacia_slab",
+          "45 minecraft:cobblestone",
+          "1 minecraft:egg",
+          "2 minecraft:oak_sign",
+          "29 minecraft:dirt",
+          "45 minecraft:cobblestone",
+          "1 minecraft:poisonous_potato"
+        ]
+      },
+      {
+        "pos": "BlockPos{x\u003d-273, y\u003d65, z\u003d-282}",
+        "items": []
+      },
+      {
+        "pos": "BlockPos{x\u003d-275, y\u003d65, z\u003d-282}",
+        "items": []
+      },
+      {
+        "pos": "BlockPos{x\u003d-271, y\u003d65, z\u003d-282}",
+        "items": []
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true,
+    "miningExpeditionsReturnedAndUnloaded": 2,
+    "expeditionItemsUnloaded": 186,
+    "verifiedMineralDeposits": {
+      "7463b5ea-51e8-48d2-94ce-a8e9e3ec6d51": 139,
+      "6c160c28-0773-4d87-b6e3-3ce611a921b6": 2
+    },
+    "atomicBoundaryClock": 35500,
+    "atomicMiningAcrossSchedule": true,
+    "warehouseBlocks": 161,
+    "warehouseOrigin": -75591425585088,
+    "damagedHouseBlocks": [
+      -82738251313072,
+      -82463373406128,
+      -81913617588147,
+      -82188495495091
+    ],
+    "repairTicks": 894,
+    "repairedBlocks": [
+      {
+        "actual": "Block{minecraft:oak_planks}",
+        "original": "Block{minecraft:oak_planks}"
+      },
+      {
+        "actual": "Block{minecraft:oak_planks}",
+        "original": "Block{minecraft:oak_planks}"
+      },
+      {
+        "actual": "Block{minecraft:acacia_door}[facing\u003dsouth,half\u003dlower,hinge\u003dright,open\u003dtrue,powered\u003dfalse]",
+        "original": "Block{minecraft:oak_door}[facing\u003dsouth,half\u003dlower,hinge\u003dright,open\u003dtrue,powered\u003dfalse]"
+      },
+      {
+        "actual": "Block{minecraft:cobblestone}",
+        "original": "Block{minecraft:white_terracotta}"
+      }
+    ]
+  }
+}

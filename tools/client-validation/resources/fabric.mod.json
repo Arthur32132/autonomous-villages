@@ -5,5 +5,5 @@
   "name": "Isolated integrated-server regression",
   "environment": "client",
   "entrypoints": {"client": ["dev.autonomousvillages.IntegratedServerProbe"]},
-  "depends": {"autonomous_villages": ">=0.1.1", "navigation_ai": ">=0.1.1", "fabric-api": "*"}
+  "depends": {"autonomous_villages": ">=0.2.0", "navigation_ai": ">=0.2.0", "fabric-api": "*"}
 }

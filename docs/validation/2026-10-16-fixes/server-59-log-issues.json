@@ -1,0 +1,174 @@
+{
+  "groups": [
+    {
+      "source": "server.log",
+      "message": "[main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:",
+      "count": 1,
+      "first": "[05:38:25] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:",
+      "last": "[05:38:25] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:"
+    },
+    {
+      "source": "server.log",
+      "message": "[main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "count": 1,
+      "first": "[05:38:25] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "last": "[05:38:25] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values"
+    },
+    {
+      "source": "server.log",
+      "message": "[main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "count": 1,
+      "first": "[05:38:25] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "last": "[05:38:25] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8"
+    },
+    {
+      "source": "server.log",
+      "message": "[Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!",
+      "count": 1,
+      "first": "[05:38:29] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!",
+      "last": "[05:38:29] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!"
+    },
+    {
+      "source": "server.log",
+      "message": "[Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.",
+      "count": 1,
+      "first": "[05:38:29] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.",
+      "last": "[05:38:29] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware."
+    },
+    {
+      "source": "server.log",
+      "message": "[Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.",
+      "count": 1,
+      "first": "[05:38:29] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.",
+      "last": "[05:38:29] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose."
+    },
+    {
+      "source": "server.log",
+      "message": "[Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file.",
+      "count": 1,
+      "first": "[05:38:29] [Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file.",
+      "last": "[05:38:29] [Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file."
+    },
+    {
+      "source": "server.log",
+      "message": "[Server thread/WARN]: Can't keep up! Is the server overloaded? Running 1598ms or 95 ticks behind",
+      "count": 1,
+      "first": "[05:38:32] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 1598ms or 95 ticks behind",
+      "last": "[05:38:32] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 1598ms or 95 ticks behind"
+    },
+    {
+      "source": "restart.log",
+      "message": "[main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:",
+      "count": 1,
+      "first": "[05:41:59] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:",
+      "last": "[05:41:59] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:"
+    },
+    {
+      "source": "restart.log",
+      "message": "[main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "count": 1,
+      "first": "[05:41:59] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "last": "[05:41:59] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values"
+    },
+    {
+      "source": "restart.log",
+      "message": "[main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "count": 1,
+      "first": "[05:41:59] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "last": "[05:41:59] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8"
+    },
+    {
+      "source": "restart.log",
+      "message": "[Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!",
+      "count": 1,
+      "first": "[05:42:04] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!",
+      "last": "[05:42:04] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!"
+    },
+    {
+      "source": "restart.log",
+      "message": "[Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.",
+      "count": 1,
+      "first": "[05:42:04] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.",
+      "last": "[05:42:04] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware."
+    },
+    {
+      "source": "restart.log",
+      "message": "[Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.",
+      "count": 1,
+      "first": "[05:42:04] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.",
+      "last": "[05:42:04] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose."
+    },
+    {
+      "source": "restart.log",
+      "message": "[Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file.",
+      "count": 1,
+      "first": "[05:42:04] [Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file.",
+      "last": "[05:42:04] [Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file."
+    },
+    {
+      "source": "restart.log",
+      "message": "[Server thread/WARN]: Recovered legacy local mine outside footprint for Test; existing excavation retained as an expedition worksite",
+      "count": 1,
+      "first": "[05:42:04] [Server thread/WARN]: Recovered legacy local mine outside footprint for Test; existing excavation retained as an expedition worksite",
+      "last": "[05:42:04] [Server thread/WARN]: Recovered legacy local mine outside footprint for Test; existing excavation retained as an expedition worksite"
+    },
+    {
+      "source": "corrupt-state.log",
+      "message": "[main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:",
+      "count": 1,
+      "first": "[05:42:13] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:",
+      "last": "[05:42:13] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:"
+    },
+    {
+      "source": "corrupt-state.log",
+      "message": "[main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "count": 1,
+      "first": "[05:42:13] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "last": "[05:42:13] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values"
+    },
+    {
+      "source": "corrupt-state.log",
+      "message": "[main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "count": 1,
+      "first": "[05:42:13] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "last": "[05:42:13] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8"
+    },
+    {
+      "source": "corrupt-state.log",
+      "message": "[Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!",
+      "count": 1,
+      "first": "[05:42:17] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!",
+      "last": "[05:42:17] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!"
+    },
+    {
+      "source": "corrupt-state.log",
+      "message": "[Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.",
+      "count": 1,
+      "first": "[05:42:17] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.",
+      "last": "[05:42:17] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware."
+    },
+    {
+      "source": "corrupt-state.log",
+      "message": "[Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.",
+      "count": 1,
+      "first": "[05:42:17] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.",
+      "last": "[05:42:17] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose."
+    },
+    {
+      "source": "corrupt-state.log",
+      "message": "[Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file.",
+      "count": 1,
+      "first": "[05:42:17] [Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file.",
+      "last": "[05:42:17] [Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file."
+    },
+    {
+      "source": "corrupt-state.log",
+      "message": "[Server thread/ERROR]: Cannot load villages; preserving original file",
+      "count": 1,
+      "first": "[05:42:17] [Server thread/ERROR]: Cannot load villages; preserving original file",
+      "last": "[05:42:17] [Server thread/ERROR]: Cannot load villages; preserving original file"
+    }
+  ],
+  "overflowEvents": 0,
+  "note": "Raw severity retained; offline authentication, third-party and deliberate corrupt-state errors require separate interpretation."
+}

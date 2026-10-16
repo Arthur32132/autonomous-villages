@@ -1,0 +1,1063 @@
+{
+  "scope": "One frozen-candidate run, no gameplay changes or retries",
+  "snapshots": 239,
+  "snapshotIntervalTicks": 200,
+  "warningAndErrorEvents": [
+    "[00:34:55] [ForkJoinPool-1-worker-12/WARN]: Mod dev_isxander_sdl_sdl-api uses the version release-3.4.12-4 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version",
+    "[00:34:55] [ForkJoinPool-1-worker-5/WARN]: Mod dev_isxander_sdl_sdl-backend-ffm uses the version release-3.4.12-4 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version",
+    "[00:35:00] [main/WARN]: Stream injection failed; legacy loggers may retain blocking behavior.",
+    "[00:35:01] [main/WARN]: Reference map 'entityculling.refmap.mixins.json' for entityculling.mixins.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'ixeris.mixins.refmap.json' for ixeris.mixins.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'mixintrace-refmap.json' for mixintrace.mixins.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'modernfix.refmap.json' for modernfix-fabric.mixins.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'modernfix.refmap.json' for modernfix-common.mixins.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'reeses-sodium-options.refmap.json' for reeses-sodium-options.mixins.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'sspb.refmap.json' for sspb.mixins.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl.mixins.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl-fabric.mixins.json could not be read. If this is a development environment you can ignore this message",
+    "[00:35:01] [main/WARN]: Force disabled MC-122477 because it only applies to OS: LINUX",
+    "[00:35:02] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children",
+    "[00:35:02] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]",
+    "[00:35:02] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.",
+    "[00:35:05] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt: ",
+    "[00:35:05] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+    "[00:35:05] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+    "[00:35:08] [main/WARN]: Method overwrite conflict for getTemperature in modernfix-common.mixins.json:perf.remove_biome_temperature_cache.BiomeMixin from mod modernfix, previously written by net.caffeinemc.mods.lithium.mixin.world.temperature_cache.BiomeMixin. Skipping method.",
+    "[00:35:12] [Download-2/ERROR]: Failed to fetch user properties",
+    "[00:35:13] [Render thread/ERROR]: Error parsing option value 4 for option Simulation Distance: Value 4 outside of range [5:33]",
+    "[00:35:13] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.",
+    "[00:35:16] [Download-1/ERROR]: Failed to fetch Realms feature flags",
+    "[00:35:16] [Render thread/ERROR]: Controlify has prevented Remove Reloading Screen (rrls) mod from removing the initial loading screen due to an incompatibility.",
+    "[00:35:16] [Render thread/WARN]: Dynamic FPS config missing or corrupted! Using defaults.",
+    "[00:35:16] [Download-2/ERROR]: Couldn't connect to realms",
+    "[00:35:16] [Download-2/ERROR]: Failed to retrieve profile key pair",
+    "[00:35:17] [pool-5-thread-8/WARN]: Failed to parse mod name from fabric.mod.json of basic-math-0.6.1.jar",
+    "[00:35:18] [Render thread/WARN]: Initial datapack load took 810.3 ms",
+    "[00:35:21] [Render thread/ERROR]: [SteamDeckUtil] Skipping Steam Deck checks as steamOS has temporarily broken the enhanced driver.",
+    "[00:35:25] [Render thread/WARN]: @ModifyVariable(@At(\"HEAD\")) Shift.BY=1 on sspb.mixins.json:sodium.SmoothLightPipelineMixin from mod sspb::localvar$fdb000$sspb$modifyApplyInsetPartialFaceVertexN2d exceeds the maximum allowed value: 0. Increase the value of maxShiftBy to suppress this warning.",
+    "[00:35:25] [Render thread/WARN]: Game took 33.603 seconds to start",
+    "[00:35:25] [Render thread/WARN]: Time from main menu to in-game was 6.6130075 seconds",
+    "[00:35:25] [Render thread/WARN]: Total time to load game and open world was 40.216007 seconds",
+    "[00:35:28] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 1542ms or 61 ticks behind",
+    "[00:40:42] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-242.2896812548946, 64.0, -298.4999863467867) next=BlockPos{x=-244, y=63, z=-299} goal=PositionGoal[position=(-270.5, 64.0, -290.5), tolerance=1.0] pathIndex=1 pathSize=17 pose=STANDING velocity=(-0.1202643497355042, -0.0784000015258789, -3.3477167346491834E-7)",
+    "[00:46:07] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-271.3949245965259, 64.0, -287.4987457728418) next=BlockPos{x=-273, y=65, z=-288} goal=PositionGoal[position=(-273.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=3 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+    "[00:55:25] [Server thread/WARN]: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-272.5028876636468, 65.0, -286.51249998807907) next=BlockPos{x=-273, y=65, z=-288} goal=PositionGoal[position=(-245.5, 82.0, -318.5), tolerance=0.35] pathIndex=1 pathSize=47 pose=STANDING velocity=(1.4795002481825717E-4, -0.0784000015258789, 0.0)"
+  ],
+  "warningAndErrorGroups": [
+    {
+      "message": "ForkJoinPool-1-worker-N/WARN: Mod dev_isxander_sdl_sdl-api uses the version release-3.4.12-4 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version",
+      "count": 1,
+      "times": [
+        "00:34:55"
+      ]
+    },
+    {
+      "message": "ForkJoinPool-1-worker-N/WARN: Mod dev_isxander_sdl_sdl-backend-ffm uses the version release-3.4.12-4 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version",
+      "count": 1,
+      "times": [
+        "00:34:55"
+      ]
+    },
+    {
+      "message": "main/WARN: Stream injection failed; legacy loggers may retain blocking behavior.",
+      "count": 1,
+      "times": [
+        "00:35:00"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'entityculling.refmap.mixins.json' for entityculling.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'ixeris.mixins.refmap.json' for ixeris.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'mixintrace-refmap.json' for mixintrace.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'modernfix.refmap.json' for modernfix-fabric.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'modernfix.refmap.json' for modernfix-common.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'reeses-sodium-options.refmap.json' for reeses-sodium-options.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'sspb.refmap.json' for sspb.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl-fabric.mixins.json could not be read. If this is a development environment you can ignore this message",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Force disabled MC-122477 because it only applies to OS: LINUX",
+      "count": 1,
+      "times": [
+        "00:35:01"
+      ]
+    },
+    {
+      "message": "main/WARN: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children",
+      "count": 1,
+      "times": [
+        "00:35:02"
+      ]
+    },
+    {
+      "message": "main/WARN: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]",
+      "count": 1,
+      "times": [
+        "00:35:02"
+      ]
+    },
+    {
+      "message": "main/WARN: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.",
+      "count": 1,
+      "times": [
+        "00:35:02"
+      ]
+    },
+    {
+      "message": "main/ERROR: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt: ",
+      "count": 1,
+      "times": [
+        "00:35:05"
+      ]
+    },
+    {
+      "message": "main/WARN: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "count": 1,
+      "times": [
+        "00:35:05"
+      ]
+    },
+    {
+      "message": "main/WARN: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "count": 1,
+      "times": [
+        "00:35:05"
+      ]
+    },
+    {
+      "message": "main/WARN: Method overwrite conflict for getTemperature in modernfix-common.mixins.json:perf.remove_biome_temperature_cache.BiomeMixin from mod modernfix, previously written by net.caffeinemc.mods.lithium.mixin.world.temperature_cache.BiomeMixin. Skipping method.",
+      "count": 1,
+      "times": [
+        "00:35:08"
+      ]
+    },
+    {
+      "message": "Download-2/ERROR: Failed to fetch user properties",
+      "count": 1,
+      "times": [
+        "00:35:12"
+      ]
+    },
+    {
+      "message": "Render thread/ERROR: Error parsing option value 4 for option Simulation Distance: Value 4 outside of range [5:33]",
+      "count": 1,
+      "times": [
+        "00:35:13"
+      ]
+    },
+    {
+      "message": "ForkJoinPool.commonPool-worker-N/WARN: [Iris Update Check] This version doesn't have an update index, skipping.",
+      "count": 1,
+      "times": [
+        "00:35:13"
+      ]
+    },
+    {
+      "message": "Download-1/ERROR: Failed to fetch Realms feature flags",
+      "count": 1,
+      "times": [
+        "00:35:16"
+      ]
+    },
+    {
+      "message": "Render thread/ERROR: Controlify has prevented Remove Reloading Screen (rrls) mod from removing the initial loading screen due to an incompatibility.",
+      "count": 1,
+      "times": [
+        "00:35:16"
+      ]
+    },
+    {
+      "message": "Render thread/WARN: Dynamic FPS config missing or corrupted! Using defaults.",
+      "count": 1,
+      "times": [
+        "00:35:16"
+      ]
+    },
+    {
+      "message": "Download-2/ERROR: Couldn't connect to realms",
+      "count": 1,
+      "times": [
+        "00:35:16"
+      ]
+    },
+    {
+      "message": "Download-2/ERROR: Failed to retrieve profile key pair",
+      "count": 1,
+      "times": [
+        "00:35:16"
+      ]
+    },
+    {
+      "message": "pool-5-thread-8/WARN: Failed to parse mod name from fabric.mod.json of basic-math-0.6.1.jar",
+      "count": 1,
+      "times": [
+        "00:35:17"
+      ]
+    },
+    {
+      "message": "Render thread/WARN: Initial datapack load took 810.3 ms",
+      "count": 1,
+      "times": [
+        "00:35:18"
+      ]
+    },
+    {
+      "message": "Render thread/ERROR: [SteamDeckUtil] Skipping Steam Deck checks as steamOS has temporarily broken the enhanced driver.",
+      "count": 1,
+      "times": [
+        "00:35:21"
+      ]
+    },
+    {
+      "message": "Render thread/WARN: @ModifyVariable(@At(\"HEAD\")) Shift.BY=1 on sspb.mixins.json:sodium.SmoothLightPipelineMixin from mod sspb::localvar$fdb000$sspb$modifyApplyInsetPartialFaceVertexN2d exceeds the maximum allowed value: 0. Increase the value of maxShiftBy to suppress this warning.",
+      "count": 1,
+      "times": [
+        "00:35:25"
+      ]
+    },
+    {
+      "message": "Render thread/WARN: Game took 33.603 seconds to start",
+      "count": 1,
+      "times": [
+        "00:35:25"
+      ]
+    },
+    {
+      "message": "Render thread/WARN: Time from main menu to in-game was 6.6130075 seconds",
+      "count": 1,
+      "times": [
+        "00:35:25"
+      ]
+    },
+    {
+      "message": "Render thread/WARN: Total time to load game and open world was 40.216007 seconds",
+      "count": 1,
+      "times": [
+        "00:35:25"
+      ]
+    },
+    {
+      "message": "Server thread/WARN: Can't keep up! Is the server overloaded? Running 1542ms or 61 ticks behind",
+      "count": 1,
+      "times": [
+        "00:35:28"
+      ]
+    },
+    {
+      "message": "Server thread/WARN: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-242.2896812548946, 64.0, -298.4999863467867) next=BlockPos{x=-244, y=63, z=-299} goal=PositionGoal[position=(-270.5, 64.0, -290.5), tolerance=1.0] pathIndex=1 pathSize=17 pose=STANDING velocity=(-0.1202643497355042, -0.0784000015258789, -3.3477167346491834E-7)",
+      "count": 1,
+      "times": [
+        "00:40:42"
+      ]
+    },
+    {
+      "message": "Server thread/WARN: Navigation stuck: bot=Крестьянин reason=changed_obstacle pos=(-271.3949245965259, 64.0, -287.4987457728418) next=BlockPos{x=-273, y=65, z=-288} goal=PositionGoal[position=(-273.5, 65.0, -284.5), tolerance=0.35] pathIndex=1 pathSize=3 pose=STANDING velocity=(0.0, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "times": [
+        "00:46:07"
+      ]
+    },
+    {
+      "message": "Server thread/WARN: Navigation stuck: bot=Крестьянин reason=no_progress pos=(-272.5028876636468, 65.0, -286.51249998807907) next=BlockPos{x=-273, y=65, z=-288} goal=PositionGoal[position=(-245.5, 82.0, -318.5), tolerance=0.35] pathIndex=1 pathSize=47 pose=STANDING velocity=(1.4795002481825717E-4, -0.0784000015258789, 0.0)",
+      "count": 1,
+      "times": [
+        "00:55:25"
+      ]
+    }
+  ],
+  "workerLastFailureValues": {
+    "нет безопасного подхода": {
+      "firstTick": 1200,
+      "lastTick": 48000,
+      "workers": [
+        "427c3568-1349-4edd-bae4-49aa84c5b401",
+        "6dc7a63a-ba3b-420a-8cad-969b5c3eac1b",
+        "94699b2d-6f91-4aa5-bf4c-3930f2ef656f",
+        "b26677b5-3464-42a8-8b84-74f507cb8321",
+        "c8b48ae4-07b1-4498-99d4-38de3534a39e"
+      ]
+    },
+    "цель недоступна; выбирает другую работу": {
+      "firstTick": 2800,
+      "lastTick": 48000,
+      "workers": [
+        "427c3568-1349-4edd-bae4-49aa84c5b401",
+        "6dc7a63a-ba3b-420a-8cad-969b5c3eac1b",
+        "b26677b5-3464-42a8-8b84-74f507cb8321"
+      ]
+    },
+    "добыча: obstructed": {
+      "firstTick": 7200,
+      "lastTick": 48000,
+      "workers": [
+        "33a1a1a6-2f4f-44dc-9c9e-6da723772c68",
+        "b26677b5-3464-42a8-8b84-74f507cb8321"
+      ]
+    },
+    "маршрут: unreachable": {
+      "firstTick": 26400,
+      "lastTick": 48000,
+      "workers": [
+        "427c3568-1349-4edd-bae4-49aa84c5b401",
+        "94699b2d-6f91-4aa5-bf4c-3930f2ef656f",
+        "b26677b5-3464-42a8-8b84-74f507cb8321",
+        "c8b48ae4-07b1-4498-99d4-38de3534a39e"
+      ]
+    },
+    "проходка: no_suitable_tool": {
+      "firstTick": 39200,
+      "lastTick": 48000,
+      "workers": [
+        "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+      ]
+    }
+  },
+  "lastFailureCaveat": "Persistent lastFailure fields; durations and snapshot counts are not fresh failure event counts.",
+  "healthChanges": [
+    {
+      "tick": 15400,
+      "uuid": "427c3568-1349-4edd-bae4-49aa84c5b401",
+      "health": 16.0,
+      "pos": "(-276.50170023356526, 64.0, -288.40837253459097)"
+    },
+    {
+      "tick": 28200,
+      "uuid": "427c3568-1349-4edd-bae4-49aa84c5b401",
+      "health": 17.0,
+      "pos": "(-300.52315948623203, 76.0, -340.43041145450036)"
+    },
+    {
+      "tick": 36200,
+      "uuid": "427c3568-1349-4edd-bae4-49aa84c5b401",
+      "health": 18.0,
+      "pos": "(-307.50523723791923, 77.18970334025373, -338.50523723771664)"
+    },
+    {
+      "tick": 36600,
+      "uuid": "427c3568-1349-4edd-bae4-49aa84c5b401",
+      "health": 19.0,
+      "pos": "(-310.4999101183421, 77.5625, -341.7149755418348)"
+    },
+    {
+      "tick": 37000,
+      "uuid": "427c3568-1349-4edd-bae4-49aa84c5b401",
+      "health": 20.0,
+      "pos": "(-310.4999101183421, 77.5625, -341.7149755418348)"
+    }
+  ],
+  "warehouseProgress": [
+    {
+      "tick": 400,
+      "built": 0,
+      "total": 162
+    },
+    {
+      "tick": 4600,
+      "built": 2,
+      "total": 161
+    },
+    {
+      "tick": 5600,
+      "built": 6,
+      "total": 161
+    },
+    {
+      "tick": 5800,
+      "built": 7,
+      "total": 161
+    },
+    {
+      "tick": 6000,
+      "built": 8,
+      "total": 161
+    },
+    {
+      "tick": 8800,
+      "built": 11,
+      "total": 161
+    },
+    {
+      "tick": 9000,
+      "built": 15,
+      "total": 161
+    },
+    {
+      "tick": 9200,
+      "built": 17,
+      "total": 161
+    },
+    {
+      "tick": 9400,
+      "built": 19,
+      "total": 161
+    },
+    {
+      "tick": 9600,
+      "built": 23,
+      "total": 161
+    },
+    {
+      "tick": 9800,
+      "built": 34,
+      "total": 161
+    },
+    {
+      "tick": 10800,
+      "built": 36,
+      "total": 161
+    },
+    {
+      "tick": 11000,
+      "built": 41,
+      "total": 161
+    },
+    {
+      "tick": 11200,
+      "built": 48,
+      "total": 161
+    },
+    {
+      "tick": 11400,
+      "built": 55,
+      "total": 161
+    },
+    {
+      "tick": 11600,
+      "built": 62,
+      "total": 161
+    },
+    {
+      "tick": 11800,
+      "built": 68,
+      "total": 161
+    },
+    {
+      "tick": 12000,
+      "built": 72,
+      "total": 161
+    },
+    {
+      "tick": 12200,
+      "built": 77,
+      "total": 161
+    },
+    {
+      "tick": 25400,
+      "built": 78,
+      "total": 161
+    },
+    {
+      "tick": 25600,
+      "built": 84,
+      "total": 161
+    },
+    {
+      "tick": 25800,
+      "built": 89,
+      "total": 161
+    },
+    {
+      "tick": 26000,
+      "built": 91,
+      "total": 161
+    },
+    {
+      "tick": 26200,
+      "built": 96,
+      "total": 161
+    },
+    {
+      "tick": 26400,
+      "built": 101,
+      "total": 161
+    },
+    {
+      "tick": 26600,
+      "built": 106,
+      "total": 161
+    },
+    {
+      "tick": 26800,
+      "built": 110,
+      "total": 161
+    },
+    {
+      "tick": 27000,
+      "built": 118,
+      "total": 161
+    },
+    {
+      "tick": 27200,
+      "built": 121,
+      "total": 161
+    },
+    {
+      "tick": 28000,
+      "built": 124,
+      "total": 161
+    },
+    {
+      "tick": 28200,
+      "built": 131,
+      "total": 161
+    },
+    {
+      "tick": 28600,
+      "built": 134,
+      "total": 161
+    },
+    {
+      "tick": 28800,
+      "built": 141,
+      "total": 161
+    },
+    {
+      "tick": 29000,
+      "built": 142,
+      "total": 161
+    },
+    {
+      "tick": 35600,
+      "built": 148,
+      "total": 161
+    }
+  ],
+  "expeditionPhases": [
+    {
+      "observedTick": 400,
+      "state": null
+    },
+    {
+      "observedTick": 9200,
+      "state": {
+        "purpose": "mine",
+        "phase": "scout",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -49478024556471,
+        "started": 9155,
+        "phaseSince": 9155,
+        "deliveryStart": 15,
+        "direction": 0,
+        "length": 0,
+        "completedSegments": 0,
+        "brokenBlocks": 0,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": false,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 0,
+        "mineralCargoStart": 0,
+        "cargoSnapshot": false,
+        "phaseBudget": 0,
+        "dug": false,
+        "workedSegments": 0,
+        "oreCollected": 0,
+        "oreSince": 0,
+        "oreTargets": []
+      }
+    },
+    {
+      "observedTick": 9400,
+      "state": {
+        "purpose": "mine",
+        "phase": "rally",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -51677047844784,
+        "started": 9155,
+        "phaseSince": 9236,
+        "deliveryStart": 15,
+        "direction": 0,
+        "length": 8,
+        "completedSegments": 0,
+        "brokenBlocks": 0,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": false,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 0,
+        "mineralCargoStart": 0,
+        "cargoSnapshot": false,
+        "phaseBudget": 3047,
+        "dug": false,
+        "workedSegments": 0,
+        "oreCollected": 0,
+        "oreSince": 0,
+        "oreTargets": []
+      }
+    },
+    {
+      "observedTick": 10400,
+      "state": {
+        "purpose": "mine",
+        "phase": "travel",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -51677047844784,
+        "started": 9155,
+        "phaseSince": 10279,
+        "deliveryStart": 15,
+        "direction": 0,
+        "length": 8,
+        "completedSegments": 0,
+        "brokenBlocks": 0,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": true,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 0,
+        "mineralCargoStart": 2,
+        "cargoSnapshot": true,
+        "phaseBudget": 3151,
+        "dug": false,
+        "workedSegments": 0,
+        "oreCollected": 0,
+        "oreSince": 0,
+        "oreTargets": []
+      }
+    },
+    {
+      "observedTick": 11200,
+      "state": {
+        "purpose": "mine",
+        "phase": "work",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -51677047844784,
+        "started": 9155,
+        "phaseSince": 11104,
+        "deliveryStart": 15,
+        "direction": 0,
+        "length": 8,
+        "completedSegments": 0,
+        "brokenBlocks": 3,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": true,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 0,
+        "mineralCargoStart": 2,
+        "cargoSnapshot": true,
+        "phaseBudget": 3151,
+        "dug": false,
+        "workedSegments": 0,
+        "oreCollected": 0,
+        "oreSince": 0,
+        "oreTargets": []
+      }
+    },
+    {
+      "observedTick": 11800,
+      "state": {
+        "purpose": "mine",
+        "phase": "return",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -51677047844784,
+        "started": 9155,
+        "phaseSince": 11766,
+        "deliveryStart": 15,
+        "direction": 0,
+        "length": 8,
+        "completedSegments": 0,
+        "brokenBlocks": 21,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": true,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 0,
+        "mineralCargoStart": 2,
+        "cargoSnapshot": true,
+        "phaseBudget": 3069,
+        "dug": true,
+        "workedSegments": 8,
+        "oreCollected": 0,
+        "oreSince": 11765,
+        "oreTargets": []
+      }
+    },
+    {
+      "observedTick": 13000,
+      "state": null
+    },
+    {
+      "observedTick": 23200,
+      "state": {
+        "purpose": "mine",
+        "phase": "prepare",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -51677047844784,
+        "started": 23100,
+        "phaseSince": 23100,
+        "deliveryStart": 55,
+        "direction": 0,
+        "length": 16,
+        "completedSegments": 8,
+        "brokenBlocks": 0,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": false,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 0,
+        "mineralCargoStart": 0,
+        "cargoSnapshot": false,
+        "phaseBudget": 0,
+        "dug": false,
+        "workedSegments": 0,
+        "oreCollected": 0,
+        "oreSince": 0,
+        "oreTargets": []
+      }
+    },
+    {
+      "observedTick": 25600,
+      "state": null
+    },
+    {
+      "observedTick": 26800,
+      "state": {
+        "purpose": "mine",
+        "phase": "prepare",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -51677047844784,
+        "started": 26701,
+        "phaseSince": 26701,
+        "deliveryStart": 58,
+        "direction": 0,
+        "length": 16,
+        "completedSegments": 8,
+        "brokenBlocks": 0,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": false,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 0,
+        "mineralCargoStart": 0,
+        "cargoSnapshot": false,
+        "phaseBudget": 0,
+        "dug": false,
+        "workedSegments": 0,
+        "oreCollected": 0,
+        "oreSince": 0,
+        "oreTargets": []
+      }
+    },
+    {
+      "observedTick": 27800,
+      "state": {
+        "purpose": "mine",
+        "phase": "rally",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -51677047844784,
+        "started": 26701,
+        "phaseSince": 27658,
+        "deliveryStart": 58,
+        "direction": 0,
+        "length": 16,
+        "completedSegments": 8,
+        "brokenBlocks": 0,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": false,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 0,
+        "mineralCargoStart": 0,
+        "cargoSnapshot": false,
+        "phaseBudget": 2644,
+        "dug": false,
+        "workedSegments": 0,
+        "oreCollected": 0,
+        "oreSince": 0,
+        "oreTargets": []
+      }
+    },
+    {
+      "observedTick": 28400,
+      "state": {
+        "purpose": "mine",
+        "phase": "travel",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -51677047844784,
+        "started": 26701,
+        "phaseSince": 28299,
+        "deliveryStart": 58,
+        "direction": 0,
+        "length": 16,
+        "completedSegments": 8,
+        "brokenBlocks": 0,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": true,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 13,
+        "mineralCargoStart": 0,
+        "cargoSnapshot": true,
+        "phaseBudget": 3221,
+        "dug": false,
+        "workedSegments": 0,
+        "oreCollected": 0,
+        "oreSince": 0,
+        "oreTargets": []
+      }
+    },
+    {
+      "observedTick": 29600,
+      "state": {
+        "purpose": "mine",
+        "phase": "work",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -51677047844784,
+        "started": 26701,
+        "phaseSince": 29502,
+        "deliveryStart": 58,
+        "direction": 0,
+        "length": 16,
+        "completedSegments": 8,
+        "brokenBlocks": 0,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": true,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 13,
+        "mineralCargoStart": 0,
+        "cargoSnapshot": true,
+        "phaseBudget": 3221,
+        "dug": false,
+        "workedSegments": 0,
+        "oreCollected": 0,
+        "oreSince": 0,
+        "oreTargets": []
+      }
+    },
+    {
+      "observedTick": 33600,
+      "state": {
+        "purpose": "mine",
+        "phase": "return",
+        "team": [
+          "b26677b5-3464-42a8-8b84-74f507cb8321",
+          "94699b2d-6f91-4aa5-bf4c-3930f2ef656f"
+        ],
+        "target": -51677047844784,
+        "started": 26701,
+        "phaseSince": 33476,
+        "deliveryStart": 58,
+        "direction": 0,
+        "length": 16,
+        "completedSegments": 8,
+        "brokenBlocks": 25,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": true,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 13,
+        "mineralCargoStart": 0,
+        "cargoSnapshot": true,
+        "phaseBudget": 3015,
+        "dug": true,
+        "workedSegments": 16,
+        "oreCollected": 1,
+        "oreSince": 30255,
+        "oreTargets": [
+          -51677047783360,
+          -51951925690303,
+          -51677047779265,
+          -51951925686208,
+          -51677047783361,
+          -51951925690304,
+          -51951925694399,
+          -52226803597247,
+          -51951925686209,
+          -51951925694400,
+          -52226803597248,
+          -52226803601343,
+          -52226803601344,
+          -52226803605439,
+          -52501681508287,
+          -52226803605438,
+          -52501681512383,
+          -52501681512382
+        ]
+      }
+    },
+    {
+      "observedTick": 38600,
+      "state": null
+    },
+    {
+      "observedTick": 47800,
+      "state": {
+        "purpose": "mine",
+        "phase": "prepare",
+        "team": [
+          "c8b48ae4-07b1-4498-99d4-38de3534a39e",
+          "6dc7a63a-ba3b-420a-8cad-969b5c3eac1b"
+        ],
+        "target": -51677047844784,
+        "started": 47621,
+        "phaseSince": 47621,
+        "deliveryStart": 82,
+        "direction": 0,
+        "length": 24,
+        "completedSegments": 16,
+        "brokenBlocks": 0,
+        "attempts": 0,
+        "harvested": 0,
+        "departingTogether": false,
+        "unloadedMembers": [],
+        "mineralDeliveryStart": 0,
+        "mineralCargoStart": 0,
+        "cargoSnapshot": false,
+        "phaseBudget": 0,
+        "dug": false,
+        "workedSegments": 0,
+        "oreCollected": 0,
+        "oreSince": 0,
+        "oreTargets": []
+      }
+    }
+  ],
+  "testMilestones": [
+    "[00:35:36] [Server thread/INFO]: COLONY_TEST PASS whole_village_enrollment 6 residents",
+    "[00:39:52] [Server thread/INFO]: COLONY_TEST atomic mining across social boundary BlockPos{x=-315, y=73, z=-370}",
+    "[00:39:56] [Server thread/INFO]: COLONY_TEST PASS atomic_mining_across_schedule",
+    "[00:55:26] [Server thread/INFO]: COLONY_TEST DONE success=false reason=production_observation_timeout"
+  ],
+  "cleanup": {
+    "initialSuccess": false,
+    "error": "PermissionError [WinError 32]",
+    "lockedFile": "profile/local/crash_assistant/32436_1792092891785_app.jar",
+    "source": "tools/test_artifacts.py:96 shutil.rmtree(path), invoked by finish at line 278",
+    "recovery": "No related process remained on inspection. python tools/clean_validation.py --apply succeeded.",
+    "removedLabs": 1,
+    "freedBytes": 348971644,
+    "processKilled": false
+  }
+}

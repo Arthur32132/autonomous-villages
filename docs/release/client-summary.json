@@ -1,0 +1,114 @@
+{
+  "success": false,
+  "reason": "stopped_for_diagnosis",
+  "ticks": 51065,
+  "exitCode": 0,
+  "sourcesUnchanged": true,
+  "timelineTruncated": false,
+  "stoppedAtUserRequest": true,
+  "jars": {
+    "autonomous-villages-0.2.1.jar": "1a83eefe6e9435eb42bbcea3f6a1129db86114d96285390d68857b0454202214",
+    "navigation-ai-0.2.1.jar": "19f9211b6e80af3947792069f621868283bd440bcf778b6f7f382a9315a1f615"
+  },
+  "projects": [
+    {
+      "kind": "warehouse",
+      "built": 137,
+      "total": 161
+    }
+  ],
+  "health": [
+    {
+      "uuid": "33d5359e-8e72-4f38-8652-4787ad8e727f",
+      "health": 20.0
+    },
+    {
+      "uuid": "849436cf-10fa-4919-83de-2431126f5635",
+      "health": 20.0
+    },
+    {
+      "uuid": "540e0cc0-7cef-4255-bd72-c6345b0e56d7",
+      "health": 20.0
+    },
+    {
+      "uuid": "b355cf1d-8b75-4c52-b994-3b46fc068a03",
+      "health": 20.0
+    },
+    {
+      "uuid": "62ba3433-f84a-49e8-9944-4a9ef9caa34a",
+      "health": 18.0
+    },
+    {
+      "uuid": "89abde7c-2deb-4f66-8e1e-948a33945d7f",
+      "health": 20.0
+    }
+  ],
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 0,
+    "newExpeditionItemsUnloaded": 0,
+    "observedNightTicks": 20000,
+    "observedSleepTicks": 23879,
+    "naturalThreatsSeen": 1364,
+    "clockTime": 51000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [
+      "-419, 49, -233 Block{minecraft:copper_ore}",
+      "-409, 39, -233 Block{minecraft:copper_ore}",
+      "-409, 40, -234 Block{minecraft:copper_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "coal": 0,
+      "cobblestone": 51,
+      "rawIron": 10,
+      "iron": 0
+    },
+    "sharedChestContents": [
+      {
+        "pos": "BlockPos{x=-303, y=77, z=-342}",
+        "items": [
+          "11 minecraft:dirt",
+          "1 minecraft:egg",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ]
+      },
+      {
+        "pos": "BlockPos{x=-274, y=65, z=-283}",
+        "items": [
+          "51 minecraft:cobblestone",
+          "1 minecraft:egg",
+          "3 minecraft:dirt",
+          "7 minecraft:granite",
+          "2 minecraft:raw_copper"
+        ]
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true
+  }
+}

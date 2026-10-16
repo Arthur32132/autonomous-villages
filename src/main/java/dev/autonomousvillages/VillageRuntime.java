@@ -21,12 +21,41 @@ public final class VillageRuntime {
     public final MinecraftServer server;
     final BotService bots;
     final Map<String, Village> villages = new LinkedHashMap<>();
+    final Map<UUID,VillageState.ResidentName> pendingReleases=new LinkedHashMap<>();
     private final Path file;
     private boolean loadFailed;
     long ticks;
+    private final Map<Long,Integer> chunkLeases=new HashMap<>();
+    void lease(net.minecraft.world.level.ChunkPos pos,boolean acquire){
+        int before=chunkLeases.getOrDefault(pos.pack(),0),after=acquire?before+1:Math.max(0,before-1);
+        if(before==0&&after>0)server.overworld().getChunkSource().addTicketWithRadius(AutonomousVillagesMod.TICKET,pos,2);
+        if(before>0&&after==0)server.overworld().getChunkSource().removeTicketWithRadius(AutonomousVillagesMod.TICKET,pos,2);
+        if(after==0)chunkLeases.remove(pos.pack());else chunkLeases.put(pos.pack(),after);
+    }
     public VillageRuntime(MinecraftServer server) {
         this.server = server; this.bots = NavigationAiMod.runtime(server).service();
         file = server.getWorldPath(LevelResource.ROOT).resolve("autonomous_villages.json"); load();
+        for(var entity:server.overworld().getAllEntities())if(entity instanceof Villager resident)residentLoaded(resident);
+    }
+    void residentLoaded(Villager resident){
+        if(loadFailed)return;
+        UUID id=resident.getUUID();
+        if(pendingReleases.containsKey(id)){
+            var handle=bots.find(id).orElse(null);
+            if(handle==null&&((dev.navigationai.runtime.VillagerAccess)resident).navigationAiSavedState()!=null)handle=bots.attach(resident);
+            if(handle!=null&&handle.state()==BotState.ACTIVE)handle.detach();
+            VillagePresentation.restoreName(resident,pendingReleases.remove(id));save();
+        }else if(villages.values().stream().anyMatch(v->!v.state.active&&v.state.residents.contains(id)))
+            bots.find(id).filter(b->b.state()==BotState.ACTIVE).ifPresent(BotHandle::stopAll);
+    }
+    boolean mayBreak(UUID id,BlockPos pos){
+        Village owner=villages.values().stream().filter(v->v.state.residents.contains(id)).findFirst().orElse(null);
+        if(owner==null)return true;
+        var worker=owner.workers.get(id);
+        boolean explicit=worker!=null&&("renovate".equals(worker.job)||"harvest".equals(worker.job))&&pos.equals(worker.target);
+        for(var other:villages.values())if(other.town.protects(pos))return other==owner&&explicit;
+        var block=server.overworld().getBlockState(pos);
+        return !block.is(net.minecraft.world.level.block.Blocks.FARMLAND)&&!(block.getBlock() instanceof net.minecraft.world.level.block.CropBlock)||explicit;
     }
     private void mutable() {
         if (!server.isSameThread()) throw new IllegalStateException("Только поток сервера");
@@ -37,24 +66,18 @@ public final class VillageRuntime {
         if (level != server.overworld()) throw new IllegalArgumentException("Деревни поддерживаются в обычном мире.");
         if (villages.size() >= 4) throw new IllegalArgumentException("Одновременно поддерживаются 4 деревни.");
         if (villages.containsKey(name.toLowerCase(Locale.ROOT))) throw new IllegalArgumentException("Это имя занято.");
-        var beds = level.getPoiManager().getInRange(h -> h.is(PoiTypes.HOME), origin, 64, PoiManager.Occupancy.ANY)
-                .map(PoiRecord::getPos).filter(p -> level.hasChunkAt(p)).sorted(Comparator.comparingDouble(origin::distSqr)).toList();
-        if (beds.isEmpty()) throw new IllegalArgumentException("Рядом нет деревни: нужны жители и кровати (до 64 блоков).");
-        BlockPos anchor = beds.getFirst();
-        List<BlockPos> cluster = beds.stream().filter(p -> p.distSqr(anchor) <= radius * radius).toList();
-        BlockPos center = new BlockPos((int)cluster.stream().mapToInt(BlockPos::getX).average().orElseThrow(),
-                (int)cluster.stream().mapToInt(BlockPos::getY).average().orElseThrow(),
-                (int)cluster.stream().mapToInt(BlockPos::getZ).average().orElseThrow());
-        VillageState state = new VillageState(name, owner, center, radius); state.validate();
-        var residents = level.getEntitiesOfClass(Villager.class, new AABB(Vec3.atCenterOf(center), Vec3.atCenterOf(center)).inflate(radius, 48, radius),
+        var survey=VillageDiscovery.survey(level,origin);
+        VillageState state = new VillageState(name, owner, origin, 48);VillageDiscovery.apply(state,survey);state.validate();
+        if(VillageState.footprintChunks(state.bounds)>VillageState.MAX_TICKET_CHUNKS)throw new IllegalArgumentException("Территория превышает бюджет 1024 активных чанков.");
+        var residents = level.getEntitiesOfClass(Villager.class, VillageDiscovery.area(state,0),
                 v -> v.isAlive() && state.contains(v.blockPosition()));
         if (residents.isEmpty()) throw new IllegalArgumentException("У кроватей нет живых жителей.");
-        if (residents.size() > 64) throw new IllegalArgumentException("В территории больше 64 жителей; выберите меньший радиус.");
+        if(residents.size()>1024)throw new IllegalArgumentException("Слишком много жителей (максимум 1024).");
         for (Village other : villages.values()) if (state.overlaps(other.state)) throw new IllegalArgumentException("Территория пересекает " + other.state.name);
         for (Villager v : residents) if (bots.find(v.getUUID()).isPresent()) throw new IllegalArgumentException("Один из жителей уже управляется библиотекой.");
         residents.forEach(v -> state.residents.add(v.getUUID()));
-        Village village = new Village(this, state); villages.put(name.toLowerCase(Locale.ROOT), village); village.ticket(true); save();
-        return "Деревня " + name + " выбрана: " + center.toShortString() + ", радиус " + radius + ", жителей " + residents.size()
+        Village village = new Village(this, state); villages.put(name.toLowerCase(Locale.ROOT), village); village.ticket(true);village.town.capture(survey);save();
+        return "Поселение " + name + " выбрано по зданиям и рабочим точкам: " + state.center().toShortString() + ", жителей сейчас " + residents.size()
                 + ". Автономность включена. /avillage status " + name;
     }
     Village get(String name) {
@@ -65,8 +88,13 @@ public final class VillageRuntime {
         mutable(); Village v = get(name);
         switch (action) {
             case "pause" -> { v.state.active = false; v.stop(false); }
-            case "resume" -> { v.state.active = true; v.ticket(true); }
-            case "release" -> { v.state.active = false; v.stop(true); villages.remove(name.toLowerCase(Locale.ROOT)); }
+            case "resume" -> { if(v.state.bounds!=null&&VillageState.footprintChunks(v.state.bounds)>VillageState.MAX_TICKET_CHUNKS)throw new IllegalArgumentException("Территория превышает бюджет 1024 активных чанков.");v.state.active = true; v.ticket(true); }
+            case "release" -> {
+                var deferred=v.state.residents.stream().filter(id->bots.find(id).isEmpty()).toList();
+                if(pendingReleases.size()+deferred.size()>16384)throw new IllegalStateException("Сначала загрузите жителей ранее освобождённых деревень (очередь 16384).");
+                for(UUID id:deferred)pendingReleases.put(id,v.state.residentNames.getOrDefault(id,new VillageState.ResidentName()));
+                v.state.active = false; v.stop(true); villages.remove(name.toLowerCase(Locale.ROOT));
+            }
             default -> throw new IllegalArgumentException("Неизвестное действие");
         }
         save(); return name + ": " + switch (action) { case "pause" -> "приостановлена"; case "resume" -> "работает"; default -> "освобождена, жители продолжают обычную жизнь"; };
@@ -87,7 +115,7 @@ public final class VillageRuntime {
     }
     public void tick() {
         ticks++;
-        if (ticks <= 40) return; // library/entity restoration finishes first
+        if (ticks <= 5) return; // sync retries bodies that have not loaded; do not leave a night restart unguarded
         for (Village village : villages.values()) if (village.state.active) try { village.tick(); }
             catch (RuntimeException error) { village.problem = "ошибка планирования: " + error.getClass().getSimpleName();
                 if (ticks % 200 == 0) AutonomousVillagesMod.LOG.error("Village {}", village.state.name, error); }
@@ -96,7 +124,8 @@ public final class VillageRuntime {
     public void save() {
         if (loadFailed) return;
         try {
-            Save data = new Save(); data.villages = villages.values().stream().map(v -> v.state).toList();
+            villages.values().forEach(v->{v.rememberResidents();v.state.compactMetadata();v.state.validate();});
+            Save data = new Save(); data.villages = villages.values().stream().map(v -> v.state).toList();data.pendingReleases.putAll(pendingReleases);
             Path temp = file.resolveSibling(file.getFileName() + ".tmp"); Files.writeString(temp, GSON.toJson(data));
             try { Files.move(temp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
             catch (AtomicMoveNotSupportedException ignored) { Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING); }
@@ -106,21 +135,26 @@ public final class VillageRuntime {
         if (!Files.exists(file)) return;
         try {
             Save data = GSON.fromJson(Files.readString(file), Save.class);
-            if (data == null || data.version != 1 || data.villages == null || data.villages.size() > 4) throw new IllegalArgumentException("Invalid village save");
+            if (data == null || data.version<1||data.version>3 || data.villages == null || data.villages.size() > 4
+                    ||data.pendingReleases==null||data.pendingReleases.size()>16384||data.pendingReleases.entrySet().stream().anyMatch(e->e.getKey()==null||e.getValue()==null||e.getValue().json==null)) throw new IllegalArgumentException("Invalid village save");
             Map<String, Village> restored = new LinkedHashMap<>(); Set<UUID> people = new HashSet<>();
             for (VillageState state : data.villages) {
+                state.compactMetadata();
+                state.recoverProjectBounds();
+                if(state.migrateLegacyMineReference())AutonomousVillagesMod.LOG.warn("Recovered legacy local mine outside footprint for {}; existing excavation retained as an expedition worksite",state.name);
                 state.validate(); String key = state.name.toLowerCase(Locale.ROOT);
                 if (restored.containsKey(key) || restored.values().stream().anyMatch(v -> state.overlaps(v.state))) throw new IllegalArgumentException("Duplicate/overlapping village");
                 for (UUID id : state.residents) if (id == null || !people.add(id)) throw new IllegalArgumentException("Duplicate resident");
                 restored.put(key, new Village(this, state));
             }
-            villages.putAll(restored); villages.values().stream().filter(v -> v.state.active).forEach(v -> v.ticket(true));
+            pendingReleases.putAll(data.pendingReleases);
+            villages.putAll(restored); villages.values().stream().filter(v -> v.state.active).toList().forEach(v -> v.ticket(true));
         } catch (Exception error) { loadFailed = true; AutonomousVillagesMod.LOG.error("Cannot load villages; preserving original file", error); }
     }
     public void close() {
         save();
         // Do not detach on shutdown: library may already be closed and it owns backpack persistence.
-        for (Village v : villages.values()) v.ticket(false);
+        for (Village v : villages.values()) {v.presentation.close();v.ticket(false);}
     }
-    static final class Save { int version = 1; List<VillageState> villages; }
+    static final class Save { int version = 3; List<VillageState> villages;Map<UUID,VillageState.ResidentName> pendingReleases=new LinkedHashMap<>(); }
 }

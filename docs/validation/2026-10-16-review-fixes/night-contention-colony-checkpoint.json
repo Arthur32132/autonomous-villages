@@ -1,0 +1,87 @@
+{
+  "ticks": 48000,
+  "complete": false,
+  "status": "Observed | работает | центр -321, 73, -319 | территория -401,-392 — -242,-246 | жителей загружено 6, работников 6, кроватей 5 | сундуков 3, еды 1 | строительство склад 149/161 | хозяйство работает\nспит, общение, торговля и размножение",
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 1,
+    "newExpeditionItemsUnloaded": 88,
+    "observedNightTicks": 20000,
+    "observedSleepTicks": 23934,
+    "naturalThreatsSeen": 1140,
+    "clockTime": 48000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [
+      "-419, 49, -233 Block{minecraft:copper_ore}",
+      "-409, 39, -233 Block{minecraft:copper_ore}",
+      "-409, 40, -234 Block{minecraft:copper_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "coal": 0,
+      "cobblestone": 58,
+      "rawIron": 2,
+      "iron": 0
+    },
+    "sharedChestContents": [
+      {
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}",
+        "items": [
+          "2 minecraft:oak_log",
+          "5 minecraft:dirt",
+          "2 minecraft:egg",
+          "1 minecraft:brown_egg",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ]
+      },
+      {
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}",
+        "items": [
+          "12 minecraft:dirt",
+          "49 minecraft:cobblestone",
+          "7 minecraft:granite",
+          "2 minecraft:raw_copper"
+        ]
+      },
+      {
+        "pos": "BlockPos{x\u003d-275, y\u003d65, z\u003d-282}",
+        "items": []
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true,
+    "miningExpeditionsReturnedAndUnloaded": 1,
+    "expeditionItemsUnloaded": 88,
+    "verifiedMineralDeposits": {
+      "6f3560df-30f8-44c5-b907-21961b921d17": 71
+    }
+  },
+  "warehouse": false,
+  "repair": false,
+  "upgrade": false,
+  "growth": false
+}

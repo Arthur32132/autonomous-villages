@@ -1,0 +1,89 @@
+{
+  "success": false,
+  "reason": "production_observation_timeout",
+  "ticks": 48001,
+  "screenshots": 399,
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 1,
+    "newExpeditionItemsUnloaded": 40,
+    "observedNightTicks": 20000,
+    "observedSleepTicks": 22558,
+    "naturalThreatsSeen": 1228,
+    "clockTime": 48378,
+    "raining": true,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [
+      "-190, 65, -312 Block{minecraft:coal_ore}",
+      "-189, 63, -311 Block{minecraft:coal_ore}",
+      "-190, 64, -311 Block{minecraft:coal_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "rawIron": 0,
+      "iron": 0,
+      "coal": 3,
+      "cobblestone": 74
+    },
+    "sharedChestContents": [
+      {
+        "items": [
+          "8 minecraft:crafting_table",
+          "1 minecraft:brown_egg",
+          "3 minecraft:rotten_flesh",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ],
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}"
+      },
+      {
+        "items": [
+          "5 minecraft:rotten_flesh",
+          "64 minecraft:cobblestone",
+          "2 minecraft:coal",
+          "27 minecraft:dirt",
+          "7 minecraft:oak_log",
+          "1 minecraft:egg",
+          "4 minecraft:oak_planks",
+          "2 minecraft:crafting_table",
+          "9 minecraft:acacia_slab",
+          "8 minecraft:cobblestone",
+          "4 minecraft:granite"
+        ],
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}"
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true,
+    "atomicBoundaryClock": 11001,
+    "atomicMiningAcrossSchedule": true,
+    "miningExpeditionsReturnedAndUnloaded": 1,
+    "expeditionItemsUnloaded": 40,
+    "verifiedMineralDeposits": {
+      "b26677b5-3464-42a8-8b84-74f507cb8321": 47,
+      "94699b2d-6f91-4aa5-bf4c-3930f2ef656f": 40
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "success": false,
+  "reason": "stopped_for_diagnosis",
+  "ticks": 51065,
+  "screenshots": 424,
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 0,
+    "newExpeditionItemsUnloaded": 0,
+    "observedNightTicks": 20000,
+    "observedSleepTicks": 23879,
+    "naturalThreatsSeen": 1364,
+    "clockTime": 51000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [
+      "-419, 49, -233 Block{minecraft:copper_ore}",
+      "-409, 39, -233 Block{minecraft:copper_ore}",
+      "-409, 40, -234 Block{minecraft:copper_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "coal": 0,
+      "cobblestone": 51,
+      "rawIron": 10,
+      "iron": 0
+    },
+    "sharedChestContents": [
+      {
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}",
+        "items": [
+          "11 minecraft:dirt",
+          "1 minecraft:egg",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ]
+      },
+      {
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}",
+        "items": [
+          "51 minecraft:cobblestone",
+          "1 minecraft:egg",
+          "3 minecraft:dirt",
+          "7 minecraft:granite",
+          "2 minecraft:raw_copper"
+        ]
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true
+  }
+}

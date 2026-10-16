@@ -1,0 +1,88 @@
+{
+  "ticks": 48000,
+  "complete": false,
+  "status": "Observed | работает | центр -321, 73, -319 | территория -401,-392 — -242,-246 | жителей загружено 6, работников 6, кроватей 5 | сундуков 2, еды 0 | строительство склад 64/161 | хозяйство работает\nспит, возвращается домой",
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 1,
+    "newExpeditionItemsUnloaded": 93,
+    "observedNightTicks": 20000,
+    "observedSleepTicks": 23799,
+    "naturalThreatsSeen": 1091,
+    "clockTime": 48000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [
+      "-189, 64, -312 Block{minecraft:coal_ore}",
+      "-189, 63, -311 Block{minecraft:coal_ore}",
+      "-190, 64, -311 Block{minecraft:coal_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "coal": 2,
+      "cobblestone": 65,
+      "rawIron": 0,
+      "iron": 0
+    },
+    "sharedChestContents": [
+      {
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}",
+        "items": [
+          "12 minecraft:acacia_planks",
+          "1 minecraft:wheat",
+          "2 minecraft:acacia_log",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ]
+      },
+      {
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}",
+        "items": [
+          "1 minecraft:crafting_table",
+          "61 minecraft:cobblestone",
+          "6 minecraft:oak_log",
+          "4 minecraft:acacia_planks",
+          "11 minecraft:dirt",
+          "4 minecraft:cobblestone",
+          "2 minecraft:coal"
+        ]
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true,
+    "miningExpeditionsReturnedAndUnloaded": 1,
+    "expeditionItemsUnloaded": 93,
+    "verifiedMineralDeposits": {
+      "7463b5ea-51e8-48d2-94ce-a8e9e3ec6d51": 72,
+      "6c160c28-0773-4d87-b6e3-3ce611a921b6": 2
+    },
+    "atomicBoundaryClock": 35500,
+    "atomicMiningAcrossSchedule": true
+  },
+  "warehouse": false,
+  "repair": false,
+  "upgrade": false,
+  "growth": false
+}

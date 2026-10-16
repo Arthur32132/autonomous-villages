@@ -27,11 +27,21 @@ public final class AutonomousVillagesMod implements ModInitializer {
         return runtime;
     }
     @Override public void onInitialize() {
+        dev.navigationai.api.BlockBreakPermissions.register((id,pos)->{
+            if(runtime==null)return true;
+            return runtime.mayBreak(id,pos);
+        });
         ServerLifecycleEvents.SERVER_STARTED.register(server -> runtime = new VillageRuntime(server));
+        ServerEntityEvents.ENTITY_LOAD.register((entity,level)->{if(runtime!=null&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident&&level==runtime.server.overworld())runtime.residentLoaded(resident);});
         ServerTickEvents.END_SERVER_TICK.register(server -> { if (runtime != null) runtime.tick(); });
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_UNLOAD.register((entity,level)->{
+            if(runtime!=null&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident&&resident.isAlive()&&level==runtime.server.overworld())
+                for(var village:runtime.villages.values())if(village.state.residents.contains(resident.getUUID()))village.state.residentPositions.put(resident.getUUID(),resident.blockPosition().asLong());
+        });
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             if (runtime != null) for (Village village : runtime.villages.values()) {
                 if (village.state.residents.remove(entity.getUUID())) {
+                    village.state.residentPositions.remove(entity.getUUID());
                     village.workers.remove(entity.getUUID()); village.reservations.release(entity.getUUID());
                 }
             }
@@ -42,9 +52,7 @@ public final class AutonomousVillagesMod implements ModInitializer {
                     .executes(c -> help(c.getSource()))
                     .then(Commands.literal("help").executes(c -> help(c.getSource())))
                     .then(Commands.literal("claim").then(Commands.argument("name", StringArgumentType.string())
-                        .executes(c -> claim(c.getSource(), StringArgumentType.getString(c, "name"), 48))
-                        .then(Commands.argument("radius", IntegerArgumentType.integer(24, 64))
-                            .executes(c -> claim(c.getSource(), StringArgumentType.getString(c, "name"), IntegerArgumentType.getInteger(c, "radius"))))))
+                        .executes(c -> claim(c.getSource(), StringArgumentType.getString(c, "name"), 48))))
                     .then(Commands.literal("status").executes(c -> run(c.getSource(), () -> runtime(c.getSource().getServer()).status(null)))
                         .then(Commands.argument("name", StringArgumentType.string()).executes(c -> run(c.getSource(), () -> runtime(c.getSource().getServer()).status(StringArgumentType.getString(c, "name"))))))
                     .then(Commands.literal("storage").then(Commands.argument("name", StringArgumentType.string())
@@ -66,7 +74,7 @@ public final class AutonomousVillagesMod implements ModInitializer {
         catch (Exception error) { s.sendFailure(Component.literal(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())); return 0; }
     }
     private static int help(CommandSourceStack s) {
-        s.sendSuccess(() -> Component.literal("/avillage claim <имя> [радиус 24..64] — выбрать деревню рядом и запустить; "
+        s.sendSuccess(() -> Component.literal("/avillage claim <имя> — выбрать всё поселение по зданиям и рабочим точкам; "
                 + "status [имя]; pause <имя>; resume <имя>; release <имя>; storage <имя> <x y z> — разрешить общий сундук."), false); return 1;
     }
 }

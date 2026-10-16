@@ -1,0 +1,140 @@
+{
+  "success": false,
+  "reason": "production_observation_timeout",
+  "ticks": 144001,
+  "screenshots": 1198,
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 40,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 1,
+    "newExpeditionItemsUnloaded": 130,
+    "observedNightTicks": 60000,
+    "observedSleepTicks": 71699,
+    "naturalThreatsSeen": 3766,
+    "clockTime": 144000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [
+      "-419, 49, -233 Block{minecraft:copper_ore}",
+      "-409, 39, -233 Block{minecraft:copper_ore}",
+      "-409, 40, -234 Block{minecraft:copper_ore}"
+    ],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": true,
+    "peakWool": 10,
+    "currentStock": {
+      "iron": 0,
+      "coal": 3,
+      "cobblestone": 57,
+      "rawIron": 0
+    },
+    "sharedChestContents": [
+      {
+        "items": [
+          "7 minecraft:cobblestone",
+          "10 minecraft:dirt",
+          "1 minecraft:rotten_flesh",
+          "4 minecraft:acacia_planks",
+          "2 minecraft:egg",
+          "3 minecraft:brown_egg",
+          "1 minecraft:birch_door",
+          "2 minecraft:birch_sign",
+          "13 minecraft:wheat",
+          "1 minecraft:bundle",
+          "9 minecraft:wheat_seeds",
+          "5 minecraft:apple",
+          "1 minecraft:poisonous_potato",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ],
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}"
+      },
+      {
+        "items": [
+          "1 minecraft:acacia_slab",
+          "1 minecraft:brown_egg",
+          "4 minecraft:birch_slab",
+          "19 minecraft:dirt",
+          "33 minecraft:cobblestone",
+          "7 minecraft:granite",
+          "2 minecraft:torch",
+          "2 minecraft:raw_copper",
+          "4 minecraft:acacia_planks",
+          "1 minecraft:apple",
+          "1 minecraft:cobblestone",
+          "2 minecraft:egg",
+          "1 minecraft:short_grass",
+          "1 minecraft:poppy",
+          "2 minecraft:birch_leaves"
+        ],
+        "pos": "BlockPos{x\u003d-274, y\u003d65, z\u003d-283}"
+      },
+      {
+        "items": [],
+        "pos": "BlockPos{x\u003d-275, y\u003d65, z\u003d-282}"
+      },
+      {
+        "items": [],
+        "pos": "BlockPos{x\u003d-273, y\u003d65, z\u003d-282}"
+      },
+      {
+        "items": [],
+        "pos": "BlockPos{x\u003d-271, y\u003d65, z\u003d-282}"
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "partyDepartedTogether": true,
+    "miningExpeditionsReturnedAndUnloaded": 1,
+    "expeditionItemsUnloaded": 130,
+    "verifiedMineralDeposits": {
+      "bc30fd2b-a33b-47d3-8537-9f7ebd01fb30": 109,
+      "4e0be2a3-1639-41bd-a092-15ab298fe13a": 7,
+      "fe8c27bb-ae14-4589-8f86-2c553308fa2c": 7
+    },
+    "warehouseBlocks": 161,
+    "warehouseOrigin": -75591425585088,
+    "damagedHouseBlocks": [
+      -84937274662831,
+      -83288007221167,
+      -84112640921523,
+      -82188495495091
+    ],
+    "repairTicks": 69860,
+    "repairedBlocks": [
+      {
+        "original": "Block{minecraft:oak_planks}",
+        "actual": "Block{minecraft:oak_planks}"
+      },
+      {
+        "original": "Block{minecraft:oak_planks}",
+        "actual": "Block{minecraft:oak_planks}"
+      },
+      {
+        "original": "Block{minecraft:oak_door}[facing\u003dnorth,half\u003dlower,hinge\u003dright,open\u003dfalse,powered\u003dfalse]",
+        "actual": "Block{minecraft:birch_door}[facing\u003dnorth,half\u003dlower,hinge\u003dright,open\u003dtrue,powered\u003dfalse]"
+      },
+      {
+        "original": "Block{minecraft:white_terracotta}",
+        "actual": "Block{minecraft:cobblestone}"
+      }
+    ],
+    "houseUpgrade": true
+  }
+}

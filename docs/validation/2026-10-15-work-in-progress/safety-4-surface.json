@@ -1,0 +1,54 @@
+{
+  "success": true,
+  "scope": "safety_only",
+  "output": "C:\\minecraftWorkflow\\AutonomousVillages\\build\\validation\\20261015-195322",
+  "jars": {
+    "autonomous-villages-0.2.0.jar": "dc5fb71b577f23c2b33dfb50b1155b7a7302782fc0edcf10f61ecbbedeb933c7",
+    "autonomous-villages-validation-0.2.0.jar": "2d0bc95f8b79aded08fb4fa333e72fd358f09daf073b0ada68ed9347c8a27492",
+    "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+    "navigation-ai-0.2.0.jar": "de5de326b4d9ab41df4ca8fc3b0542163ac6937666a72883386109196d4c7d51"
+  },
+  "sourceSha256": {
+    "src\\test\\java\\dev\\autonomousvillages\\VillageRulesTest.java": "9f765d250d42c3f3f4825e83ede7f068e7f3bb33988d95ba313e8a7f20bad619",
+    "src\\main\\resources\\autonomous_villages.mixins.json": "aa17cb0a06d6e7adf4e826594a25c4314e55504401fe93ca7766ee6084dfad49",
+    "src\\main\\resources\\fabric.mod.json": "0525c670160196f374f363db948733b085974ac858f05e0b848ada4a5c505817",
+    "src\\main\\java\\dev\\autonomousvillages\\AccessWorks.java": "583c13d76861dd10e78d3c86000d3f640af19db24fc0d6de188d23aeab297983",
+    "src\\main\\java\\dev\\autonomousvillages\\AutonomousVillagesMod.java": "21406f2bf51bda4283dadc8ed5f9ed94a324d6d4d221690fa165c80e71e36f03",
+    "src\\main\\java\\dev\\autonomousvillages\\BreathingSafety.java": "70e29763e2a205f1d54c53e6360ff0d1f17e2b25e266be330ff58eba7c8cb79b",
+    "src\\main\\java\\dev\\autonomousvillages\\Construction.java": "23eddedd0c745823e672f21a97bfa391a3a078ec8bdb3c197d498a9b3dcefe45",
+    "src\\main\\java\\dev\\autonomousvillages\\ExpeditionManager.java": "1db39873191484cb27bb1c1df40b4626c9bf2ad40fc23df97fea9de71aa72da9",
+    "src\\main\\java\\dev\\autonomousvillages\\ExpeditionState.java": "f6b8f729c8412a22ee33d8cca5bed1b1a203e1bdf297f88a544d0225bd1423cf",
+    "src\\main\\java\\dev\\autonomousvillages\\ForestWork.java": "777709761c412a8ab474c24db13341ca2b5d993ff80a82334690777597a88f5f",
+    "src\\main\\java\\dev\\autonomousvillages\\Reservations.java": "dc56799b18ff9f4466c001a3f000f3283d2d5b2bf997b8da32ba7ca1b035125f",
+    "src\\main\\java\\dev\\autonomousvillages\\Resident.java": "5045e73a1b9d778fc829dc81e601131809c622253c4b1bb3aecd8b9432bb83ec",
+    "src\\main\\java\\dev\\autonomousvillages\\Supplies.java": "18246604810f72b6a6a781d3db60546c66d6c03f68e623be1a11904e21fadd89",
+    "src\\main\\java\\dev\\autonomousvillages\\SupplyRuns.java": "a0bf93f699b1521789117528d46e2800468a3cb43985688e1acc1c4903e55168",
+    "src\\main\\java\\dev\\autonomousvillages\\TerrainRecovery.java": "a7138ae70c73b5cbedf1b70aec327531d513da80f78014d223827147df401aa0",
+    "src\\main\\java\\dev\\autonomousvillages\\TownBuilding.java": "389ed86f10c32b67a817b94001a7d54ad2ea87df63bbdbd941b7b9c22ebfce13",
+    "src\\main\\java\\dev\\autonomousvillages\\TownCrafting.java": "3d9acd6bc16a77a428495daed05f238a6bd3e217bf1d3ccb9059be8aeb6bf68b",
+    "src\\main\\java\\dev\\autonomousvillages\\TownPlanner.java": "e75eaedd2bb19c08eaa31fbb9ffad1065fa9e58c36612817036fe92ae09258a9",
+    "src\\main\\java\\dev\\autonomousvillages\\Village.java": "0a5816ce4822575e5b917e3433695cdcaa4870beb726d0fed712991f4e681bf4",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageDiscovery.java": "5f631da0bb1e4005e5b94210df856df06f244ac9b289a1963a1568b54742eab5",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageIndex.java": "38c96be25bdf104937775725b60711f665762c8ea813b00ad9209a8b0e9245c5",
+    "src\\main\\java\\dev\\autonomousvillages\\VillagePresentation.java": "bf5714b32a342be2510b51c36ff1709dd728d2ed74938a07bfd1c9a82a755956",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageRuntime.java": "90e1d994d751bdca1211387cc41f8f526fe1f16516db940d34a0c536653f002e",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageState.java": "1ce81efc612e056e18b511fb18f77ddbb126dd1e9c0540d8108197eeefc32f14",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageWorkshop.java": "de78fbedf6c04bfa42d17162a44d8672a76c18916356662acd858b70149549a6",
+    "src\\main\\java\\dev\\autonomousvillages\\mixin\\ServerEmptyPauseMixin.java": "bc92af38c7f2301d645de17986191e88c8e8cc70fdae7f27d677f159de66cfcc",
+    "tools\\validation\\run.py": "8a8bb2aa0666e2148c29cf08165488cc3989fa834017b3823b1bfa0cd3da6817",
+    "tools\\validation\\resources\\fabric.mod.json": "17c4fd9f75d63dce2ff98e3a50176a37877c17a67cc7b14f898c7a639fa07b14",
+    "tools\\validation\\java\\dev\\autonomousvillages\\VillageProbeMod.java": "cb9b32cde3e1dc137919a91a83e9825d63e1f058de397e3c7603fb376a9ae5f4",
+    "tools\\validation\\java\\dev\\autonomousvillages\\VillageSelfTest.java": "6a3416a9e188051dac2b5ae7aa9e4a2af6738aac09378734c1f1f3913f307505"
+  },
+  "checks": [
+    "[19:53:45] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+    "[19:53:49] [Server thread/INFO]: VILLAGE_TEST PASS ordinary_villager_movement_brakes_at_deep_diagonal_ledge_without_sneaking",
+    "[19:53:49] [Server thread/INFO]: VILLAGE_TEST PASS native_villager_centres_body_before_narrow_flooded_corridor_turn",
+    "[19:53:50] [Server thread/INFO]: VILLAGE_TEST PASS low_air_interrupts_work_and_native_villager_surfaces_without_drowning_or_air_gifts"
+  ],
+  "junit": {
+    "tests": 15,
+    "failures": 0,
+    "errors": 0
+  }
+}

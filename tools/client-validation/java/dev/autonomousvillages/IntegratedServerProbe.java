@@ -34,6 +34,7 @@ public final class IntegratedServerProbe implements ClientModInitializer {
     private int firstTitleTicks;
     private static void require(boolean b,String message){if(!b)throw new IllegalStateException(message);}
     @Override public void onInitializeClient(){
+        if(Boolean.getBoolean("avillage.test.colony")){new SettlementSimulationProbe().onInitializeClient();return;}
         ServerLifecycleEvents.SERVER_STOPPED.register(s->{if(s==firstServer)stopped=true;});
         ServerTickEvents.END_SERVER_TICK.register(this::serverTick);
         ClientTickEvents.END_CLIENT_TICK.register(this::clientTick);
@@ -67,7 +68,8 @@ public final class IntegratedServerProbe implements ClientModInitializer {
                 mc.createWorldOpenFlows().openWorld("IntegratedSmoke",()->fail(new IllegalStateException("World reopening cancelled")));
             }
             if(phase==3&&secondPassed&&mc.level!=null&&mc.level.getEntity(bodyId) instanceof Villager){
-                phase=4;finishAt=System.nanoTime()+30_000_000_000L;
+                phase=4;finishAt=System.nanoTime()+5_000_000_000L;
+                net.minecraft.client.Screenshot.grab(mc.gameDirectory,"integrated-reload.png",mc.gameRenderer.mainRenderTarget(),1,message->LOG.info("CLIENT_TEST FRAME {}",message));
                 write("{\"success\":true,\"freshWorld\":true,\"nativeVillagerRendered\":true,\"reloadBackpack\":17,\"activeVillageResumed\":true}");
                 LOG.info("CLIENT_TEST READY_SCREENSHOT fresh_world_and_reload_passed");
             }

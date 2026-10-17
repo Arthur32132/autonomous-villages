@@ -21,6 +21,8 @@ final class Village {
     final VillagePresentation presentation;
     final ExpeditionManager expeditions;
     final Reservations reservations = new Reservations();
+    /** Roadmap 1: the current dependency graph, recomputed with the orders each planning cycle. */
+    SettlementNeeds.Plan needs = SettlementNeeds.Plan.empty();
     final Map<UUID, Resident> workers = new LinkedHashMap<>();
     final Map<Long, Long> rejected = new HashMap<>();
     final ServerLevel level;
@@ -79,7 +81,7 @@ final class Village {
         ManagedLand.tick(this);
         ProductionBuildings.tick(this);
         PopulationPlanning.tick(this);
-        if(time%100==0)IronSupply.sync(this,time);
+        if(time%100==0)town.syncOrders(time);
         expeditions.tick();
         SupplyRuns.tick(this);
         DeliveryRuns.tick(this);
@@ -219,13 +221,12 @@ final class Village {
     }
     /** Earlier open orders keep their chest allocation; unrelated fetches see only free stock. */
     int claimableFromChests(Orders.Order wanted){
-        Orders.refreshStock(this);
-        int stock=chestCount(wanted.kind());
-        for(var order:state.orders){
-            if(order==wanted)return Math.min(stock,order.outstanding());
-            if(order.open()&&!order.returnCargo()&&order.kind()==wanted.kind())stock=Math.max(0,stock-order.outstanding());
-        }
-        return 0;
+        var allocation=Orders.allocations(this,wanted.kind()).get(wanted);
+        return allocation==null?0:allocation.chest();
+    }
+    int claimableFromBag(Orders.Order wanted,Resident donor){
+        var allocation=Orders.allocations(this,wanted.kind()).get(wanted);
+        return allocation==null?0:allocation.bags().getOrDefault(donor.id,0);
     }
     /** Residents whose backpack physically carries this material and can hand it over. */
     List<Resident> holders(Orders.Material material){
@@ -339,6 +340,7 @@ final class Village {
                 + (state.orders.isEmpty() ? "" : " | заказы: " + String.join(", ", state.orders.stream()
                         .map(o -> o.material + " " + o.delivered + "/" + o.quantity + (o.transit ? " в пути" : "") + " " + o.purpose).toList()))
                 + " | запас еды нужен "+SettlementEconomy.budget(this).food()+" | "+(SettlementEconomy.canGrow(this)?"рост обеспечен":"рост ждёт ресурсов/жилья")
+                + " | потребности: "+needs.summary()
                 + " | " + problem + (jobs.isEmpty() ? "" : "\n" + jobs);
     }
 }

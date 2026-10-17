@@ -46,6 +46,7 @@ final class VillageWorkshop {
         ItemStack output = recipe.value().assemble(input);
         if (output.isEmpty() || !accept.test(output) || !output.isItemEnabled(v.level.enabledFeatures())) return false;
         var maker=v.workers.get(b.id());
+        if(maker!=null&&!SettlementNeeds.mayCraft(v,maker,output,grid,before))return false;
         if(maker!=null&&output.is(Items.BREAD)){
             int spent=Supplies.count(grid,s->s.is(Items.WHEAT));
             if(Supplies.count(next,s->s.is(Items.WHEAT))<v.farm.wheatReserve(maker)||v.count(s->s.is(Items.WHEAT))-spent<SettlementEconomy.budget(v).breedingWheat())return false;
@@ -79,7 +80,7 @@ final class VillageWorkshop {
         if(guard&&!hasDefensiveSword(b)
                 &&craft(b,v,Items.STONE_SWORD,new String[]{"M","M","S"},STONE))return true;
         if(miner&&needsIronSurvey(v)&&!hasSurveyPick(b)&&maintainSurveyPick(b,v))return true;
-        if(v.expeditions.preparingMine(b.id())&&hasPickFor(b,Blocks.IRON_ORE.defaultBlockState())
+        if((v.expeditions.preparingMine(b.id())||SettlementNeeds.needsMineKit(v,v.workers.get(b.id())))&&hasPickFor(b,Blocks.IRON_ORE.defaultBlockState())
                 &&MineSupplies.inspect(v.workers.get(b.id())).spare()<24
                 &&craft(b,v,Items.STONE_PICKAXE,new String[]{"MMM"," S "," S "},STONE))return true;
         int planks = Supplies.count(slots, PLANK);
@@ -132,6 +133,30 @@ final class VillageWorkshop {
         }
         return false;
     }
+    /** The ready graph node selects the recipe; normal vanilla validation still pays every input. */
+    static boolean makePlanned(BotHandle b,Village v,SettlementNeeds.Need need){
+        return switch(need.produces()){
+            case "planks" -> craft(b,v,new String[]{"M"},s->s.is(ItemTags.LOGS_THAT_BURN),PLANK);
+            case "sticks" -> craft(b,v,Items.STICK,new String[]{"P","P"},PLANK);
+            case "wooden_pick" -> craft(b,v,Items.WOODEN_PICKAXE,new String[]{"PPP"," S "," S "},PLANK);
+            case "survey_pick" -> craft(b,v,Items.STONE_PICKAXE,new String[]{"MMM"," S "," S "},STONE);
+            case "beds" -> {
+                boolean made=false;
+                for(var wool:b.inventory().snapshot().slots())if(wool.is(ItemTags.WOOL)&&b.inventory().count(wool.getItem())>=3
+                        &&craft(b,v,new String[]{"MMM","PPP"},s->s.is(wool.getItem()),s->s.is(ItemTags.BEDS))){made=true;break;}
+                yield made;
+            }
+            case "iron_shears" -> craft(b,v,Items.SHEARS,new String[]{" I","I "},s->s.is(Items.IRON_INGOT));
+            case "iron_pickaxe" -> craft(b,v,Items.IRON_PICKAXE,new String[]{"III"," S "," S "},STONE);
+            case "iron_bucket" -> craft(b,v,Items.BUCKET,new String[]{"I I"," I "},STONE);
+            case "iron_offhand" -> craft(b,v,Items.SHIELD,new String[]{"PIP","PPP"," P "},PLANK);
+            case "iron_chest" -> craft(b,v,Items.IRON_CHESTPLATE,new String[]{"I I","III","III"},STONE);
+            case "iron_head" -> craft(b,v,Items.IRON_HELMET,new String[]{"III","I I"},STONE);
+            case "iron_legs" -> craft(b,v,Items.IRON_LEGGINGS,new String[]{"III","I I","I I"},STONE);
+            case "iron_feet" -> craft(b,v,Items.IRON_BOOTS,new String[]{"I I","I I"},STONE);
+            default -> false;
+        };
+    }
     static boolean hasPickFor(BotHandle b,net.minecraft.world.level.block.state.BlockState state){return Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s)&&s.isCorrectToolForDrops(state))>=0;}
     static boolean needsIronSurvey(Village v){return IronSupply.rawNeeded(v)>0;}
     static boolean hasSurveyPick(BotHandle b){return Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&s.isCorrectToolForDrops(Blocks.IRON_ORE.defaultBlockState())&&s.getMaxDamage()-s.getDamageValue()>=80)>=0;}
@@ -155,20 +180,30 @@ final class VillageWorkshop {
         if (!out.isEmpty() && Supplies.insert(withOutput, out)) { next=withOutput; replacement.set(2,ItemStack.EMPTY); changed = true; }
         if (replacement.get(0).isEmpty()) {
             int slot = -1;
-            boolean charcoal=v.count(s->s.is(Items.CHARCOAL)||s.is(Items.COAL))<8&&v.count(s->s.is(ItemTags.LOGS)||s.is(ItemTags.PLANKS))>16;
-            for (int i = 0; i < next.size(); i++) if (next.get(i).is(Items.RAW_IRON) || charcoal&&next.get(i).is(ItemTags.LOGS_THAT_BURN)
+            boolean charcoal=charcoalRequested(v,b)||b.inventory().count(Items.RAW_IRON)==0&&v.count(s->s.is(Items.CHARCOAL)||s.is(Items.COAL))<8&&v.count(s->s.is(ItemTags.LOGS)||s.is(ItemTags.PLANKS))>16;
+            for (int i = 0; i < next.size(); i++) if (!charcoal&&next.get(i).is(Items.RAW_IRON) || charcoal&&next.get(i).is(ItemTags.LOGS_THAT_BURN)
                     ||v.town.pending(Items.GLASS_PANE)&&v.count(s->s.is(Items.GLASS))<16&&next.get(i).is(Items.SAND)
                     ||v.town.pending(Items.STONE_BRICKS)&&v.count(s->s.is(Items.STONE))<32&&next.get(i).is(Items.COBBLESTONE)) { slot = i; if (next.get(i).is(Items.RAW_IRON)) break; }
             if (slot >= 0) {
                 ItemStack input = next.get(slot);
                 var recipe = v.level.recipeAccess().getRecipeFor(RecipeType.SMELTING, new SingleRecipeInput(input), v.level);
-                if (recipe.isPresent()) { int n = Math.min(input.getCount(),8); replacement.set(0,input.copyWithCount(n)); input.shrink(n); changed = true; }
+                if (recipe.isPresent()) {
+                    int limit=8;var resident=v.workers.get(b.id());
+                    if(resident!=null)for(var material:Orders.Material.values())if(material.accepts.test(input))
+                        limit=Math.min(limit,SettlementNeeds.furnaceAllowance(v,resident,material));
+                    int n=Math.min(input.getCount(),limit);
+                    if(n>0){replacement.set(0,input.copyWithCount(n));input.shrink(n);changed=true;}
+                }
             }
         }
         if (!replacement.get(0).isEmpty() && replacement.get(1).getCount() < 4) {
             for (ItemStack fuel : next) if ((fuel.is(Items.COAL) || fuel.is(Items.CHARCOAL) || fuel.is(ItemTags.PLANKS)) && v.level.fuelValues().isFuel(fuel)
                     && (replacement.get(1).isEmpty() || ItemStack.isSameItemSameComponents(replacement.get(1),fuel))) {
                 int n = Math.min(fuel.getCount(),4-replacement.get(1).getCount());
+                var resident=v.workers.get(b.id());
+                if(resident!=null)for(var material:Orders.Material.values())if(material.accepts.test(fuel))
+                    n=Math.min(n,SettlementNeeds.furnaceAllowance(v,resident,material));
+                if(n==0)continue;
                 if (replacement.get(1).isEmpty()) replacement.set(1,fuel.copyWithCount(n)); else replacement.get(1).grow(n);
                 fuel.shrink(n); changed = true; break;
             }
@@ -182,7 +217,11 @@ final class VillageWorkshop {
         return !f.getItem(2).isEmpty()||!f.getItem(0).isEmpty()&&f.getItem(1).isEmpty()
                 ||f.getItem(0).isEmpty()&&(b.inventory().count(Items.RAW_IRON)>0
                 ||v.town.pending(Items.GLASS_PANE)&&b.inventory().count(Items.SAND)>0||v.town.pending(Items.STONE_BRICKS)&&b.inventory().count(Items.COBBLESTONE)>0
-                ||v.count(s->s.is(Items.CHARCOAL)||s.is(Items.COAL))<8&&v.count(s->s.is(ItemTags.LOGS)||s.is(ItemTags.PLANKS))>16
+                ||(charcoalRequested(v,b)||v.count(s->s.is(Items.CHARCOAL)||s.is(Items.COAL))<8&&v.count(s->s.is(ItemTags.LOGS)||s.is(ItemTags.PLANKS))>16)
                 &&b.inventory().snapshot().slots().stream().anyMatch(s->s.is(ItemTags.LOGS_THAT_BURN)));
+    }
+    private static boolean charcoalRequested(Village v,BotHandle b){
+        return v.needs.needs().stream().anyMatch(n->n.purpose().equals("charcoal")&&n.executor().equals(b.id().toString())
+                &&v.needs.state(n).state()==SettlementNeeds.State.READY);
     }
 }

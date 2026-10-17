@@ -95,7 +95,7 @@ final class ProductionRegression {
             if(miner.bot().inventory().count(Items.IRON_INGOT)<2)return false;
             farmer.body().snapTo(Vec3.atBottomCenterOf(base.offset(0,0,-10)),0,0);
             miner.body().snapTo(Vec3.atBottomCenterOf(base.offset(2,0,-10)),0,0);
-            var order=v.state.orders.stream().filter(o->o.purpose.equals("iron_shears")).findFirst().orElseThrow();
+            var order=v.state.orders.stream().filter(o->o.purpose.split("@",2)[0].equals("iron_shears")).findFirst().orElseThrow();
             miner.deliver(order,farmer.id);phase=11;return false;
         }
         if(phase==11){

@@ -21,7 +21,21 @@ final class Orders {
         IRON(s -> s.is(Items.IRON_INGOT)),
         COBBLESTONE(s -> s.is(Items.COBBLESTONE)),
         WOODEN_DOOR(s -> s.is(ItemTags.WOODEN_DOORS)),
-        WOODEN_STAIRS(s -> s.is(ItemTags.WOODEN_STAIRS));
+        WOODEN_STAIRS(s -> s.is(ItemTags.WOODEN_STAIRS)),
+        RAW_IRON(s -> s.is(Items.RAW_IRON)),
+        FUEL(s -> s.is(Items.COAL)||s.is(Items.CHARCOAL)),
+        STICKS(s -> s.is(Items.STICK)),
+        FOOD(Supplies::food),
+        SEEDS(s -> s.is(Items.WHEAT_SEEDS)||s.is(Items.BEETROOT_SEEDS)),
+        IRON_PICKAXE(s -> s.is(Items.IRON_PICKAXE)&&Supplies.usable(s)),
+        BUCKET(s -> s.is(Items.BUCKET)||s.is(Items.WATER_BUCKET)),
+        SHIELD(s -> s.is(Items.SHIELD)&&Supplies.usable(s)),
+        CHESTPLATE(s -> s.is(Items.IRON_CHESTPLATE)&&Supplies.usable(s)),
+        HELMET(s -> s.is(Items.IRON_HELMET)&&Supplies.usable(s)),
+        LEGGINGS(s -> s.is(Items.IRON_LEGGINGS)&&Supplies.usable(s)),
+        BOOTS(s -> s.is(Items.IRON_BOOTS)&&Supplies.usable(s)),
+        SURVEY_PICK(s -> s.is(Items.STONE_PICKAXE)&&s.isCorrectToolForDrops(net.minecraft.world.level.block.Blocks.IRON_ORE.defaultBlockState())
+                &&s.getMaxDamage()-s.getDamageValue()>=32);
         final Predicate<ItemStack> accepts;
         Material(Predicate<ItemStack> accepts){this.accepts=accepts;}
         static Material named(String name){for(Material m:values())if(m.name().equals(name))return m;return null;}
@@ -41,6 +55,8 @@ final class Orders {
         public String carrier="";
         public int inTransit;
         public int observedStock;
+        /** A manufacturing output target; only its selected inputs may be fetched externally. */
+        public boolean localOnly;
         public long retryAfter;
         public long created;
         transient int craftedCoverage;
@@ -53,6 +69,47 @@ final class Orders {
     /** One derived need: a material class, the reason and the required quantity. */
     record Demand(Material material,String purpose,int quantity){ }
 
+    record Allocation(int chest,Map<UUID,Integer> bags){
+        int total(){return chest+bags.values().stream().mapToInt(Integer::intValue).sum();}
+    }
+
+    /** The same physical pools serve dispatch and self-fetch; every unit is allocated once. */
+    static Map<Order,Allocation> allocations(Village v){return allocations(v,List.of(Material.values()));}
+    static Map<Order,Allocation> allocations(Village v,Material material){return allocations(v,List.of(material));}
+    private static Map<Order,Allocation> allocations(Village v,List<Material> materials){
+        refreshStock(v);
+        var out=new IdentityHashMap<Order,Allocation>();
+        var active=v.workers.values().stream().filter(r->r.bot()!=null&&r.bot().state()==dev.navigationai.api.BotState.ACTIVE
+                &&r.body().isAlive()).sorted(Comparator.comparing(r->r.id.toString())).toList();
+        for(var material:materials){
+            int chest=v.chestCount(material);
+            var bags=new LinkedHashMap<UUID,Integer>();
+            for(var r:active){
+                int assigned=v.state.orders.stream().filter(o->!o.returnCargo()&&o.kind()==material&&o.recipient.equals(r.id.toString()))
+                        .mapToInt(o->Math.max(0,o.delivered-o.craftedCoverage)).sum();
+                bags.put(r.id,Math.max(0,r.count(material)-Math.max(r.kit(material),assigned)));
+            }
+            // Honour real cargo already in a courier's hands before reserving chest stock.
+            for(var o:v.state.orders)if(o.open()&&!o.returnCargo()&&!o.localOnly&&o.kind()==material&&!o.carrier.isEmpty()){
+                for(var r:active)if(o.carrier.equals(r.id.toString())){
+                    int n=Math.min(o.outstanding(),Math.min(o.inTransit,bags.getOrDefault(r.id,0)));
+                    out.put(o,new Allocation(0,Map.of(r.id,n)));bags.merge(r.id,-n,Integer::sum);
+                }
+            }
+            for(var o:v.state.orders)if(o.open()&&!o.returnCargo()&&!o.localOnly&&o.kind()==material){
+                var prior=out.getOrDefault(o,new Allocation(0,Map.of()));
+                int left=o.outstanding()-prior.total(),stored=Math.min(chest,left);chest-=stored;left-=stored;
+                var granted=new LinkedHashMap<UUID,Integer>(prior.bags());
+                for(var r:active)if(!r.id.toString().equals(o.recipient)){
+                    int n=Math.min(left,bags.getOrDefault(r.id,0));left-=n;bags.merge(r.id,-n,Integer::sum);
+                    if(n>0)granted.merge(r.id,n,Integer::sum);
+                }
+                out.put(o,new Allocation(stored,Map.copyOf(granted)));
+            }
+        }
+        return out;
+    }
+
     /** Free stock / personal emergency kit / reserved for an order / cargo in transit. */
     record Ledger(int free,int kit,int reserved,int transit,int backpacks,int reservedBackpacks){
         int total(){return free+kit+reserved+transit+backpacks;}
@@ -62,6 +119,7 @@ final class Orders {
 
     // 256 building projects plus return cargo; admission is explicit and never trims live orders.
     static final int MAX_ORDERS=4096;
+    static final int MAX_PURPOSE_LENGTH=128;
     /** A cold trail stops reserving material once the drop can no longer be found. */
     static final long RETURN_CARGO_TICKS=24000;
 
@@ -129,7 +187,7 @@ final class Orders {
             kit+=keep;surplus+=held-keep;
         }
         int availableChest=Math.max(0,chest),availableBags=surplus,reserved=0,transit=0,reservedBags=0;
-        for(Order order:orders)if(order.open()&&order.kind()==material&&!order.returnCargo()){
+        for(Order order:orders)if(order.open()&&!order.localOnly&&order.kind()==material&&!order.returnCargo()){
             int moving=Math.min(availableBags,Math.min(order.outstanding(),order.inTransit));
             transit+=moving;availableBags-=moving;
             int wanted=order.outstanding()-moving;

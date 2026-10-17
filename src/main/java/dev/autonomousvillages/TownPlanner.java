@@ -152,7 +152,6 @@ final class TownPlanner {
             try{var survey=VillageDiscovery.survey(v.level,v.state.center());capture(survey);v.runtime.save();}catch(IllegalArgumentException ignored){}
         }
         if(now<nextPlanning)return;nextPlanning=now+100;
-        syncOrders(now);
         boolean adjusted=!coalesced&&coalesceHouses();
         for(var building:v.state.buildings){
             if(building.kind.equals("native_house"))adjusted|=building.blocks.removeIf(p->!structural(p.block()));
@@ -257,33 +256,8 @@ final class TownPlanner {
             if((order.transit||!order.carrier.isEmpty())&&v.workers.values().stream().noneMatch(r->r.deliverOrder==order)){Orders.release(order);changed=true;}
         }
         for(var material:Orders.Material.values())changed|=Orders.recovered(v.state.orders,material,v.chestCount(material),now);
-        var missing=v.state.buildings.stream()
-                .filter(b->b.blocks.stream().anyMatch(p->p.block().getBlock() instanceof BedBlock&&!p.matches(v))).toList();
-        var works=missing.stream().map(b->b.origin).collect(java.util.stream.Collectors.toSet());
-        changed|=v.state.orders.removeIf(o->o.purpose.startsWith("bed_")&&!works.contains(o.work));
-        if(missing.isEmpty()){
-            if(Orders.clear(v.state.orders,"bed_"))changed=true;
-        }else{
-            var keeper=v.farm.caretaker();
-            boolean hasShears=keeper!=null&&Supplies.find(keeper.bot(),s->s.is(Items.SHEARS)&&Supplies.usable(s))>=0;
-            var builder=v.workers.values().stream().filter(r->v.builder(r.id)&&r.bot()!=null&&r.body().isAlive()).sorted(Comparator.<Resident>comparingInt(r->v.hasRole(r.id,ResidentRoles.Role.BUILDER)?0:1).thenComparing(r->r.id.toString())).findFirst().orElse(null);
-            String recipient=builder==null?"":builder.id.toString();
-            long delivery=v.meetingPoint().asLong();
-            for(TownBuilding work:missing){
-                int beds=(int)work.blocks.stream().filter(p->p.block().getBlock() instanceof BedBlock&&!p.matches(v)).count();
-                var demand=Orders.beds(beds,hasShears,true);
-                changed|=v.state.orders.removeIf(o->o.work==work.origin&&o.purpose.startsWith("bed_")
-                        &&demand.stream().noneMatch(d->d.purpose().equals(o.purpose)));
-                for(var need:demand){
-                    // Assign the final recipient once. Routing shears through the builder
-                    // first released their carrier on every synchronization.
-                    String receiver=need.material()==Orders.Material.SHEARS?(keeper==null?"":keeper.id.toString()):recipient;
-                    changed|=Orders.applyScoped(v.state.orders,work.origin,List.of(need),receiver,delivery,now,need.purpose());
-                }
-            }
-        }
-        changed|=ConstructionSupply.sync(v,now);
-        changed|=Orders.refreshStock(v);
+        // One supply pass after town, farm and population updates; direct callers use it too.
+        SettlementNeeds.sync(v,now);
         if(changed)v.runtime.save();
     }
     TownBuilding warehouse(BlockPos base){

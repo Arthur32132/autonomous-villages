@@ -66,7 +66,8 @@ final class Resident {
         int keep=0;var counted=new HashSet<Item>();
         if(material==Orders.Material.SHEARS){
             for(int slot:keptShears())if(material.accepts.test(bag.get(slot)))keep+=bag.get(slot).getCount();
-        }else for(ItemStack stack:bag)if(!stack.isEmpty()&&material.accepts.test(stack)&&counted.add(stack.getItem()))keep=Math.max(keep,reserve(stack,v.steward(id)));
+        }else if(material==Orders.Material.SURVEY_PICK)keep=v.miner(id)?2:1;
+        else for(ItemStack stack:bag)if(!stack.isEmpty()&&material.accepts.test(stack)&&counted.add(stack.getItem()))keep=Math.max(keep,reserve(stack,v.steward(id)));
         // Cargo just accepted by a porter is not retroactively turned into his own kit.
         if(deliveryKit>=0&&deliverOrder!=null&&deliverOrder.kind()==material)return Math.min(held,deliveryKit);
         return Math.min(held,keep);
@@ -117,7 +118,7 @@ final class Resident {
     private void deliver(Orders.Order order,UUID recipient,int personalKit){
         cancel();
         deliverOrder=order;deliveryKit=personalKit;
-        order.inTransit=Math.min(order.outstanding(),Math.max(0,count(order.kind())-kit(order.kind())));
+        order.inTransit=Math.min(v.claimableFromBag(order,this),Math.max(0,count(order.kind())-kit(order.kind())));
         order.transit=order.inTransit>0;order.carrier=id.toString();
         if(!order.transit){Orders.release(order);finish();return;}
         deliverOrder=order;deliverRecipient=recipient;
@@ -221,6 +222,7 @@ final class Resident {
         if(v.expeditions.preparingSurveyPick(id)&&(prepareCrafting(b,steward)||depositOrFetch(b,steward)))return;
         if((Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))<0
                 ||Supplies.find(b,s->s.is(ItemTags.AXES)&&Supplies.usable(s))<0)&&prepareCrafting(b,steward))return;
+        for(var need:v.needs.runnable(this))if(plannedWork(b,need))return;
         if(constructionWork(b))return;
         // Bring excess cargo to the shared store before accepting another project. Otherwise a
         // repeatable renovation can keep the equipped shearer ineligible for every wool outing.
@@ -310,11 +312,13 @@ final class Resident {
                 if(ore!=null){assign("ore",ore);return job!=null;}
             }
         if (Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))>=0) {
-            if(v.count(s->s.is(Items.COBBLESTONE))<Math.max(32,v.workers.size()*12)) {
+            boolean stoneRequested=v.needs.needs().stream().anyMatch(n->n.purpose().equals("produce_cobblestone")
+                    &&v.needs.state(n).state()==SettlementNeeds.State.READY);
+            if(stoneRequested||v.count(s->s.is(Items.COBBLESTONE))<Math.max(32,v.workers.size()*12)) {
                 BlockPos stone=nearest(v.index.stone,p->v.state.policy.allows("mine",p)&&v.level.getBlockState(p).is(Blocks.STONE)&&VillageIndex.exposed(v.level,p));
                 if(stone!=null){assign("stone",stone);return job!=null;}
             }
-            if((v.count(s->s.is(Items.COBBLESTONE))<Math.max(32,v.workers.size()*12)
+            if((stoneRequested||v.count(s->s.is(Items.COBBLESTONE))<Math.max(32,v.workers.size()*12)
                     ||IronSupply.rawNeeded(v)>0)&&startMine(b))return true;
         }
         return false;
@@ -329,12 +333,12 @@ final class Resident {
             if(!ConstructionSupply.awaiting(this)){
                 var tree=nearest(v.index.trees,this::treeCandidate);if(tree!=null){assign("wood",tree);return true;}
             }
-            b.activities().run(List.of(new BotActivity.Wait(20)));status="строитель готовит инструменты перед земляными работами";return true;
+            status="стройка ждёт инструменты; доступен для другой работы";return false;
         }
         if(startBuilding(b,true)||constructionInputs(b)||startBuilding(b)||Infrastructure.work(this))return true;
         var plans=v.town.wantedPlans(this);if(plans.isEmpty())return false;
         if(prepareCrafting(b,false)||infrastructure(b,false)||depositOrFetch(b,false))return true;
-        if(ConstructionSupply.awaiting(this)){b.activities().run(List.of(new BotActivity.Wait(20)));status="строитель ждёт носильщика с материалами своей стройки";return true;}
+        if(ConstructionSupply.awaiting(this)){status="стройка ждёт носильщика; доступен для другой работы";return false;}
         int timber=Supplies.count(b.inventory().snapshot().slots(),s->s.is(ItemTags.PLANKS))+4*Supplies.count(b.inventory().snapshot().slots(),s->s.is(ItemTags.LOGS));
         if(timber<16||needsBasicTools()){
             var tree=nearest(v.index.trees,this::treeCandidate);if(tree!=null){assign("wood",tree);return true;}
@@ -344,7 +348,40 @@ final class Resident {
             var stone=nearest(v.index.stone,p->v.state.policy.allows("mine",p)&&v.level.getBlockState(p).is(Blocks.STONE)&&VillageIndex.exposed(v.level,p));
             if(stone!=null){assign("stone",stone);return true;}
         }
-        status="строитель ждёт материалы или доступ к текущей стройке";return true;
+        status="стройка ждёт материалы или доступ; доступен для другой работы";return false;
+    }
+    /** Try useful ready leaves; waiting graph nodes never claim the resident's whole shift. */
+    private boolean plannedWork(BotHandle b,SettlementNeeds.Need need){
+        return switch(need.action()){
+            case FETCH -> depositOrFetch(b,v.steward(id));
+            case CRAFT -> {
+                needsWorkbench=false;
+                if(VillageWorkshop.makePlanned(b,v,need)){
+                    b.activities().run(List.of(new BotActivity.Wait(20)));status="изготавливает по плану: "+need.produces();yield true;
+                }
+                yield needsWorkbench&&(infrastructure(b,v.steward(id))||prepareWorkbench(b,v.steward(id)));
+            }
+            case BUILD -> startBuilding(b,true)||constructionInputs(b)||startBuilding(b)||Infrastructure.work(this);
+            case WOOL -> v.farm.planWork(this)||shear(b);
+            case MINE -> miningWork(b);
+            case SMELT -> production(b);
+            case WORKPLACE -> {
+                needsWorkbench=true;
+                yield infrastructure(b,v.steward(id))||prepareWorkbench(b,v.steward(id))||prepareCrafting(b,v.steward(id));
+            }
+            case STORAGE -> prepareCrafting(b,true)||infrastructure(b,true);
+            case WOOD -> {
+                BlockPos tree=nearest(v.index.trees,this::treeCandidate);
+                if(tree!=null)assign("wood",tree);yield job!=null;
+            }
+            case STONE -> miningWork(b);
+            case FOOD -> foodWork(b)||farmExpand(b);
+            case SEEDS -> {
+                BlockPos grass=nearest(v.index.grass,p->v.level.getBlockState(p).is(Blocks.SHORT_GRASS)||v.level.getBlockState(p).is(Blocks.TALL_GRASS));
+                if(grass!=null)assign("seeds",grass);yield job!=null;
+            }
+            case NONE -> false;
+        };
     }
     private boolean constructionInputs(BotHandle b){
         needsWorkbench=false;
@@ -659,7 +696,7 @@ final class Resident {
                 donor.cancel();
                 Orders.refreshStock(v);
                 var material=order.kind();int moved=0,personalKit=kit(material);
-                int limit=Math.min(order.outstanding(),Math.max(0,donor.count(material)-donor.kit(material)));
+                int limit=v.claimableFromBag(order,donor);
                 var slots=donor.bot().inventory().snapshot().slots();
                 for(int slot=0;slot<slots.size()&&moved<limit;slot++)if(donor.shareableSlot(material,slot))
                     moved+=donor.bot().inventory().transferTo(b.inventory(),slot,limit-moved);
@@ -675,7 +712,7 @@ final class Resident {
                 var material=deliverOrder==null?null:deliverOrder.kind();
                 int moved=0;
                 if(recipient!=null&&recipient.bot()!=null&&material!=null){
-                    int limit=Math.min(deliverOrder.outstanding(),Math.max(0,count(material)-kit(material)));
+                    int limit=v.claimableFromBag(deliverOrder,this);
                     var slots=b.inventory().snapshot().slots();
                     for(int slot=0;slot<slots.size()&&moved<limit;slot++)if(shareableSlot(material,slot)){
                         int amount=b.inventory().transferTo(recipient.bot().inventory(),slot,limit-moved);

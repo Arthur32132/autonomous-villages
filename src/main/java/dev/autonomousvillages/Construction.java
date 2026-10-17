@@ -133,6 +133,8 @@ final class Construction {
         return false;
     }
     static boolean place(Village v, BotHandle b, Step step) {
+        var resident=v.workers.get(b.id());
+        if(resident!=null&&!SettlementNeeds.mayPlace(v,resident,step))return false;
         BlockPos p=step.pos();
         if(!v.state.policy.allows(step.state().getBlock() instanceof SaplingBlock?"wood":"build",p))return false;
         if(step.state().getBlock() instanceof SaplingBlock&&!v.state.plantedTrees.contains(p.asLong())&&v.state.plantedTrees.size()>=512)return false;

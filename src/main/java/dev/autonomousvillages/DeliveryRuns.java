@@ -11,7 +11,7 @@ final class DeliveryRuns {
     }
 
     private static Dispatch plan(Village v,Orders.Order order){
-        if(!order.open()||order.returnCargo()||order.kind()==null||order.recipient.isEmpty()
+        if(!order.open()||order.localOnly||order.returnCargo()||order.kind()==null||order.recipient.isEmpty()
                 ||order.retryAfter>v.level.getGameTime()||!order.carrier.isEmpty())return null;
         Resident recipient;
         try{recipient=v.workers.get(UUID.fromString(order.recipient));}catch(IllegalArgumentException ignored){return null;}
@@ -21,13 +21,13 @@ final class DeliveryRuns {
                 .min(Comparator.comparing(r->r.id.toString())).orElse(null);
         if(porter!=null){
             Resident donor=v.holders(material).stream().filter(r->r!=recipient&&r!=porter&&r.canExchange()
-                            &&!v.expeditions.owns(r.id)&&r.count(material)>r.kit(material)
+                            &&!v.expeditions.owns(r.id)&&v.claimableFromBag(order,r)>0
                             &&r.body().distanceToSqr(porter.body())<256*256)
                     .min(Comparator.comparingDouble(r->r.body().distanceToSqr(porter.body()))).orElse(null);
             if(donor!=null)return new Dispatch(porter,donor,recipient);
         }
         Resident carrier=v.holders(material).stream().filter(r->r!=recipient&&r.canHelp()
-                        &&r.count(material)>r.kit(material)&&r.body().distanceToSqr(recipient.body())<256*256)
+                        &&v.claimableFromBag(order,r)>0&&r.body().distanceToSqr(recipient.body())<256*256)
                 .min(Comparator.<Resident>comparingInt(r->v.porter(r.id)?0:1)
                         .thenComparingDouble(r->r.body().distanceToSqr(recipient.body()))).orElse(null);
         return carrier==null?null:new Dispatch(carrier,null,recipient);

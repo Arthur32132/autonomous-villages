@@ -199,7 +199,8 @@ public final class VillageState {
             if(pos==null||!recordedWork(BlockPos.of(pos)))throw new IllegalArgumentException("Рабочая область вне деревни");
         if(orders==null||orders.size()>Orders.MAX_ORDERS)throw new IllegalArgumentException("Повреждённые заказы");
         for(Orders.Order order:orders){
-            if(order==null||order.kind()==null||order.purpose==null||order.purpose.isEmpty()||order.purpose.length()>32
+            if(order==null||order.kind()==null||order.purpose==null||order.purpose.isEmpty()||order.purpose.length()>Orders.MAX_PURPOSE_LENGTH
+                    ||order.localOnly&&(order.kind()!=Orders.Material.PLANKS||order.returnCargo())
                     ||order.quantity<0||order.returnCargo()&&order.quantity<1||order.quantity>65536||order.delivered<0||order.delivered>order.quantity
                     ||order.carrier==null||order.inTransit<0||order.inTransit>65536||order.observedStock<0
                     ||order.recipient==null||!worldPosition(order.delivery)||!worldPosition(order.work))throw new IllegalArgumentException("Повреждённый заказ");

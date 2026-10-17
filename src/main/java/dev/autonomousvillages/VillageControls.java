@@ -72,6 +72,10 @@ final class VillageControls {
     static String explain(Village v,int page){
         var lines=new ArrayList<String>();var budget=SettlementEconomy.budget(v);
         lines.add(v.state.name+": еда (хлебные порции) "+SettlementEconomy.food(v)+"/"+budget.food()+", семенной фонд "+budget.seed()+", пшеница стаду "+budget.breedingWheat()+", рост "+(SettlementEconomy.canGrow(v)?"обеспечен":"ждёт две свободные кровати, орошаемое поле и запас еды"));
+        for(String need:SettlementNeeds.lines(v.needs).stream().skip((long)(page-1)*8).limit(8).toList())lines.add("потребность "+need);
+        if(v.needs.needs().isEmpty())lines.add("потребности: граф ещё не построен");
+        else if(v.needs.needs().stream().allMatch(n->v.needs.state(n).state()==SettlementNeeds.State.DONE))lines.add("потребности: все условия выполнены");
+        else if(v.needs.open().isEmpty())lines.add("потребности: все работы ожидают; причины указаны в графе");
         for(var o:v.state.orders.stream().filter(Orders.Order::open).skip((long)(page-1)*8).limit(8).toList()){
             var ledger=o.kind()==null?null:v.ledger(o.kind());
             String who=o.recipient.isEmpty()?"не назначен":o.recipient;String carrier=o.carrier.isEmpty()?"не назначен":o.carrier;

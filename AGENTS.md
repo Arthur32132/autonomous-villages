@@ -2,12 +2,13 @@
 
 ## Latest human scope — 2026-10-17
 
-The human requested a static audit and fixes without tests, followed by updating
-the build, documentation, Git commits and push. Build/package is authorized;
-Minecraft launches and test execution are not. Keep historical PASS results tied
-to their original artifacts. The current candidate is 0.2.2, not full autonomy
-acceptance. Include the matching Navigation AI dependency changes when saving
-the pair of repositories.
+The latest human request is to fix all three roadmap item 2 review findings,
+close that roadmap item, commit and push. Preserve the human restriction:
+no tests, builds or Minecraft launches for these review fixes; use static checks.
+The implementation and short checks are recorded in
+docs/validation/2026-10-17-roadmap-2/REPORT.md. Further long colony tests are not
+authorized by that result. Keep historical PASS results tied to their own JARs;
+the local 0.2.2 roadmap candidate is not full autonomy acceptance.
 
 Read the workspace-level `../AGENTS.md` when available and obey the latest human
 instruction. The mod is not release-ready; disk cleanup does not authorize

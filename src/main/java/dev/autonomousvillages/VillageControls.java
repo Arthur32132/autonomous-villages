@@ -80,7 +80,7 @@ final class VillageControls {
             var ledger=o.kind()==null?null:v.ledger(o.kind());
             String who=o.recipient.isEmpty()?"не назначен":o.recipient;String carrier=o.carrier.isEmpty()?"не назначен":o.carrier;
             int stock=o.kind()==null?0:v.count(o.kind().accepts);
-            lines.add(o.purpose+": осталось "+o.outstanding()+", исполнитель "+who+", перевозчик "+carrier+", свободно "+(ledger==null?0:ledger.free())+", резерв "+(ledger==null?0:ledger.reserved())+", в пути "+o.inTransit+"; "+reason(v,o,stock));
+            lines.add(o.purpose+": осталось "+o.outstanding()+", исполнитель "+who+", перевозчик "+carrier+", свободно "+(ledger==null?0:ledger.free())+", резерв "+(ledger==null?0:ledger.reserved())+", в пути "+o.inTransit+"; "+reason(v,o,stock)+(o.waiting==null||o.waiting.isEmpty()?"":"; доставка: "+o.waiting));
         }
         for(var b:v.state.buildings.stream().filter(b->b.built(v)<b.blocks.size()||!Infrastructure.prepared(v,b)).skip((long)(page-1)*8).limit(8).toList()){
             var executor=v.workers.values().stream().filter(r->r.townPlan!=null&&b.blocks.contains(r.townPlan)).map(r->r.id.toString()).findFirst().orElse("ожидает строителя");
@@ -90,6 +90,7 @@ final class VillageControls {
                     +(b.housingFor==null?"":"; расширение жилого участка "+BlockPos.of(b.housingFor).toShortString())
                     +projectMaterials(v,b));
         }
+        lines.add("Логистика: "+DeliveryRuns.status(v));
         lines.add("Выпуск мастерских (предметы; для поста — ответы на тревогу): "+v.state.workshopOutput);
         for(int i=0;i<v.state.policy.zones.size();i++){var z=v.state.policy.zones.get(i);lines.add("Запрет №"+i+" "+z.activity+": "+z.minX+","+z.minZ+"–"+z.maxX+","+z.maxZ);}
         lines.add("Страница "+page+"; остальные проекты: /avillage orders "+v.state.name+" "+(page+1));

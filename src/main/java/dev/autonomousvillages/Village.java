@@ -161,6 +161,7 @@ final class Village {
         dyingCargo.put(id,cargo);
     }
     void residentLost(UUID id){
+        state.cargoKits.remove(id);
         var lost=primaryRole(id);if(lost!=null)state.vacantRoles.add(lost);
         state.residentRoles.remove(id);announcedRoles.remove(id);
         var stock=new EnumMap<Orders.Material,Integer>(Orders.Material.class);

@@ -144,6 +144,9 @@ class OrdersTest {
         assertEquals(s.orders.getFirst().material,restored.orders.getFirst().material);
         assertEquals(6,restored.orders.getFirst().quantity);
         restored.orders.getFirst().quantity=0;
+        // Roadmap 1 can shrink a production target to zero after the work is covered.
+        assertDoesNotThrow(restored::validate);
+        restored.orders.getFirst().quantity=-1;
         assertThrows(IllegalArgumentException.class,restored::validate);
         restored.orders.getFirst().quantity=6;restored.orders.getFirst().material="NOPE";
         assertThrows(IllegalArgumentException.class,restored::validate);

@@ -1,0 +1,62 @@
+{
+  "groups": [
+    {
+      "source": "server.log",
+      "message": "[main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:",
+      "count": 1,
+      "first": "[17:34:46] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:",
+      "last": "[17:34:46] [main/ERROR]: Unable to locate English counter names in registry Perflib 009. Counters may need to be rebuilt:"
+    },
+    {
+      "source": "server.log",
+      "message": "[main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "count": 1,
+      "first": "[17:34:46] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values",
+      "last": "[17:34:46] [main/WARN]: Unable to locate English counter names in registry Perflib 009. Assuming English counters. Error 0x80070057. See https://support.microsoft.com/en-us/help/300956/how-to-manually-rebuild-performance-counter-library-values"
+    },
+    {
+      "source": "server.log",
+      "message": "[main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "count": 1,
+      "first": "[17:34:46] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8",
+      "last": "[17:34:46] [main/WARN]: Failed to locate performance object for Process in the registry. Performance counters may be corrupt. Pdh call failed with error code 0xC0000BB8"
+    },
+    {
+      "source": "server.log",
+      "message": "[Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!",
+      "count": 1,
+      "first": "[17:34:51] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!",
+      "last": "[17:34:51] [Server thread/WARN]: **** SERVER IS RUNNING IN OFFLINE/INSECURE MODE!"
+    },
+    {
+      "source": "server.log",
+      "message": "[Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.",
+      "count": 1,
+      "first": "[17:34:51] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware.",
+      "last": "[17:34:51] [Server thread/WARN]: The server will make no attempt to authenticate usernames. Beware."
+    },
+    {
+      "source": "server.log",
+      "message": "[Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.",
+      "count": 1,
+      "first": "[17:34:51] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose.",
+      "last": "[17:34:51] [Server thread/WARN]: While this makes the game possible to play without internet access, it also opens up the ability for hackers to connect with any username they choose."
+    },
+    {
+      "source": "server.log",
+      "message": "[Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file.",
+      "count": 1,
+      "first": "[17:34:51] [Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file.",
+      "last": "[17:34:51] [Server thread/WARN]: To change this, set \"online-mode\" to \"true\" in the server.properties file."
+    },
+    {
+      "source": "server.log",
+      "message": "[Server thread/WARN]: Can't keep up! Is the server overloaded? Running 1553ms or 621 ticks behind",
+      "count": 1,
+      "first": "[17:34:54] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 1553ms or 621 ticks behind",
+      "last": "[17:34:54] [Server thread/WARN]: Can't keep up! Is the server overloaded? Running 1553ms or 621 ticks behind"
+    }
+  ],
+  "overflowEvents": 0,
+  "note": "Raw severity retained; offline authentication, third-party and deliberate corrupt-state errors require separate interpretation."
+}

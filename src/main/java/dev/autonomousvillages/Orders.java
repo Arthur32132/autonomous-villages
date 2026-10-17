@@ -58,6 +58,7 @@ final class Orders {
         /** A manufacturing output target; only its selected inputs may be fetched externally. */
         public boolean localOnly;
         public long retryAfter;
+        public String waiting="";
         public long created;
         transient int craftedCoverage;
         Material kind(){return Material.named(material);}

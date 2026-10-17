@@ -38,6 +38,7 @@ final class Resident {
     Orders.Order deliverOrder;
     UUID haulDonor;
     private int deliveryKit=-1;
+    DeliveryRuns.Agreement agreement;
     Construction.Step build;
     TownBuilding.Plan townPlan;
     long since, cooldown, collectingUntil;
@@ -62,34 +63,45 @@ final class Resident {
     int kit(Orders.Material material){
         BotHandle b=bot();if(b==null)return 0;
         var bag=b.inventory().snapshot().slots();
-        int held=Supplies.count(bag,material.accepts);if(held==0)return 0;
+        int held=Supplies.count(bag,material.accepts);
+        if(held==0){
+            var cargo=v.state.cargoKits.get(id);if(cargo!=null){cargo.remove(material);if(cargo.isEmpty())v.state.cargoKits.remove(id);}
+            return 0;
+        }
         int keep=0;var counted=new HashSet<Item>();
-        if(material==Orders.Material.SHEARS){
-            for(int slot:keptShears())if(material.accepts.test(bag.get(slot)))keep+=bag.get(slot).getCount();
-        }else if(material==Orders.Material.SURVEY_PICK)keep=v.miner(id)?2:1;
+        if(material==Orders.Material.SHEARS||bag.stream().anyMatch(s->material.accepts.test(s)&&!PersonalKits.family(s).isEmpty())){
+            for(int slot:protectedSlots())if(material.accepts.test(bag.get(slot)))keep+=bag.get(slot).getCount();
+        }
         else for(ItemStack stack:bag)if(!stack.isEmpty()&&material.accepts.test(stack)&&counted.add(stack.getItem()))keep=Math.max(keep,reserve(stack,v.steward(id)));
+        keep=Math.max(keep,Supplies.count(bag,s->material.accepts.test(s)&&s.has(DataComponents.CUSTOM_NAME)));
         // Cargo just accepted by a porter is not retroactively turned into his own kit.
         if(deliveryKit>=0&&deliverOrder!=null&&deliverOrder.kind()==material)return Math.min(held,deliveryKit);
+        var cargoKit=v.state.cargoKits.get(id);
+        if(cargoKit!=null&&cargoKit.containsKey(material)){
+            int personal=cargoKit.get(material);
+            if(held<=personal){cargoKit.remove(material);if(cargoKit.isEmpty())v.state.cargoKits.remove(id);}
+            else return Math.min(held,personal);
+        }
         return Math.min(held,keep);
     }
-    private Set<Integer> keptShears(){
-        var bag=bot().inventory().snapshot().slots();var kept=new HashSet<Integer>();int best=-1,life=-1;
-        boolean needs=v.farm.caretaker()==this||"shear".equals(job)
+    private Set<Integer> protectedSlots(){
+        boolean shepherd=v.farm.caretaker()==this||"shear".equals(job)
                 ||v.expeditions.owns(id)&&v.state.expedition!=null&&"wool".equals(v.state.expedition.purpose);
-        if(deliveryKit>=0&&deliverOrder!=null&&deliverOrder.kind()==Orders.Material.SHEARS)needs=deliveryKit>0;
-        boolean namedUsable=false;
-        for(int slot=0;slot<bag.size();slot++){
-            var s=bag.get(slot);if(!s.is(Items.SHEARS))continue;
-            if(s.has(DataComponents.CUSTOM_NAME)){kept.add(slot);namedUsable|=Supplies.usable(s);}
-            int remaining=s.getMaxDamage()-s.getDamageValue();
-            if(Supplies.usable(s)&&remaining>life){life=remaining;best=slot;}
-        }
-        if(needs&&!namedUsable&&best>=0)kept.add(best);
-        return kept;
+        return PersonalKits.kept(bot().inventory().snapshot().slots(),v.primaryRole(id),shepherd,
+                v.state.cargoKits.getOrDefault(id,Map.of()));
     }
-    private boolean shareableSlot(Orders.Material material,int slot){
+    boolean shareableSlot(Orders.Material material,int slot){
         var s=bot().inventory().snapshot().slots().get(slot);
-        return material.accepts.test(s)&&(material!=Orders.Material.SHEARS||!keptShears().contains(slot));
+        return material.accepts.test(s)&&!s.has(DataComponents.CUSTOM_NAME)
+                &&!protectedSlots().contains(slot);
+    }
+    List<ItemStack> shareable(Orders.Material material){
+        var bag=bot().inventory().snapshot().slots();var out=new ArrayList<ItemStack>();
+        int left=Math.max(0,count(material)-kit(material));
+        for(int i=0;i<bag.size()&&left>0;i++)if(shareableSlot(material,i)){
+            int n=Math.min(left,bag.get(i).getCount());out.add(bag.get(i).copyWithCount(n));left-=n;
+        }
+        return out;
     }
     /** Inventory operations stop intents, so external exchanges use an idle boundary. */
     boolean canExchange(){
@@ -115,14 +127,35 @@ final class Resident {
     void deliver(Orders.Order order,UUID recipient){
         deliver(order,recipient,-1);
     }
-    private void deliver(Orders.Order order,UUID recipient,int personalKit){
+    void deliver(Orders.Order order,UUID recipient,int personalKit){
         cancel();
         deliverOrder=order;deliveryKit=personalKit;
         order.inTransit=Math.min(v.claimableFromBag(order,this),Math.max(0,count(order.kind())-kit(order.kind())));
         order.transit=order.inTransit>0;order.carrier=id.toString();
-        if(!order.transit){Orders.release(order);finish();return;}
+        if(!order.transit||!DeliveryRuns.reserve(this,order,null,v.workers.get(recipient),order.inTransit)){Orders.release(order);finish();return;}
+        order.inTransit=Math.min(order.inTransit,agreement.quantity);
         deliverOrder=order;deliverRecipient=recipient;
         job="deliver";target=v.workers.get(recipient).body().blockPosition();shelter=null;since=now();
+        workWait.reset();navigation=null;mining=null;collectingUntil=0;triedApproaches.clear();lastApproach=null;
+        status="несёт материалы по заказу исполнителю";
+    }
+    /** Continue the existing promise: picked-up stock must not be reallocated to chests. */
+    void carryCollectedOrder(int moved,int personalKit){
+        agreement.quantity=moved;agreement.pickedUp=true;
+        deliveryKit=personalKit;haulDonor=null;
+        // Receiving a better tool can change which concrete stack is surplus.
+        // Confirm capacity for that selection without releasing the order's cargo.
+        agreement.cargo=shareable(agreement.material);
+        agreement.quantity=DeliveryRuns.room(agreement.recipient.bot().inventory().snapshot().slots(),
+                agreement.cargo,agreement.material.accepts,Math.min(moved,deliverOrder.outstanding()));
+        if(agreement.quantity==0){
+            deliverOrder.waiting="после получения груза нет места для доступных компонентов; груз сохранён";
+            cancel();return;
+        }
+        deliverOrder.inTransit=agreement.quantity;
+        deliverOrder.transit=deliverOrder.inTransit>0;deliverOrder.carrier=id.toString();
+        deliverOrder.waiting="груз получен; носильщик идёт к исполнителю";
+        job="deliver";target=agreement.recipient.body().blockPosition();shelter=null;since=now();
         workWait.reset();navigation=null;mining=null;collectingUntil=0;triedApproaches.clear();lastApproach=null;
         status="несёт материалы по заказу исполнителю";
     }
@@ -149,7 +182,8 @@ final class Resident {
         cancel();assign("collect_order",donor.body().blockPosition());
         if(!"collect_order".equals(job))return;
         deliverOrder=order;deliverRecipient=recipient;haulDonor=donor.id;
-        order.carrier=id.toString();status="забирает свободные материалы для доставки";
+        if(!DeliveryRuns.reserve(this,order,donor,v.workers.get(recipient),v.claimableFromBag(order,donor))){finish();return;}
+        order.carrier=id.toString();status="забирает подтверждённый излишек для доставки";
     }
     void tick() {
         tick(true);
@@ -212,7 +246,9 @@ final class Resident {
             }
         }
         if(!breakTime&&v.expeditions.work(this))return;
+        if("farm_watch".equals(job)&&DeliveryRuns.promised(this)&&canExchange())finish();
         if (job!=null) { work(b);return; }
+        if(DeliveryRuns.hold(this))return;
         if(!mayPlan)return;
         if (now()<cooldown) return;
         cooldown=now()+20;
@@ -511,6 +547,7 @@ final class Resident {
     }
     void work(BotHandle b){
         if(!v.state.policy.allows(job.equals("build")&&build!=null&&build.state().getBlock() instanceof SaplingBlock?"wood":activity(job),target)){cancel();status="работа запрещена границей игрока";return;}
+        if(Set.of("deliver","collect_order","collect_chest","deliver_chest").contains(job)&&!DeliveryRuns.valid(this))return;
         if(job.equals("herd")){v.farm.herd(this);return;}
         if(job.equals("collect_order")){
             var donor=v.workers.get(haulDonor);
@@ -690,19 +727,25 @@ final class Resident {
                 finish();
             }
             case "table" -> {finish();delays.put("table",now()+200);}
+            case "collect_chest","deliver_chest" -> DeliveryRuns.chestArrived(this);
             case "collect_order" -> {
                 var order=deliverOrder;UUID recipient=deliverRecipient;var donor=v.workers.get(haulDonor);
                 if(!donor.canExchange()){status="ждёт окончания действия владельца груза";return;}
                 donor.cancel();
                 Orders.refreshStock(v);
                 var material=order.kind();int moved=0,personalKit=kit(material);
-                int limit=v.claimableFromBag(order,donor);
+                int limit=Math.min(agreement.quantity,v.claimableFromBag(order,donor));
+                limit=Math.min(limit,DeliveryRuns.room(v.workers.get(recipient).bot().inventory().snapshot().slots(),donor.shareable(material),material.accepts,limit));
                 var slots=donor.bot().inventory().snapshot().slots();
-                for(int slot=0;slot<slots.size()&&moved<limit;slot++)if(donor.shareableSlot(material,slot))
+                for(int slot=0;slot<slots.size()&&moved<limit;slot++)if(donor.shareableSlot(material,slot)&&DeliveryRuns.accepts(agreement,slots.get(slot)))
                     moved+=donor.bot().inventory().transferTo(b.inventory(),slot,limit-moved);
-                finish();
-                if(moved>0&&v.workers.containsKey(recipient))deliver(order,recipient,personalKit);
-                else order.retryAfter=now()+200;
+                if(moved>0){
+                    v.state.cargoKits.computeIfAbsent(id,k->new EnumMap<>(Orders.Material.class)).put(material,personalKit);
+                    carryCollectedOrder(moved,personalKit);
+                    v.runtime.save();
+                }else{
+                    finish();order.retryAfter=now()+200;
+                }
             }
             case "deliver" -> {
                 var recipient=v.workers.get(deliverRecipient);
@@ -712,9 +755,9 @@ final class Resident {
                 var material=deliverOrder==null?null:deliverOrder.kind();
                 int moved=0;
                 if(recipient!=null&&recipient.bot()!=null&&material!=null){
-                    int limit=v.claimableFromBag(deliverOrder,this);
+                    int limit=Math.min(agreement.quantity,v.claimableFromBag(deliverOrder,this));
                     var slots=b.inventory().snapshot().slots();
-                    for(int slot=0;slot<slots.size()&&moved<limit;slot++)if(shareableSlot(material,slot)){
+                    for(int slot=0;slot<slots.size()&&moved<limit;slot++)if(shareableSlot(material,slot)&&DeliveryRuns.accepts(agreement,slots.get(slot))){
                         int amount=b.inventory().transferTo(recipient.bot().inventory(),slot,limit-moved);
                         moved+=amount;deliverOrder.delivered+=amount;
                     }
@@ -756,6 +799,9 @@ final class Resident {
         return best;
     }
     private double workReach(){return job.equals("home")?2.4:job.equals("native_work")?2.8:job.equals("build")||job.equals("renovate")||job.equals("wood")?4.2:job.equals("pickup")?1.3:job.equals("supply")||job.equals("deliver")?2.5:3.0;}
+    boolean reaches(BlockPos p){
+        return body().getEyePosition().distanceToSqr(Vec3.atCenterOf(p))<=9&&lineOfSight(bot(),p);
+    }
     private boolean lineOfSight(BotHandle b,BlockPos p){
         var hit=v.level.clip(new ClipContext(b.entity().getEyePosition(),Vec3.atCenterOf(p),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,b.entity()));
         return hit.getType()==HitResult.Type.MISS||hit.getBlockPos().equals(p);
@@ -1029,7 +1075,9 @@ final class Resident {
         return Math.max(base,ordered);
     }
     private int baseReserve(ItemStack s,boolean steward){
-        if(Supplies.tool(s)||s.has(DataComponents.EQUIPPABLE))return Integer.MAX_VALUE;
+        if(s.has(DataComponents.CUSTOM_NAME))return Integer.MAX_VALUE;
+        for(var e:v.state.cargoKits.getOrDefault(id,Map.of()).entrySet())if(e.getKey().accepts.test(s))return e.getValue();
+        if(Supplies.tool(s)||s.has(DataComponents.EQUIPPABLE))return 0;
         if(v.expeditions.owns(id)&&"unload".equals(v.state.expedition.phase)&&!Supplies.food(s)){
             if(s.is(ItemTags.PLANKS))return 8;
             if(s.is(Items.STICK))return 4;
@@ -1048,7 +1096,7 @@ final class Resident {
         if(s.is(ItemTags.LOGS_THAT_BURN))return v.hasRole(id,ResidentRoles.Role.BUILDER)?BUILDING_TIMBER/4:needsBasicTools()?4:1;
         if(s.is(ItemTags.PLANKS))return v.hasRole(id,ResidentRoles.Role.BUILDER)?BUILDING_TIMBER:needsBasicTools()||steward?16:8;
         if(s.is(Items.STICK))return 8;
-        if(s.is(Items.COBBLESTONE))return steward?8:((!v.builder(id)||v.workers.size()<3)&&bNeedsStonePick()?3:0)
+        if(s.is(Items.COBBLESTONE))return v.miner(id)?8:steward?8:((!v.builder(id)||v.workers.size()<3)&&bNeedsStonePick()?3:0)
                 +((v.guard(id))&&!VillageWorkshop.hasDefensiveSword(bot())?2:0);
         if(s.is(Items.IRON_INGOT)){
             var need=IronSupply.next(v);if(need!=null)return need.recipient()==this?need.ingots():0;
@@ -1073,10 +1121,10 @@ final class Resident {
     }
     private int depositAmount(BotHandle b,ItemStack s,boolean steward){
         if(s.isEmpty())return 0;
-        if(s.is(Items.SHEARS)){
-            var bag=b.inventory().snapshot().slots();int total=Supplies.count(bag,t->ItemStack.isSameItemSameComponents(t,s));
-            for(int slot:keptShears())if(ItemStack.isSameItemSameComponents(bag.get(slot),s))total-=bag.get(slot).getCount();
-            return Math.max(0,total);
+        if(!PersonalKits.family(s).isEmpty()){
+            var bag=b.inventory().snapshot().slots();var protectedSlots=protectedSlots();int total=0;
+            for(int slot=0;slot<bag.size();slot++)if(!protectedSlots.contains(slot)&&ItemStack.isSameItemSameComponents(bag.get(slot),s))total+=bag.get(slot).getCount();
+            return total;
         }
         return Math.max(0,Supplies.count(b.inventory().snapshot().slots(),st->st.is(s.getItem()))-reserve(s,steward));
     }
@@ -1094,6 +1142,11 @@ final class Resident {
     }
     static boolean mineral(ItemStack s){return s.is(Items.COBBLESTONE)||s.is(Items.COBBLED_DEEPSLATE)||s.is(Items.COAL)||s.is(Items.RAW_IRON)||s.is(Items.RAW_GOLD)||s.is(Items.RAW_COPPER)||s.is(Items.DIAMOND)||s.is(Items.EMERALD)||s.is(Items.REDSTONE)||s.is(Items.LAPIS_LAZULI);}
     private int shortage(BotHandle b,ItemStack s,boolean steward){
+        if(!PersonalKits.family(s).isEmpty()){
+            String family=PersonalKits.family(s);
+            int wanted=PersonalKits.tools(v.primaryRole(id),family,v.farm.caretaker()==this);
+            return Math.max(0,wanted-(int)b.inventory().snapshot().slots().stream().filter(t->Supplies.usable(t)&&PersonalKits.family(t).equals(family)).count());
+        }
         int wanted=reserve(s,steward);
         if(wanted==Integer.MAX_VALUE||s.isEmpty())return 0;
         if(s.is(ItemTags.PLANKS))return Math.max(0,wanted-Supplies.count(b.inventory().snapshot().slots(),st->st.is(ItemTags.PLANKS)));
@@ -1115,7 +1168,7 @@ final class Resident {
             boolean used=false;
             for(ItemStack stack:b.inventory().snapshot().slots()){
                 int extra=ManagedLand.depositLimit(v,chest.getBlockPos().asLong(),stack,depositAmount(b,stack,steward));
-                if(extra>0&&ManagedLand.acceptsDeposit(v,chest.getBlockPos().asLong(),stack)){int amount=Supplies.transfer(b,chest,true,s->stack.is(Items.SHEARS)?ItemStack.isSameItemSameComponents(s,stack):s.is(stack.getItem()),extra);used|=amount>0;if(amount>0){v.state.deposits.merge(id,(long)amount,Long::sum);if(mineral(stack))v.state.mineralDeposits.merge(id,(long)amount,Long::sum);}}
+                if(extra>0&&ManagedLand.acceptsDeposit(v,chest.getBlockPos().asLong(),stack)){int amount=Supplies.transfer(b,chest,true,s->!PersonalKits.family(stack).isEmpty()?ItemStack.isSameItemSameComponents(s,stack):s.is(stack.getItem()),extra);used|=amount>0;if(amount>0){v.state.deposits.merge(id,(long)amount,Long::sum);if(mineral(stack))v.state.mineralDeposits.merge(id,(long)amount,Long::sum);}}
             }
             for(var order:v.state.orders)if(order.open()&&!order.returnCargo()&&id.toString().equals(order.recipient)&&order.kind()!=null){
                 int moved=Supplies.transfer(b,chest,false,order.kind().accepts,v.claimableFromChests(order));
@@ -1277,7 +1330,7 @@ final class Resident {
     void defend(Monster enemy){
         cancel();combat=bot().combat().fight(enemy,new CombatPolicy(CombatSkill.EXPERT,16,3,24,false,true,false).swordOnly());since=now();status="защищает деревню";
     }
-    void finish(){if("herd".equals(job)){v.farm.state().leading=null;v.farm.gate(false);}if(deliverOrder!=null&&id.toString().equals(deliverOrder.carrier))Orders.release(deliverOrder);v.reservations.release(id);treeBase=null;job=null;target=null;shelter=null;navigation=null;mining=null;excavation=null;build=null;townPlan=null;collectingUntil=0;clearingLeaves=false;fleeing=false;supplyRecipient=null;deliverRecipient=null;deliverOrder=null;haulDonor=null;deliveryKit=-1;}
+    void finish(){DeliveryRuns.release(this);if("herd".equals(job)){v.farm.state().leading=null;v.farm.gate(false);}if(deliverOrder!=null&&id.toString().equals(deliverOrder.carrier))Orders.release(deliverOrder);v.reservations.release(id);treeBase=null;job=null;target=null;shelter=null;navigation=null;mining=null;excavation=null;build=null;townPlan=null;collectingUntil=0;clearingLeaves=false;fleeing=false;supplyRecipient=null;deliverRecipient=null;deliverOrder=null;haulDonor=null;deliveryKit=-1;}
     void cancel(){workWait.reset();BotHandle b=bot();if(b!=null&&b.state()==BotState.ACTIVE)b.stopAll();v.reservations.release(id);combat=null;finish();}
     void fail(String reason){
         BlockPos destination=lastApproach!=null?lastApproach:target;boolean recovery=!"escape".equals(job)&&(reason.startsWith("маршрут")||reason.startsWith("цель недоступна")||reason.startsWith("нет безопасного подхода"));
@@ -1290,6 +1343,7 @@ final class Resident {
         }
         if(job!=null)AutonomousVillagesMod.LOG.info("WORK_INTERRUPTED village={} worker={} job={} target={} cause={}",v.state.name,id,job,target,reason);
         lastFailure=reason;
+        if(deliverOrder!=null)deliverOrder.waiting=reason+"; физический груз сохранён";
         if(recovery)Infrastructure.stuck(v,destination);
         if(target!=null&&exclusiveJob(job))v.rejected.put(target.asLong(),now()+600);
         if(treeBase!=null)v.rejected.put(treeBase.asLong(),now()+1200);
@@ -1302,5 +1356,5 @@ final class Resident {
         return switch(kind){case "wood"->"wood";case "harvest","plant","hoe","seeds","dig_irrigation","fill_bucket","irrigate"->"farm";case "build","renovate","grade"->"build";case "stone","ore","sand","mine"->"mine";default->"none";};
     }
     static String miningActivity(String kind){var a=activity(kind);return a.equals("none")?"mine":a;}
-    static boolean exclusiveJob(String kind){return kind!=null&&!Set.of("home","native_work","storage","table","air","escape","farm_watch","supply","pickup","deliver","collect_order","delivery_return","guard").contains(kind);}
+    static boolean exclusiveJob(String kind){return kind!=null&&!Set.of("home","native_work","storage","table","air","escape","farm_watch","supply","pickup","deliver","collect_order","collect_chest","deliver_chest","delivery_return","guard").contains(kind);}
 }

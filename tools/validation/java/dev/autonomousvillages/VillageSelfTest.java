@@ -38,6 +38,7 @@ public final class VillageSelfTest {
     static boolean longrunOnly;
     static boolean nightOnly;
     static boolean ordersOnly;
+    static boolean logisticsOnly;
     static boolean housingOnly;
     static boolean rolesOnly;
     static boolean productionOnly;
@@ -133,6 +134,9 @@ public final class VillageSelfTest {
             })).then(Commands.literal("housing").executes(c->{
                 server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=true;rolesOnly=false;productionOnly=false;flockOnly=false;planningOnly=false;running=true;
                 cmd("time set 1000");cmd("time pause");setup();log("HOUSING_START");return 1;
+            })).then(Commands.literal("logistics").executes(c->{
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=true;logisticsOnly=true;productionOnly=false;flockOnly=false;planningOnly=false;running=true;
+                cmd("time set 1000");cmd("time pause");setup();log("LOGISTICS_START");return 1;
             })).then(Commands.literal("roles").executes(c->{
                 server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=true;productionOnly=false;flockOnly=false;planningOnly=false;running=true;
                 cmd("time set 1000");cmd("time pause");setup();log("ROLES_START");return 1;
@@ -416,6 +420,7 @@ public final class VillageSelfTest {
             if(planningOnly){PlanningRegression.begin(v,origin);stage=72;since=age;return;}
             if(flockOnly){ProductionRegression.beginFlock(v,origin);stage=71;since=age;return;}
             if(productionOnly){ProductionRegression.begin(v,origin);stage=71;since=age;return;}
+            if(logisticsOnly){LogisticsRegression.run(v,origin);log("DONE passed="+passed+" scope=logistics");running=false;logisticsOnly=false;return;}
             if(rolesOnly){RolesRegression.run(v,origin);log("DONE passed="+passed+" scope=roles");running=false;return;}
             if(housingOnly){HousingRegression.run(v,origin);log("DONE passed="+passed+" scope=housing");running=false;return;}
             if(nightOnly){beginNightEntry();return;}

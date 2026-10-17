@@ -46,6 +46,8 @@ public final class VillageState {
     public Set<ResidentRoles.Role> vacantRoles=new LinkedHashSet<>();
     /** Order and reserve metadata only; the items themselves stay in chests and backpacks. */
     public List<Orders.Order> orders=new ArrayList<>();
+    /** Original personal quantities before accepting cargo. Items remain in real inventories. */
+    public Map<UUID,Map<Orders.Material,Integer>> cargoKits=new LinkedHashMap<>();
     public Map<Long,List<Long>> treeWork=new LinkedHashMap<>();
     public Set<Long> reforestation=new LinkedHashSet<>();
     static final int MAX_TICKET_CHUNKS=1024;
@@ -61,6 +63,8 @@ public final class VillageState {
         if(orders==null)orders=new ArrayList<>();
         if(residentRoles==null)residentRoles=new LinkedHashMap<>();
         residentRoles.keySet().retainAll(residents);
+        if(cargoKits==null)cargoKits=new LinkedHashMap<>();
+        cargoKits.keySet().retainAll(residents);
         residentNames.keySet().retainAll(residents);
         var members=new HashSet<>(residents);if(expedition!=null)members.addAll(expedition.team);
         deposits.keySet().retainAll(members);mineralDeposits.keySet().retainAll(members);
@@ -197,6 +201,10 @@ public final class VillageState {
         for(var tree:treeWork.values())if(tree==null||tree.size()>256||tree.stream().anyMatch(p->p==null||!recordedWork(BlockPos.of(p))))throw new IllegalArgumentException("Повреждённый план лесозаготовки");
         for(Set<Long> positions:List.of(plantedTrees,plantedCrops,fellingTrees))for(Long pos:positions)
             if(pos==null||!recordedWork(BlockPos.of(pos)))throw new IllegalArgumentException("Рабочая область вне деревни");
+        if(cargoKits==null||cargoKits.size()>1024)throw new IllegalArgumentException("Invalid cargo kits");
+        for(var e:cargoKits.entrySet())if(e.getKey()==null||!residents.contains(e.getKey())||e.getValue()==null
+                ||e.getValue().size()>Orders.Material.values().length||e.getValue().entrySet().stream().anyMatch(k->k.getKey()==null||k.getValue()==null||k.getValue()<0||k.getValue()>65536))
+            throw new IllegalArgumentException("Invalid cargo kit");
         if(orders==null||orders.size()>Orders.MAX_ORDERS)throw new IllegalArgumentException("Повреждённые заказы");
         for(Orders.Order order:orders){
             if(order==null||order.kind()==null||order.purpose==null||order.purpose.isEmpty()||order.purpose.length()>Orders.MAX_PURPOSE_LENGTH

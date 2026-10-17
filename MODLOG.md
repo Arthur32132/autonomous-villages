@@ -1,5 +1,14 @@
 # Development journal
 
+2026-10-17 roadmap 2 review fixes: preserve the existing agreement and order transit
+reservation when collecting from a chest or resident. Tool sharing and unloading now
+use the same cargo-aware protected slots, keeping the best tools within the saved
+personal quantity without adopting orphan cargo as a role kit. Reconfirm the concrete
+surplus components and recipient capacity after pickup. Roadmap item 2 closed at the
+human's request. No tests, builds or Minecraft launches performed for these fixes;
+previous PASS evidence and JAR hashes remain historical. Commit includes the existing
+roadmap 2 implementation, its bounded validation evidence and these review fixes.
+
 2026-10-14: User authorized a new mod selecting a village by command and making it autonomous. Existing Navigation AI supports native villagers; AutonomousBots supplies useful crafting patterns but its fake-player survival brain is not reused. Exact cached 26.2 sources are the API reference. Knowledge base searched (Minecraft); existing Fabric route retained. Chosen route: server Fabric lifecycle/commands + Navigation AI, no new game assets or game code redistribution. Fresh lab under tools/validation; never edit production worlds. See MODDING_PLAN.md for acceptance sequence.
 
 Implementation: command claims, atomic metadata, native resident membership, nonpersistent loading+simulation tickets, real chest transactions, registered recipes, real furnaces, crops, top-down forestry, equipment, bounded staircase mine, shelter blueprint and vanilla social/night windows. No fake players are registered.
@@ -698,3 +707,18 @@ JDK25 offline: compileJava compileTestJava compileValidationJava — BUILD SUCCE
 Это только компиляция; JUnit, validation-сценарии и Minecraft не запускались.
 Отчёт: docs/validation/2026-10-17-roadmap-1/REPORT.md. Приёмка полного цикла и
 поведения на 40/400 TPS остаётся открыта. Дистрибутив/релиз не обновлялись.
+
+
+## 2026-10-17 — roadmap 2
+
+Implemented agreed cargo handoffs, role kits, worksite chest replenishment and persistent cargo-kit baselines. Bounded logistics validation follows implementation; no long colony soak.
+
+Validation complete: 78 village JUnit and 109 navigation JUnit PASS. The first
+short server fixture stopped on a test setup error in address reassignment;
+the chest pool had priority over the carried pool, so no delivery was assigned.
+After isolating the carried pool in that fixture, the same gameplay JAR passed
+10 server checks (9 logistics plus claim), 4.79 seconds of scenario time at
+requested 400 TPS. No long colony run or additional game launch followed.
+Evidence, JAR SHA-256 and limitations are in
+docs/validation/2026-10-17-roadmap-2/REPORT.md. The local gameplay JAR is in
+build/libs; the historical distribution bundle was not replaced.

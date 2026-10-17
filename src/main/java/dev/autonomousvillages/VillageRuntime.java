@@ -23,6 +23,11 @@ public final class VillageRuntime {
     final Map<String, Village> villages = new LinkedHashMap<>();
     final Map<UUID,VillageState.ResidentName> pendingReleases=new LinkedHashMap<>();
     private final Path file;
+    private final FileSnapshotWriter writer;
+    long residentDecisionRemainingNanos;
+    private int villageRotation;
+    private boolean persistenceWriteFailed;
+    public boolean persistenceWriteFailed(){return persistenceWriteFailed;}
     private boolean loadFailed;
     long ticks;
     private final Map<Long,Integer> chunkLeases=new HashMap<>();
@@ -34,7 +39,8 @@ public final class VillageRuntime {
     }
     public VillageRuntime(MinecraftServer server) {
         this.server = server; this.bots = NavigationAiMod.runtime(server).service();
-        file = server.getWorldPath(LevelResource.ROOT).resolve("autonomous_villages.json"); load();
+        file = server.getWorldPath(LevelResource.ROOT).resolve("autonomous_villages.json");
+        writer=new FileSnapshotWriter(file);load();
         for(var entity:server.overworld().getAllEntities())if(entity instanceof Villager resident)residentLoaded(resident);
     }
     void residentLoaded(Villager resident){
@@ -52,7 +58,9 @@ public final class VillageRuntime {
         Village owner=villages.values().stream().filter(v->v.state.residents.contains(id)).findFirst().orElse(null);
         if(owner==null)return true;
         var worker=owner.workers.get(id);
-        boolean explicit=worker!=null&&("renovate".equals(worker.job)||"harvest".equals(worker.job))&&pos.equals(worker.target);
+        String activity=worker==null?"mine":Resident.miningActivity(worker.job);
+        if(!owner.state.policy.allows(activity,pos)||owner.state.policy.isPrivate(owner,pos))return false;
+        boolean explicit=worker!=null&&("renovate".equals(worker.job)||"harvest".equals(worker.job)||"grade".equals(worker.job)||"dig_irrigation".equals(worker.job))&&pos.equals(worker.target);
         for(var other:villages.values())if(other.town.protects(pos))return other==owner&&explicit;
         var block=server.overworld().getBlockState(pos);
         return !block.is(net.minecraft.world.level.block.Blocks.FARMLAND)&&!(block.getBlock() instanceof net.minecraft.world.level.block.CropBlock)||explicit;
@@ -106,6 +114,10 @@ public final class VillageRuntime {
         if (!(server.overworld().getBlockEntity(p) instanceof ChestBlockEntity chest) || chest.isLocked()) throw new IllegalArgumentException("Нужен незапертый сундук.");
         if (v.state.storage.size() >= 16 && !v.state.storage.contains(p.asLong())) throw new IllegalArgumentException("Достигнут лимит 16 сундуков.");
         // Explicit player command is the only way an existing chest becomes shared property.
+        v.state.policy.privateChests.remove(p.asLong());
+        var chestState=v.level.getBlockState(p);
+        if(chestState.getBlock() instanceof net.minecraft.world.level.block.ChestBlock&&chestState.getValue(net.minecraft.world.level.block.ChestBlock.TYPE)!=net.minecraft.world.level.block.state.properties.ChestType.SINGLE)
+            v.state.policy.privateChests.remove(p.relative(net.minecraft.world.level.block.ChestBlock.getConnectedDirection(chestState)).asLong());
         v.state.storage.add(p.asLong()); save(); return "Общий склад " + name + ": " + p.toShortString();
     }
     public String status(String name) {
@@ -116,20 +128,26 @@ public final class VillageRuntime {
     public void tick() {
         ticks++;
         if (ticks <= 5) return; // sync retries bodies that have not loaded; do not leave a night restart unguarded
-        for (Village village : villages.values()) if (village.state.active) try { village.tick(); }
+        residentDecisionRemainingNanos=TickWorkBudget.residentDecisionNanos(server.tickRateManager().nanosecondsPerTick());
+        var ordered=List.copyOf(villages.values());
+        for (int i=0;i<ordered.size();i++) {Village village=ordered.get(Math.floorMod(i+villageRotation,ordered.size()));if (village.state.active) try { village.tick(); }
             catch (RuntimeException error) { village.problem = "ошибка планирования: " + error.getClass().getSimpleName();
-                if (ticks % 200 == 0) AutonomousVillagesMod.LOG.error("Village {}", village.state.name, error); }
-        if (ticks % 1200 == 0) save();
+                if (ticks % 200 == 0) AutonomousVillagesMod.LOG.error("Village {}", village.state.name, error); }}
+        villageRotation++;
+        var error=writer.takeFailure();if(error!=null){persistenceWriteFailed=true;AutonomousVillagesMod.LOG.error("Cannot save periodic villages snapshot",error);}
+        if (ticks % 1200 == 0) writeSave(true);
     }
     public void save() {
+        writeSave(false);
+    }
+    private void writeSave(boolean periodic) {
         if (loadFailed) return;
         try {
             villages.values().forEach(v->{v.rememberResidents();v.state.compactMetadata();v.state.validate();});
             Save data = new Save(); data.villages = villages.values().stream().map(v -> v.state).toList();data.pendingReleases.putAll(pendingReleases);
-            Path temp = file.resolveSibling(file.getFileName() + ".tmp"); Files.writeString(temp, GSON.toJson(data));
-            try { Files.move(temp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
-            catch (AtomicMoveNotSupportedException ignored) { Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING); }
-        } catch (Exception error) { AutonomousVillagesMod.LOG.error("Cannot save villages", error); }
+            String json=GSON.toJson(data);
+            if(periodic)writer.periodic(json);else{writer.immediate(json);persistenceWriteFailed=false;}
+        } catch (Exception error) { persistenceWriteFailed=true;AutonomousVillagesMod.LOG.error("Cannot save villages", error); }
     }
     private void load() {
         if (!Files.exists(file)) return;
@@ -153,6 +171,7 @@ public final class VillageRuntime {
     }
     public void close() {
         save();
+        writer.close();
         // Do not detach on shutdown: library may already be closed and it owns backpack persistence.
         for (Village v : villages.values()) {v.presentation.close();v.ticket(false);}
     }

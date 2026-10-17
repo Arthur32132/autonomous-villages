@@ -101,8 +101,8 @@ final class ReviewRegression {
         }
     }
     private static void deferredRelease(Village v,BlockPos at){
-        v.level.getChunk(at);
-        Villager body=EntityTypes.VILLAGER.create(v.level,EntitySpawnReason.COMMAND);body.setNoAi(true);body.snapTo(Vec3.atBottomCenterOf(at),0,0);body.setCustomName(Component.literal("Original name"));v.level.addFreshEntity(body);
+        VillageSelfTest.require(v.level.isPositionEntityTicking(at),"release fixture chunk has finished entity loading before the round trip");
+        Villager body=EntityTypes.VILLAGER.create(v.level,EntitySpawnReason.COMMAND);body.setNoAi(true);body.snapTo(Vec3.atBottomCenterOf(at),0,0);body.setCustomName(Component.literal("Original name"));VillageSelfTest.require(v.level.addFreshEntity(body),"release fixture body inserted");
         var handle=v.runtime.bots.attach(body);VillageSelfTest.give(handle,Items.WOODEN_AXE,1);VillageSelfTest.give(handle,Items.DIAMOND,17);
         var state=new VillageState("ReviewRelease",UUID.randomUUID(),at,24);state.residents.add(body.getUUID());var name=new VillageState.ResidentName();name.json=net.minecraft.network.chat.ComponentSerialization.CODEC.encodeStart(com.mojang.serialization.JsonOps.INSTANCE,body.getCustomName()).getOrThrow().toString();state.residentNames.put(body.getUUID(),name);
         var released=new Village(v.runtime,state);v.runtime.villages.put("reviewrelease",released);
@@ -110,9 +110,10 @@ final class ReviewRegression {
         body.setRemoved(Entity.RemovalReason.UNLOADED_TO_CHUNK);v.runtime.change("ReviewRelease","release");
         VillageSelfTest.require(v.runtime.pendingReleases.containsKey(id),"unloaded release persisted until body returns");
         try{var file=v.runtime.server.getWorldPath(LevelResource.ROOT).resolve("autonomous_villages.json");var saved=VillageRuntime.GSON.fromJson(java.nio.file.Files.readString(file),VillageRuntime.Save.class);VillageSelfTest.require(saved.pendingReleases.containsKey(id),"deferred release survives a metadata round trip");}catch(java.io.IOException error){throw new IllegalStateException(error);}
-        Villager loaded=EntityTypes.VILLAGER.create(v.level,EntitySpawnReason.COMMAND);loaded.load(TagValueInput.create(ProblemReporter.DISCARDING,v.level.registryAccess(),nbt));v.level.addFreshEntity(loaded);v.runtime.residentLoaded(loaded);
+        Villager loaded=EntityTypes.VILLAGER.create(v.level,EntitySpawnReason.COMMAND);loaded.load(TagValueInput.create(ProblemReporter.DISCARDING,v.level.registryAccess(),nbt));VillageSelfTest.require(v.level.addFreshEntity(loaded),"released fixture body reinserted");v.runtime.residentLoaded(loaded);
         VillageSelfTest.require(v.runtime.bots.find(id).isEmpty()&&!v.runtime.pendingReleases.containsKey(id)&&((VillagerAccess)loaded).navigationAiSavedState()==null&&loaded.getName().getString().equals("Original name"),"reloaded released villager has no resurrected controller and keeps original name");
-        var drops=v.level.getEntitiesOfClass(ItemEntity.class,new AABB(at).inflate(4),item->item.getItem().is(Items.DIAMOND));VillageSelfTest.require(drops.stream().mapToInt(item->item.getItem().getCount()).sum()==17,"all17 backpack diamonds returned exactly once on deferred release");drops.forEach(Entity::discard);loaded.discard();
+        var drops=v.level.getEntitiesOfClass(ItemEntity.class,new AABB(at).inflate(4),item->item.getItem().is(Items.DIAMOND));int returned=drops.stream().mapToInt(item->item.getItem().getCount()).sum();VillageSelfTest.require(returned==17,"all17 backpack diamonds returned exactly once on deferred release; actual="+returned);drops.forEach(Entity::discard);loaded.discard();
         VillageSelfTest.pass("review_unloaded_release_persists_and_returns_backpack_once_on_load");
+        VillageSelfTest.releaseReviewFixture();
     }
 }

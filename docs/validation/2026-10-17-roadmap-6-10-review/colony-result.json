@@ -1,0 +1,170 @@
+{
+  "success": false,
+  "scope": "colony",
+  "reason": "resident_lost_during_live_observation",
+  "requestedTps": 400,
+  "maxObservationTicks": 144000,
+  "ticks": 29670,
+  "exitCode": 0,
+  "fullAutonomyAccepted": false,
+  "sourcesUnchanged": true,
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 400,
+    "requestedTps": 400,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "measuredTps": 399.3117462741219,
+    "averageTps": 378.63319482480847,
+    "meanTickMs": 1.236203,
+    "initialResidents": 1,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 0,
+    "newExpeditionItemsUnloaded": 0,
+    "navigationMetrics": {
+      "serverTicks": 29600,
+      "lastTickNanos": 574500,
+      "totalTickNanos": 6789889500,
+      "maxTickNanos": 26635300,
+      "snapshots": 486,
+      "snapshotNanos": 5143229300,
+      "pathSearchesSubmitted": 423,
+      "pathSearchesCompleted": 423,
+      "pathSearchesCancelled": 16,
+      "pathSearchesRejected": 0,
+      "backpressureDeferrals": 0,
+      "nodeBudgetDeferrals": 0,
+      "pathSearchNanos": 129845652400,
+      "pathNodesVisited": 862312,
+      "replans": 100,
+      "queuedSearches": 0,
+      "activeSearches": 0
+    },
+    "observedNightTicks": 10000,
+    "observedSleepTicks": 11675,
+    "naturalThreatsSeen": 896,
+    "clockTime": 29600,
+    "raining": true,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "iron": 0,
+      "rawIron": 0,
+      "cobblestone": 0,
+      "coal": 0
+    },
+    "sharedChestContents": [
+      {
+        "items": [
+          "1 minecraft:wheat_seeds",
+          "2 minecraft:oak_planks",
+          "15 minecraft:dirt",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ],
+        "pos": "BlockPos{x=-303, y=77, z=-342}"
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "lostOriginalResidents": [
+      "323d8bf8-4d16-4fc8-be50-7c5c5ed770d1"
+    ]
+  },
+  "id": "client-20261017-064245-565517",
+  "gameJars": {
+    "autonomous-villages-0.2.1.jar": "7eca3e67346793ac755fdb7c0ba14f2a51f741321ee78814beee4f8d08891e05",
+    "autonomous-villages-client-validation-0.2.1.jar": "76c203cc6ad76a7d8addea7346eae95a1d5a20823bb506ae421c26d51a5cc8ee",
+    "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+  },
+  "serverDeathMessages": [
+    "[06:44:26] [Server thread/INFO]: Villager Villager['строитель • укрывается от угрозы'/258, l='ServerLevel[Colony observation]', x=-298.42, y=77.00, z=-319.59] died, message: 'строитель • укрывается от угрозы был убит Зомби'",
+    "[06:44:32] [Server thread/INFO]: Villager Villager['фермер • укрывается от угрозы'/260, l='ServerLevel[Colony observation]', x=-302.30, y=77.88, z=-341.30] died, message: 'фермер • укрывается от угрозы был убит Зомби'",
+    "[06:44:32] [Server thread/INFO]: Villager Villager['шахтёр • укрывается от угрозы'/263, l='ServerLevel[Colony observation]', x=-310.70, y=78.00, z=-343.70] died, message: 'шахтёр • укрывается от угрозы был убит Зомби'",
+    "[06:44:32] [Server thread/INFO]: Villager Villager['сторож • укрывается от угрозы'/303, l='ServerLevel[Colony observation]', x=-302.30, y=77.72, z=-343.70] died, message: 'сторож • укрывается от угрозы был убит Зомби'",
+    "[06:44:39] [Server thread/INFO]: Villager Villager['лесоруб • укрывается от угрозы'/264, l='ServerLevel[Colony observation]', x=-295.70, y=70.00, z=-352.30] died, message: 'лесоруб • укрывается от угрозы был убит шахтёр • укрывается от угрозы'",
+    "[06:44:39] [Server thread/INFO]: Villager Villager['завхоз • укрывается от угрозы'/255, l='ServerLevel[Colony observation]', x=-283.22, y=69.02, z=-386.20] died, message: 'завхоз • укрывается от угрозы был убит Зомби'"
+  ],
+  "lastSnapshot": {
+    "ticks": 29600,
+    "residentCount": 2,
+    "buildings": [
+      [
+        "native_house",
+        267
+      ],
+      [
+        "native_house",
+        152
+      ],
+      [
+        "native_house",
+        150
+      ],
+      [
+        "native_house",
+        152
+      ]
+    ],
+    "fieldCount": 0,
+    "forestCount": 13,
+    "forestHarvested": 1,
+    "forestReplanted": 1,
+    "workshopOutput": {},
+    "actors": [
+      {
+        "uuid": "323d8bf8-4d16-4fc8-be50-7c5c5ed770d1",
+        "role": "завхоз",
+        "job": "home",
+        "health": 11.0,
+        "pos": "(-283.30000001192093, 68.30462909176069, -386.30000001192093)",
+        "target": "BlockPos{x=-295, y=70, z=-353}",
+        "failure": "нет безопасного подхода",
+        "bag": [
+          "1 minecraft:wooden_sword",
+          "7 minecraft:stick",
+          "1 minecraft:wooden_pickaxe",
+          "1 minecraft:wooden_axe",
+          "19 minecraft:acacia_planks",
+          "10 minecraft:acacia_log"
+        ],
+        "nativeFood": []
+      },
+      {
+        "uuid": "a2748d26-5486-4b10-bd73-d3b251e55816",
+        "role": "лесоруб",
+        "job": "home",
+        "health": 8.0,
+        "pos": "(-295.69999998807907, 70.0, -352.30000001192093)",
+        "target": "BlockPos{x=-303, y=77, z=-343}",
+        "failure": "нет безопасного подхода",
+        "bag": [
+          "1 minecraft:wooden_sword",
+          "7 minecraft:stick",
+          "1 minecraft:wooden_pickaxe",
+          "1 minecraft:wooden_axe",
+          "1 minecraft:crafting_table",
+          "8 minecraft:oak_planks"
+        ],
+        "nativeFood": []
+      }
+    ]
+  }
+}

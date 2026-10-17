@@ -27,10 +27,17 @@ final class SettlementSimulationProbe implements ClientModInitializer {
     volatile String observation="загрузка";
     int ticks,frames,clientTicks;
     long nextFrame,begin=System.nanoTime();
+    long simulationStarted,rateWindowStarted,nextSnapshotNanos;int rateWindowTick;
+    final int tickRate=Math.clamp(Integer.getInteger("avillage.test.tickRate",400),1,10000);
+    final int wallTimeout=Integer.getInteger("avillage.test.wallTimeout",1260);
+    final Map<UUID,String> observedFailures=new HashMap<>();String lastPartyPhase="";
+    final TickSpeedBenchmark benchmark=Boolean.getBoolean("avillage.test.benchmarkTps")?new TickSpeedBenchmark():null;
     final int maxTicks=Math.clamp(Integer.getInteger("avillage.test.maxTicks",48000),4800,144000);
     Village village;
     BlockPos locate;
+    int locateTick;
     final Map<String,Object> evidence=new LinkedHashMap<>();
+    final Map<UUID,Map<String,Long>> jobTicks=new LinkedHashMap<>();
     final List<TownBuilding.Plan> damage=new ArrayList<>();
     final Set<UUID> originalMembers=new HashSet<>(),seenThreats=new HashSet<>();
     final Set<Object> observedHarvests=Collections.newSetFromMap(new WeakHashMap<>());
@@ -75,25 +82,35 @@ final class SettlementSimulationProbe implements ClientModInitializer {
             }
             if(Files.exists(Path.of("stop-requested")))stop(false,"stopped_for_diagnosis");
             if(finished){mc.stop();return;}
-            if(System.nanoTime()-begin>Math.min(4800,150+maxTicks/20)*1_000_000_000L)stop(false,"client_observation_timeout");
+            if(System.nanoTime()-begin>wallTimeout*1_000_000_000L)stop(false,"client_observation_timeout");
         }catch(Throwable error){LOG.error("COLONY_TEST FAIL",error);stop(false,error.toString());}
     }
     void server(MinecraftServer server){
         if(finished||server.getPlayerList().getPlayerCount()==0)return;
         try{
             ticks++;
+            long realNow=System.nanoTime();
+            if(simulationStarted==0){simulationStarted=rateWindowStarted=realNow;rateWindowTick=ticks;}
+            if(realNow-rateWindowStarted>=1_000_000_000L){
+                evidence.put("measuredTps",(ticks-rateWindowTick)*1_000_000_000.0/(realNow-rateWindowStarted));
+                evidence.put("averageTps",(ticks-1)*1_000_000_000.0/Math.max(1,realNow-simulationStarted));
+                evidence.put("meanTickMs",server.getAverageTickTimeNanos()/1_000_000.0);
+                rateWindowStarted=realNow;rateWindowTick=ticks;
+            }
             if(ticks==1){
                 var restored=AutonomousVillagesMod.runtime(server);
                 restored.villages.values().forEach(v->originalMembers.addAll(v.state.residents));
                 boolean threats=Boolean.getBoolean("avillage.test.liveThreats");
-                server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),"gamemode "+(threats?"creative":"spectator")+" VillageProbe");
-                if(threats){
-                    server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),"difficulty normal");
-                    var observer=server.getPlayerList().getPlayers().getFirst();observer.getAbilities().flying=true;observer.onUpdateAbilities();
-                }
-                server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),"tick rate 40");
+                server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),"gamemode creative VillageProbe");
+                server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),"difficulty "+(threats?"normal":"peaceful"));
+                // Spectators may not generate chunks. Observation mode must not prevent the
+                // peaceful scene from loading its naturally generated residents.
+                var observer=server.getPlayerList().getPlayers().getFirst();observer.getAbilities().flying=true;observer.onUpdateAbilities();
+                evidence.put("difficulty",threats?"normal":"peaceful");
+                int initialRate=benchmark==null?tickRate:40;
+                server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),"tick rate "+initialRate);
                 evidence.put("itemDonations",0);evidence.put("productionFixturesPlaced",0);
-                evidence.put("simulationTickRate",40);
+                evidence.put("simulationTickRate",initialRate);evidence.put("requestedTps",tickRate);
                 evidence.put("fixedDaylight",Boolean.getBoolean("avillage.test.daylight"));
                 evidence.put("naturalThreats",threats);
                 if(Boolean.getBoolean("avillage.test.daylight")){
@@ -109,9 +126,17 @@ final class SettlementSimulationProbe implements ClientModInitializer {
                 else if(locate==null){
                     locate=server.overworld().findNearestMapStructure(StructureTags.VILLAGE,server.getPlayerList().getPlayers().getFirst().blockPosition(),16,false);
                     if(locate==null)throw new IllegalStateException("No generated village found");
+                    locateTick=ticks;
                     int y=server.overworld().getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,locate.getX(),locate.getZ());
                     server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),"tp VillageProbe "+locate.getX()+" "+(y+15)+" "+locate.getZ());
-                }else if(ticks>240){runtime.claim(server.overworld(),locate,"Observed",48,new UUID(0,0));village=runtime.villages.values().iterator().next();}
+                }else if(ticks-locateTick>200&&ticks%20==0){
+                    var area=new net.minecraft.world.phys.AABB(locate).inflate(160,128,160);
+                    if(server.overworld().getEntitiesOfClass(Villager.class,area,Villager::isAlive).isEmpty()){
+                        if(ticks-locateTick>4000)throw new IllegalStateException("Generated village residents did not load");
+                        return;
+                    }
+                    runtime.claim(server.overworld(),locate,"Observed",48,new UUID(0,0));village=runtime.villages.values().iterator().next();
+                }
                 if(village!=null){
                     originalMembers.addAll(village.state.residents);evidence.put("initialResidents",village.state.residents.size());evidence.put("initialFood",village.count(Supplies::food));
                     inheritedMiningDeliveries=village.state.verifiedMiningDeliveries;inheritedExpeditionItems=village.state.expeditionDeliveries;
@@ -120,6 +145,8 @@ final class SettlementSimulationProbe implements ClientModInitializer {
             }
             if(village==null)return;
             var v=village;
+            for(var r:v.workers.values())jobTicks.computeIfAbsent(r.id,id->new LinkedHashMap<>()).merge(r.job==null?"idle":r.job,1L,Long::sum);
+            evidence.put("residentJobTicks",jobTicks);
             if(!Boolean.getBoolean("avillage.test.daylight"))for(var r:v.workers.values())
                 if(r.mining!=null&&!r.mining.completion().isDone()&&!r.clearingLeaves
                         &&Set.of("wood","stone","ore","sand").contains(r.job)&&observedAtomicTasks.add(r.mining)){
@@ -150,6 +177,13 @@ final class SettlementSimulationProbe implements ClientModInitializer {
             if(!coverage&&ticks>400){
                 var all=server.overworld().getEntitiesOfClass(Villager.class,VillageDiscovery.area(v.state,0),e->e.isAlive());
                 if(all.stream().anyMatch(e->!v.state.residents.contains(e.getUUID())))throw new IllegalStateException("Unmanaged resident in complete footprint");
+                // Claim can run before every chunk/entity has arrived. Freeze the complete
+                // initial cohort once enrollment is verified, so the first later death stops
+                // acceptance instead of tracking only the first loaded villager.
+                addResidents(v);
+                all=server.overworld().getEntitiesOfClass(Villager.class,VillageDiscovery.area(v.state,0),e->e.isAlive());
+                originalMembers.addAll(all.stream().map(Villager::getUUID).toList());
+                evidence.put("initialResidents",originalMembers.size());
                 evidence.put("completeFootprint",v.state.bounds);evidence.put("allLoadedResidentsEnrolled",all.size());coverage=true;
                 LOG.info("COLONY_TEST PASS whole_village_enrollment {} residents",all.size());
             }
@@ -160,7 +194,7 @@ final class SettlementSimulationProbe implements ClientModInitializer {
             evidence.put("newMiningExpeditionsReturnedAndUnloaded",v.state.verifiedMiningDeliveries-inheritedMiningDeliveries);
             evidence.put("newExpeditionItemsUnloaded",v.state.expeditionDeliveries-inheritedExpeditionItems);
             camera=depot==null?v.state.center():BlockPos.of(depot.origin).offset(3,1,3);
-            if(Boolean.getBoolean("avillage.test.daylight")&&!atomic&&miningBlock==null&&ticks>500&&depot!=null&&depot.built(v)>30){
+            if(!atomic&&miningBlock==null&&ticks>500&&depot!=null&&depot.built(v)>30){
                 var worker=v.workers.values().stream().filter(r->r.mining!=null&&!r.mining.completion().isDone()&&"wood".equals(r.job)&&!r.clearingLeaves)
                         .filter(r->{
                             if(Boolean.getBoolean("avillage.test.daylight"))return true;
@@ -210,7 +244,16 @@ final class SettlementSimulationProbe implements ClientModInitializer {
             if(outing!=null&&ticks%1800>=400&&ticks%1800<1000&&!outing.team.isEmpty()){
                 var leader=v.workers.get(outing.team.getFirst());if(leader!=null&&leader.bot()!=null)camera=leader.body().blockPosition();
             }
-            if(ticks%200==0){
+            boolean grown=v.state.buildings.stream().anyMatch(b->b.kind.equals("house")&&b.completed);
+            boolean nightVerified=!Boolean.getBoolean("avillage.test.liveThreats")||nightTicks>=9000&&sleepTicks>0;
+            boolean acceptanceComplete=benchmark==null&&warehouse&&repair&&upgrade&&atomic&&v.state.verifiedMiningDeliveries>inheritedMiningDeliveries&&ticks>damagedAt+200&&nightVerified&&(!Boolean.getBoolean("avillage.test.growth")||grown);
+            if(runtime.persistenceWriteFailed()){stop(false,"metadata_write_failed");return;}
+            String partyPhase=outing==null?"none":outing.phase;
+            if(!partyPhase.equals(lastPartyPhase)){lastPartyPhase=partyPhase;LOG.info("COLONY_EVENT ticks={} expedition={}",ticks,partyPhase);}
+            if(ticks%20==0)for(var r:v.workers.values())if(!r.lastFailure.isEmpty()&&!r.lastFailure.equals(observedFailures.put(r.id,r.lastFailure)))LOG.info("COLONY_EVENT ticks={} worker={} failure={} pos={}",ticks,r.id,r.lastFailure,r.body().position());
+            if((ticks%200==0&&realNow>=nextSnapshotNanos)||acceptanceComplete||ticks==maxTicks||ticks==48000||ticks==96000){
+                nextSnapshotNanos=realNow+1_000_000_000L;
+                evidence.put("navigationMetrics",dev.navigationai.NavigationAiMod.runtime(server).metrics());
                 for(var threat:v.level.getEntitiesOfClass(net.minecraft.world.entity.monster.Monster.class,VillageDiscovery.area(v.state,0),m->m.isAlive()))seenThreats.add(threat.getUUID());
                 evidence.put("observedNightTicks",nightTicks);evidence.put("observedSleepTicks",sleepTicks);evidence.put("naturalThreatsSeen",seenThreats.size());
                 evidence.put("clockTime",v.level.getOverworldClockTime());evidence.put("raining",v.level.isRaining());evidence.put("thundering",v.level.isThundering());evidence.put("darkOutside",v.level.isDarkOutside());
@@ -226,25 +269,45 @@ final class SettlementSimulationProbe implements ClientModInitializer {
                 observation=v.status();LOG.info("COLONY_PROGRESS ticks={} {}",ticks,observation);
                 for(var r:v.workers.values())if(r.bot()!=null)LOG.info("COLONY_WORKER {} {} job={} target={} pos={} bag={} reason={}",r.id,v.role(r.id),r.job,r.target,r.bot().entity().position(),r.bot().inventory().snapshot().slots().stream().filter(s->!s.isEmpty()).toList(),r.lastFailure);
                 String json=VillageRuntime.GSON.toJson(Map.of("ticks",ticks,"state",v.state,"status",observation,"evidence",evidence,
-                        "tables",v.index.tables.toString(),"trees",v.index.trees.size(),"crops",v.index.crops.size(),"wood",v.count(s->s.is(ItemTags.PLANKS)||s.is(ItemTags.LOGS)),"actors",LiveDiagnostics.workers(v),"projects",v.state.buildings.stream().filter(b->b.built(v)<b.blocks.size()).map(b->Map.of("kind",b.kind,"built",b.built(v),"total",b.blocks.size(),"remaining",b.blocks.stream().filter(p->!p.matches(v)).limit(20).map(p->Map.of("pos",p.position().toString(),"expected",p.block().toString(),"actual",v.level.getBlockState(p.position()).toString())).toList())).toList()));Files.writeString(Path.of("colony-live.json"),json);
+                        "tables",v.index.tables.toString(),"trees",v.index.trees.size(),"crops",v.index.crops.size(),"wood",v.count(s->s.is(ItemTags.PLANKS)||s.is(ItemTags.LOGS)),"actors",LiveDiagnostics.workers(v),"projects",v.state.buildings.stream().filter(b->b.built(v)<b.blocks.size()).map(b->Map.of("kind",b.kind,"built",b.built(v),"total",b.blocks.size(),"pendingCuts",b.cuts.stream().filter(c->!Construction.clear(v.level.getBlockState(BlockPos.of(c)))&&java.util.stream.Stream.concat(b.blocks.stream(),b.foundation.stream()).noneMatch(p->p.pos==c&&p.matches(v))).count(),"pendingFoundation",b.foundation.stream().filter(c->!c.matches(v)).count(),"approachReady",Infrastructure.approachReady(v,b),"remaining",b.blocks.stream().filter(p->!p.matches(v)).limit(20).map(p->Map.of("pos",p.position().toString(),"expected",p.block().toString(),"actual",v.level.getBlockState(p.position()).toString())).toList())).toList()));Files.writeString(Path.of("colony-live.json"),json);
+            }
+            if(ticks%200==0){
                 var p=camera;
                 String view=interiorView==null?(p.getX()+12)+" "+(p.getY()+9)+" "+(p.getZ()-15):(interiorView.getX()+.5)+" "+interiorView.getY()+" "+(interiorView.getZ()+.5);
                 server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSuppressedOutput(),"tp VillageProbe "+view);
             }
-            boolean grown=v.state.buildings.stream().anyMatch(b->b.kind.equals("house")&&b.completed);
-            boolean nightVerified=!Boolean.getBoolean("avillage.test.liveThreats")||nightTicks>=9000&&sleepTicks>0;
-            if(warehouse&&repair&&upgrade&&atomic&&v.state.verifiedMiningDeliveries>inheritedMiningDeliveries&&ticks>damagedAt+200&&nightVerified&&(!Boolean.getBoolean("avillage.test.growth")||grown))stop(true,grown?"warehouse_repair_upgrade_mining_return_and_new_housing_verified":"warehouse_repair_upgrade_mining_return_verified");
+            if(benchmark!=null){if(benchmark.tick(server,ticks,v,evidence))stop(true,"tick_speed_benchmark_completed");}
+            else if(acceptanceComplete)stop(true,grown?"warehouse_repair_upgrade_mining_return_and_new_housing_verified":"warehouse_repair_upgrade_mining_return_verified");
             if((ticks==48000||ticks==96000)&&maxTicks>ticks){
                 var checkpoint=new LinkedHashMap<String,Object>();checkpoint.put("ticks",ticks);checkpoint.put("complete",warehouse&&repair&&upgrade&&atomic&&grown&&nightVerified&&v.state.verifiedMiningDeliveries>inheritedMiningDeliveries);
                 checkpoint.put("status",v.status());checkpoint.put("evidence",evidence);checkpoint.put("warehouse",warehouse);checkpoint.put("repair",repair);checkpoint.put("upgrade",upgrade);checkpoint.put("growth",grown);
                 Files.writeString(Path.of(ticks==48000?"colony-checkpoint.json":"colony-checkpoint-96000.json"),VillageRuntime.GSON.toJson(checkpoint));LOG.info("COLONY_TEST CHECKPOINT ticks={} complete={}",ticks,checkpoint.get("complete"));
             }
-            if(ticks>maxTicks)stop(false,"production_observation_timeout");
+            if(benchmark==null&&ticks>maxTicks)stop(false,"production_observation_timeout");
         }catch(Throwable error){LOG.error("COLONY_TEST FAIL",error);stop(false,error.toString());}
+    }
+    void addResidents(Village v){
+        int wanted=Math.clamp(Integer.getInteger("avillage.test.residents",0),0,32);
+        if(wanted==0)return;
+        long adults=v.state.residents.stream().map(v.level::getEntity).filter(e->e instanceof Villager body&&body.isAlive()&&!body.isBaby()).count();
+        int added=0;var starts=new ArrayList<BlockPos>();
+        for(var door:v.town.doors())for(var dir:Direction.Plane.HORIZONTAL)for(int dy:new int[]{0,-1,1}){
+            var feet=door.relative(dir).offset(0,dy,0);if(v.state.contains(feet)&&v.safeFeet(feet))starts.add(feet);
+        }
+        for(int n=(int)adults;n<wanted;n++){
+            if(starts.isEmpty())throw new IllegalStateException("No actual safe footing for added villagers");
+            var body=net.minecraft.world.entity.EntityTypes.VILLAGER.create(v.level,net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+            if(body==null)throw new IllegalStateException("Cannot create test adult");
+            body.setAge(0);body.setPersistenceRequired();
+            if(added<2)body.setVillagerData(body.getVillagerData().withProfession(v.level.registryAccess(),net.minecraft.world.entity.npc.villager.VillagerProfession.MASON).withLevel(2));
+            body.snapTo(v.feetPosition(starts.get(added%starts.size())),0,0);v.level.addFreshEntity(body);v.state.residents.add(body.getUUID());added++;
+        }
+        v.sync();v.runtime.save();evidence.put("artificialAdultsAdded",added);evidence.put("requestedAdultMinimum",wanted);
+        evidence.put("initialRoles",v.state.residentRoles);
     }
     synchronized void stop(boolean passed,String reason){
         if(finished)return;success=passed;
-        try{var result=new LinkedHashMap<String,Object>();result.put("success",passed);result.put("reason",reason);result.put("ticks",ticks);result.put("screenshots",frames);result.put("evidence",evidence);Files.writeString(Path.of("client-result.json"),VillageRuntime.GSON.toJson(result));}
+        try{var result=new LinkedHashMap<String,Object>();result.put("success",passed);result.put("scope",benchmark!=null?"tick_speed_benchmark":"colony");result.put("fullAutonomyAccepted",benchmark==null&&passed);result.put("reason",reason);result.put("ticks",ticks);result.put("screenshots",frames);result.put("evidence",evidence);Files.writeString(Path.of("client-result.json"),VillageRuntime.GSON.toJson(result));}
         catch(Exception error){LOG.error("Result",error);}
         LOG.info("COLONY_TEST DONE success={} reason={}",passed,reason);finished=true;
     }

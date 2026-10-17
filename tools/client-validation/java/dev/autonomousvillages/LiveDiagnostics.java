@@ -22,6 +22,8 @@ final class LiveDiagnostics {
         var result=new ArrayList<Map<String,Object>>();
         for(var r:v.workers.values())if(r.bot()!=null){
             var row=new LinkedHashMap<String,Object>();result.add(row);var entity=r.body();
+            row.put("infrastructureWaitTicks",r.navigation==null?0:r.navigation.infrastructureWaitTicks());
+            row.put("waitingForInfrastructure",r.navigation!=null&&r.navigation.waitingForInfrastructure());
             row.put("uuid",r.id.toString());row.put("job",String.valueOf(r.job));row.put("health",entity.getHealth());row.put("frozen",entity.getTicksFrozen());
             row.put("role",v.role(r.id));row.put("status",r.status);row.put("sleeping",entity.isSleeping());
             row.put("nativeFood",Supplies.copy(entity.getInventory()).stream().filter(s->!s.isEmpty()).map(Object::toString).toList());

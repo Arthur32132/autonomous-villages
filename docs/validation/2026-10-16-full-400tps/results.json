@@ -1,0 +1,108 @@
+{
+  "success": false,
+  "scope": "colony",
+  "maxObservationTicks": 144000,
+  "requestedTps": 400,
+  "exitCode": 0,
+  "fullAutonomyAccepted": false,
+  "reason": "resident_lost_during_live_observation",
+  "ticks": 38765,
+  "sourcesUnchanged": true,
+  "evidence": {
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 400,
+    "requestedTps": 400,
+    "fixedDaylight": false,
+    "naturalThreats": true,
+    "measuredTps": 399.9009845162338,
+    "averageTps": 384.0456165798562,
+    "meanTickMs": 1.196138,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 0,
+    "newExpeditionItemsUnloaded": 0,
+    "navigationMetrics": {
+      "serverTicks": 38600,
+      "lastTickNanos": 546500,
+      "totalTickNanos": 8613972600,
+      "maxTickNanos": 21410500,
+      "snapshots": 541,
+      "snapshotNanos": 6233065400,
+      "pathSearchesSubmitted": 537,
+      "pathSearchesCompleted": 535,
+      "pathSearchesCancelled": 17,
+      "pathSearchesRejected": 0,
+      "backpressureDeferrals": 0,
+      "nodeBudgetDeferrals": 0,
+      "pathSearchNanos": 213571122900,
+      "pathNodesVisited": 1622489,
+      "replans": 223,
+      "queuedSearches": 0,
+      "activeSearches": 0
+    },
+    "observedNightTicks": 11601,
+    "observedSleepTicks": 13923,
+    "naturalThreatsSeen": 895,
+    "clockTime": 38600,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": true,
+    "knownMineWallOres": [],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "iron": 0,
+      "rawIron": 0,
+      "cobblestone": 0,
+      "coal": 0
+    },
+    "sharedChestContents": [
+      {
+        "pos": "BlockPos{x=-303, y=77, z=-342}",
+        "items": [
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ]
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6,
+    "lostOriginalResidents": [
+      "1fb50a30-4ae0-4bff-8f4a-eef2ad488da1"
+    ]
+  },
+  "runId": "client-20261016-182434-329043",
+  "jars": {
+    "autonomous-villages-0.2.1.jar": "b09d8edc97f0cf009cbeea35cd80a3ffd1f18f35b2a03b56cb85fb1ec265d56e",
+    "autonomous-villages-client-validation-0.2.1.jar": "76c203cc6ad76a7d8addea7346eae95a1d5a20823bb506ae421c26d51a5cc8ee",
+    "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+  },
+  "lastSnapshot": {
+    "ticks": 38600,
+    "status": "Observed | СЂР°Р±РѕС‚Р°РµС‚ | С†РµРЅС‚СЂ -321, 73, -319 | С‚РµСЂСЂРёС‚РѕСЂРёСЏ -401,-392 вЂ” -242,-246 | Р¶РёС‚РµР»РµР№ Р·Р°РіСЂСѓР¶РµРЅРѕ 6, СЂР°Р±РѕС‚РЅРёРєРѕРІ 6, РєСЂРѕРІР°С‚РµР№ 5 | СЃСѓРЅРґСѓРєРѕРІ 1, РµРґС‹ 5 | СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ СЃРєР»Р°Рґ 21/161 | С…РѕР·СЏР№СЃС‚РІРѕ СЂР°Р±РѕС‚Р°РµС‚\nСѓРєСЂС‹РІР°РµС‚СЃСЏ РѕС‚ СѓРіСЂРѕР·С‹, СЃРїРёС‚, РІРѕР·РІСЂР°С‰Р°РµС‚СЃСЏ РґРѕРјРѕР№"
+  },
+  "death": {
+    "cause": "killed_by_zombie",
+    "role": "builder",
+    "position": [
+      -320.7,
+      71.0,
+      -321.25
+    ],
+    "serverLogTime": "18:26:43"
+  }
+}

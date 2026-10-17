@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "scope": "housing_only",
+  "output": "C:\\minecraftWorkflow\\AutonomousVillages\\build\\validation\\20261017-120957-701568",
+  "requestedTps": 400,
+  "jars": {
+    "autonomous-villages-0.2.1.jar": "6fc32ec11688570bd562a383f6dfa4d00d84e382d867179f4f3d286ac98d20a9",
+    "autonomous-villages-validation-0.2.1.jar": "9d96d400bc8ab1a50af2e12f62e05fa5174ba2c91270adcdb83c382684676fee",
+    "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+    "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+  },
+  "scenarioWallSeconds": 5.006300899985945,
+  "checks": [
+    "[12:10:11] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+    "[12:10:13] [Server thread/INFO]: VILLAGE_TEST PASS housing_and_bed_orders_start_before_any_depot_completion",
+    "[12:10:13] [Server thread/INFO]: VILLAGE_TEST PASS paid_lit_bootstrap_chest_and_table_function_without_roof_or_decor",
+    "[12:10:13] [Server thread/INFO]: VILLAGE_TEST PASS housing_construction_precedes_depot_workroom",
+    "[12:10:13] [Server thread/INFO]: VILLAGE_TEST PASS paid_home_repair_precedes_parallel_projects",
+    "[12:10:13] [Server thread/INFO]: VILLAGE_TEST PASS paid_two_bed_house_finishes_while_depot_remains_incomplete",
+    "[12:10:13] [Server thread/INFO]: VILLAGE_TEST PASS paid_workroom_then_roof_and_legacy_compatible_stage_reload"
+  ],
+  "junit": {
+    "tests": 69,
+    "failures": 0,
+    "errors": 0
+  }
+}

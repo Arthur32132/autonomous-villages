@@ -1,0 +1,163 @@
+{
+  "status": "candidate_incomplete_acceptance_failed",
+  "scope": "roadmap_5_bounded_attempt",
+  "runs": [
+    {
+      "id": "server-20261017-003729-129561",
+      "success": false,
+      "scope": "production_only",
+      "requestedTps": 40,
+      "checks": [
+        "[00:38:01] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+        "[00:38:06] [Server thread/INFO]: VILLAGE_TEST PASS paid_grass_pen_and_gate_preserve_grass_for_repeatable_wool",
+        "[00:38:06] [Server thread/INFO]: VILLAGE_TEST PASS iron_priority_and_real_mining_kit_gate_work_before_production"
+      ],
+      "junit": {
+        "tests": 59,
+        "failures": 0,
+        "errors": 0
+      },
+      "error": "[00:38:21] [Server thread/INFO]: VILLAGE_TEST FAIL stage=71 java.lang.AssertionError: actual smelted iron physically handed to shearer",
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "112224db16ab3aa4723a6c787507886eafefdf4e90cdce7e2bb35e01a10c2734",
+        "autonomous-villages-validation-0.2.1.jar": "1f7c540ceadb68f5ee3ba5fba665da1b033988f1205a564511dd3206ebf9a5b9",
+        "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+      }
+    },
+    {
+      "id": "server-20261017-004015-203632",
+      "success": false,
+      "scope": "production_only",
+      "requestedTps": 40,
+      "checks": [
+        "[00:40:45] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+        "[00:40:50] [Server thread/INFO]: VILLAGE_TEST PASS paid_grass_pen_and_gate_preserve_grass_for_repeatable_wool",
+        "[00:40:50] [Server thread/INFO]: VILLAGE_TEST PASS iron_priority_and_real_mining_kit_gate_work_before_production"
+      ],
+      "junit": {
+        "tests": 59,
+        "failures": 0,
+        "errors": 0
+      },
+      "error": "[00:42:30] [Server thread/INFO]: VILLAGE_TEST FAIL stage=71 java.lang.AssertionError: bounded production fixture timeout phase=1 farmer=идёт на общий склад job=null pos=(1994.6488837112383, 100.0, 2015.7819087708808) flock=0",
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "112224db16ab3aa4723a6c787507886eafefdf4e90cdce7e2bb35e01a10c2734",
+        "autonomous-villages-validation-0.2.1.jar": "ee137ef6e9ce4b361ef35ba31928d5eeab0982a90cfc4e0be3afdd127e76dbcd",
+        "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+      }
+    },
+    {
+      "id": "server-20261017-004508-115762",
+      "success": false,
+      "scope": "production_only",
+      "requestedTps": 40,
+      "checks": [
+        "[00:45:37] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+        "[00:45:41] [Server thread/INFO]: VILLAGE_TEST PASS paid_grass_pen_and_gate_preserve_grass_for_repeatable_wool",
+        "[00:45:41] [Server thread/INFO]: VILLAGE_TEST PASS iron_priority_and_real_mining_kit_gate_work_before_production"
+      ],
+      "junit": {
+        "tests": 59,
+        "failures": 0,
+        "errors": 0
+      },
+      "error": "[00:47:22] [Server thread/INFO]: VILLAGE_TEST FAIL stage=71 java.lang.AssertionError: bounded production fixture timeout phase=0 farmer=идёт на общий склад job=null pos=(1996.5, 100.0, 1994.5) flock=0",
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "112224db16ab3aa4723a6c787507886eafefdf4e90cdce7e2bb35e01a10c2734",
+        "autonomous-villages-validation-0.2.1.jar": "2d6444d548aecdd6a923941fda90313a38e820c464101bebcc8644d3a6af26a2",
+        "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+      }
+    },
+    {
+      "id": "server-20261017-005000-091390",
+      "success": false,
+      "scope": "flock_only",
+      "requestedTps": 40,
+      "checks": [
+        "[00:50:28] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+        "[00:50:33] [Server thread/INFO]: VILLAGE_TEST PASS paid_grass_pen_and_gate_preserve_grass_for_repeatable_wool",
+        "[00:50:33] [Server thread/INFO]: VILLAGE_TEST PASS iron_priority_and_real_mining_kit_gate_work_before_production",
+        "[00:50:34] [Server thread/INFO]: VILLAGE_TEST PASS two_original_sheep_walk_through_gate_and_breeding_consumes_two_real_wheat"
+      ],
+      "junit": {
+        "tests": 59,
+        "failures": 0,
+        "errors": 0
+      },
+      "error": "No terminal marker matching VILLAGE_TEST (DONE|FAIL) within 90s",
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "bef44a1dd7ec2054b4d21c2b4ca014b22998f2265c4dfcb94024bbb72f8bff94",
+        "autonomous-villages-validation-0.2.1.jar": "9b47ca776342c31f41cae20150fc8862fd9db57e4c1b92c1eaa18e756fc02dda",
+        "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+      }
+    }
+  ],
+  "frozenCandidateJars": {
+    "autonomous-villages-0.2.1.jar": "bef44a1dd7ec2054b4d21c2b4ca014b22998f2265c4dfcb94024bbb72f8bff94",
+    "autonomous-villages-validation-0.2.1.jar": "9b47ca776342c31f41cae20150fc8862fd9db57e4c1b92c1eaa18e756fc02dda",
+    "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+    "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+  },
+  "frozenCandidateSources": {
+    "src\\test\\java\\dev\\autonomousvillages\\FileSnapshotWriterTest.java": "aa1562126e046ffd12930f7c6dd2631d4ba83f554cc67b390fe6da3f5ece49a9",
+    "src\\test\\java\\dev\\autonomousvillages\\OrdersTest.java": "fc3c37faf2b387c6692861abcf67f514bda800ca3be25430c7dc425bc9724f8a",
+    "src\\test\\java\\dev\\autonomousvillages\\ProductionRulesTest.java": "b246d48b5c103e40a7dafc17f9f5a70630b140c74260bfd42cff00bb2afc9d8c",
+    "src\\test\\java\\dev\\autonomousvillages\\ResidentRolesTest.java": "6ad3358f058ce71f53d52075b22122ef9333bfb95e81107bef40eacd8b3bf4ef",
+    "src\\test\\java\\dev\\autonomousvillages\\VillageRulesTest.java": "838cc1f121c6d9e5409ecca17b62295206ab57dde747d0e57704fe63bc80cd90",
+    "src\\main\\resources\\autonomous_villages.mixins.json": "aa17cb0a06d6e7adf4e826594a25c4314e55504401fe93ca7766ee6084dfad49",
+    "src\\main\\resources\\fabric.mod.json": "31a2a36d2fcda5b3ef99afdc7a1178f241b0c399b472368cce08b13b69ddc762",
+    "src\\main\\java\\dev\\autonomousvillages\\AccessWorks.java": "c5ed2d217c5de8f0d0b6fc79a6767b2d4b74c42bf85d429198e9b14239bb67b0",
+    "src\\main\\java\\dev\\autonomousvillages\\AutonomousVillagesMod.java": "8fdbf2571df17026daa62711f3c1237e986835821ed59fbd5e29ae19a7a55dd9",
+    "src\\main\\java\\dev\\autonomousvillages\\BreathingSafety.java": "70e29763e2a205f1d54c53e6360ff0d1f17e2b25e266be330ff58eba7c8cb79b",
+    "src\\main\\java\\dev\\autonomousvillages\\Construction.java": "d6e8b43a3fb1359b9e2a2728a05ac865f27f51b7c89b2d5f654bfa5beb2ad289",
+    "src\\main\\java\\dev\\autonomousvillages\\DeliveryRuns.java": "9c6aa88bc8642cda187950f4e1b302fe7b72e340e6e1741a51d74a037649f7ca",
+    "src\\main\\java\\dev\\autonomousvillages\\ExpeditionManager.java": "b66f5be618021f04e05df0aea03fc5d94d4e0fbec263945d611971ce236a38e1",
+    "src\\main\\java\\dev\\autonomousvillages\\ExpeditionState.java": "a4c54d90eecc430ffb2f0a3e4f8db56762562450bc3181efc49a04184dda3f57",
+    "src\\main\\java\\dev\\autonomousvillages\\FileSnapshotWriter.java": "d70aed5e38f494ddbc81859d5e940cc354c1d58a4ff641e9adc0eba35a74b32b",
+    "src\\main\\java\\dev\\autonomousvillages\\ForestWork.java": "7979c0f580a1759a07d32a7888e6b9443d67ed8524362af0e4f472f7e557f5d8",
+    "src\\main\\java\\dev\\autonomousvillages\\IronSupply.java": "c7718d7077ad98842c5e742fbe830626444d6d163698241cea5c0b0ce3ddb36b",
+    "src\\main\\java\\dev\\autonomousvillages\\MineKnowledge.java": "c2b74ba3803f59198ff1373c8831b8c6e5e626b3b624dfb177a5278ee606195a",
+    "src\\main\\java\\dev\\autonomousvillages\\MineSupplies.java": "e87eec306a5de69f0dfb7390513b8504348387cf198db9118047e0ac44beda92",
+    "src\\main\\java\\dev\\autonomousvillages\\Orders.java": "3edd551a1b1c67e6e933ce20e717c37c55d8fb59fb250ffcc8413cabcca0ff5f",
+    "src\\main\\java\\dev\\autonomousvillages\\Reservations.java": "dc56799b18ff9f4466c001a3f000f3283d2d5b2bf997b8da32ba7ca1b035125f",
+    "src\\main\\java\\dev\\autonomousvillages\\Resident.java": "8080f01ec135889a409d8a65f028e53d5f5047d1e105a6793703a17ada7a5e02",
+    "src\\main\\java\\dev\\autonomousvillages\\ResidentRoles.java": "836d844b59900efe5d02cf30358107833cac6e0aebefc6202eef1fc9183aec9a",
+    "src\\main\\java\\dev\\autonomousvillages\\SheepFarm.java": "836b10e19cd69a02e19dddb320d61e730c161d94e9b8b9b88ef31a0a7bd2963b",
+    "src\\main\\java\\dev\\autonomousvillages\\Supplies.java": "6fa7a3ee59c15d9c9bb211dcb9da97727dfbc904e965d8047563901f1353503f",
+    "src\\main\\java\\dev\\autonomousvillages\\SupplyRuns.java": "1831c40d170e926ef4d961c33f4e452fb3b289dfd7d5edcd0385a6edb53fbda9",
+    "src\\main\\java\\dev\\autonomousvillages\\TerrainRecovery.java": "33d126363859d7956c8d6b7958d362c507b10706d9341b5378703b011d6c0ca7",
+    "src\\main\\java\\dev\\autonomousvillages\\TownBuilding.java": "616ef5f600331622d6d3b33237c3cf980b5e056ddc757528d712a16967bee45d",
+    "src\\main\\java\\dev\\autonomousvillages\\TownCrafting.java": "c4bde85312e12d9cb6b4901706d02b93b920271a01fc890855d864e41529efeb",
+    "src\\main\\java\\dev\\autonomousvillages\\TownPlanner.java": "c8f55abc64f5006682e7d919816047ea0c3d2d9c8a9f5d984c3d8513028c7e26",
+    "src\\main\\java\\dev\\autonomousvillages\\Village.java": "b2b4a977c8eb2e609b075aec611b0aa52279196ada5d27018761eff394c32348",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageDiscovery.java": "5f631da0bb1e4005e5b94210df856df06f244ac9b289a1963a1568b54742eab5",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageIndex.java": "0d28129c35d9954eed4e6e5062b5472b616c6e5501213bd9268da826e66cf97c",
+    "src\\main\\java\\dev\\autonomousvillages\\VillagePresentation.java": "eb434bf612d23299d95c529a4e7b48e2bc0b8c4213c695363b3cf719d19c7d25",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageRuntime.java": "49f38b67edce58279a75abf15512d3c8a2221864d3df1f7f4ead0548d813bed2",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageState.java": "1fb332cccbe9cab9bca275ca8bd7588f7034c4e8213bc54d983f5ab7b02ae20b",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageWorkshop.java": "51660ef8093760baeb37b9c2ce2e1fbc5dde4391f511d93d2c9de08ee63218d7",
+    "src\\main\\java\\dev\\autonomousvillages\\mixin\\ServerEmptyPauseMixin.java": "bc92af38c7f2301d645de17986191e88c8e8cc70fdae7f27d677f159de66cfcc",
+    "tools\\validation\\read_item_entities.py": "8b20d752a210760d8e475c192b0293a5f4014385c4f090455dfb9e391f681e4a",
+    "tools\\validation\\run.py": "151f441c24a1e6f7bb2d4dc332611b7ea8b0b0bb73b4106c04d867bbca1ee6e0",
+    "tools\\validation\\resources\\fabric.mod.json": "17c4fd9f75d63dce2ff98e3a50176a37877c17a67cc7b14f898c7a639fa07b14",
+    "tools\\validation\\java\\dev\\autonomousvillages\\HousingRegression.java": "0ebc0bb4c6f730d29da5aaf92e3bc0fa675055356a8376c3e7414d012aad23e1",
+    "tools\\validation\\java\\dev\\autonomousvillages\\LongRunRegression.java": "05cac80480b032ae47e00b1f1da929e824c93335ed53f7e14b20d46ad8d2e1f4",
+    "tools\\validation\\java\\dev\\autonomousvillages\\ProductionRegression.java": "8059131b50c2891da59d302a0917e19e3eca0ffb7b7332fe66d37169e37b1a53",
+    "tools\\validation\\java\\dev\\autonomousvillages\\ReviewRegression.java": "6d74cb0317a816ed7549d40eab62fbeafcb09f18ce970e545a506d79b667bb8f",
+    "tools\\validation\\java\\dev\\autonomousvillages\\RolesRegression.java": "2e0e07d830c929d658ae745ae72b701f8f205a40d31e868f28a1ce9f91a7f41e",
+    "tools\\validation\\java\\dev\\autonomousvillages\\ShelterRegression.java": "50f675ce1b101ec8d0b38fe6dc98f3b3fdb0a5e4ca6f00203728703b82955ffc",
+    "tools\\validation\\java\\dev\\autonomousvillages\\UnloadingRegression.java": "6aac53cfdb52be733d2e4cf585ea46309d55a63558b7743689262db01e609547",
+    "tools\\validation\\java\\dev\\autonomousvillages\\VillageProbeMod.java": "cb9b32cde3e1dc137919a91a83e9825d63e1f058de397e3c7603fb376a9ae5f4",
+    "tools\\validation\\java\\dev\\autonomousvillages\\VillageSelfTest.java": "0004aaf059eb7c6cc8ba68fe570f3eeaa83c9b3694072404168155fc8d573329"
+  },
+  "acceptanceFailures": [
+    "Full iron chain did not complete the physical delivery acceptance.",
+    "Flock-only scene did not register a native lamb before its 90 second deadline.",
+    "Wool shearing, regrowth, delivery and new beds branches were not reached.",
+    "No 400-TPS acceptance run performed."
+  ]
+}

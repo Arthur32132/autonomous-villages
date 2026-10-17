@@ -1,0 +1,20 @@
+[12:10:50] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS road_dependency_blocks_earthworks_before_approach_is_built
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS real_grading_preserves_drop_and_replacement_does_not_reopen_cut
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS real_bucket_recipe_soil_mining_source_pickup_and_irrigation_conserve_materials
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS seed_bank_access_and_food_budget_preserve_real_planting_reserve
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS distinct_workshops_pay_actual_blocks_and_measure_planks_bread_and_smelted_iron
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS real_commands_preserve_boundary_chest_save_and_accept_removed_house_cell
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS indoor_storage_below_roof_does_not_block_outdoor_building_access
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS growth_prerequisites_precede_real_native_food_issue_without_spawning_children
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS walkable_unlit_soil_approach_releases_building_while_road_improvements_remain_unpaid
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS primary_builder_bootstraps_missing_tools_before_grading_more_sites
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS paid_in_reach_assembly_does_not_wait_for_an_unnecessary_hidden_approach
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS twelve_adults_release_overnight_route_on_day_shift
+[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS bootstrap_steward_physically_installs_paid_furnace_before_warehouse_and_road_lighting
+[12:10:54] [Server thread/INFO]: VILLAGE_TEST PASS primary_builder_fetches_crafts_mines_and_finishes_real_uphill_road
+[12:11:02] [Server thread/INFO]: VILLAGE_TEST PASS porter_physically_collects_and_delivers_refillable_construction_batches_preserving_donor_kit
+[12:11:02] [Server thread/INFO]: VILLAGE_TEST PASS porter_physically_returns_after_handoff_instead_of_parking_on_future_entrance_stairs
+[12:11:02] [Server thread/INFO]: VILLAGE_TEST PASS primary_builder_completes_paid_two_bed_house_using_normal_scheduler_without_placement_or_travel_shortcuts
+[12:11:02] [Server thread/INFO]: VILLAGE_TEST BUILDER_JOBS {idle=2258, build=1613, storage=243, table=449, renovate=120} simulatedTicks=4683
+[12:11:02] [Server thread/INFO]: VILLAGE_TEST DONE passed=18 scope=builders

@@ -1,0 +1,156 @@
+[
+  {
+    "id": "server-20261017-063533-533027",
+    "success": false,
+    "scope": "planning_only",
+    "requestedTps": 40,
+    "scenarioWallSeconds": 9.770277700008592,
+    "error": "[06:36:03] [Server thread/INFO]: VILLAGE_TEST FAIL stage=1 java.lang.AssertionError: real raised soil has a paid preparation and route",
+    "jars": {
+      "autonomous-villages-0.2.1.jar": "3b41f5a23646a73ee8ce7fd2cf7c8b2c6d4d953e51790ef94736c1128e10d21c",
+      "autonomous-villages-validation-0.2.1.jar": "27d9b3f7eb5eee6d0fd0f06acd54778b9b96b76f30510efb15cc413a97587f65",
+      "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+      "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+    },
+    "checks": [
+      "[06:35:59] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections"
+    ],
+    "junit": {
+      "tests": 69,
+      "failures": 0,
+      "errors": 0
+    }
+  },
+  {
+    "id": "server-20261017-063651-925176",
+    "success": false,
+    "scope": "planning_only",
+    "requestedTps": 40,
+    "scenarioWallSeconds": 10.324407099978998,
+    "error": "[06:37:21] [Server thread/INFO]: VILLAGE_TEST FAIL stage=1 java.lang.AssertionError: real paid placement BlockPos{x=2018, y=100, z=1990} Block{minecraft:cobblestone_stairs}[facing=north,half=bottom,shape=straight,waterlogged=false]",
+    "jars": {
+      "autonomous-villages-0.2.1.jar": "3b41f5a23646a73ee8ce7fd2cf7c8b2c6d4d953e51790ef94736c1128e10d21c",
+      "autonomous-villages-validation-0.2.1.jar": "e6296425abb709426a941751971d290b20df15442ce31949411b2372697ff82c",
+      "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+      "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+    },
+    "checks": [
+      "[06:37:16] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+      "[06:37:21] [Server thread/INFO]: VILLAGE_TEST PASS road_dependency_blocks_earthworks_before_approach_is_built"
+    ],
+    "junit": {
+      "tests": 69,
+      "failures": 0,
+      "errors": 0
+    }
+  },
+  {
+    "id": "server-20261017-063832-250832",
+    "success": false,
+    "scope": "planning_only",
+    "requestedTps": 40,
+    "scenarioWallSeconds": 10.181916000001365,
+    "error": "[06:39:02] [Server thread/INFO]: VILLAGE_TEST FAIL stage=72 java.lang.AssertionError: real three-ingot bucket recipe at field workbench",
+    "jars": {
+      "autonomous-villages-0.2.1.jar": "e79dde7f99051b4a9859296bb0f90628a2c56a13ab861191c284a7c7958e69a1",
+      "autonomous-villages-validation-0.2.1.jar": "889640087de64d2b4a42038f3d13e78abd77c19f7b719489523b1f8fbb06557b",
+      "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+      "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+    },
+    "checks": [
+      "[06:38:57] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+      "[06:39:01] [Server thread/INFO]: VILLAGE_TEST PASS road_dependency_blocks_earthworks_before_approach_is_built",
+      "[06:39:02] [Server thread/INFO]: VILLAGE_TEST PASS real_grading_preserves_drop_and_replacement_does_not_reopen_cut"
+    ],
+    "junit": {
+      "tests": 69,
+      "failures": 0,
+      "errors": 0
+    }
+  },
+  {
+    "id": "server-20261017-063958-561728",
+    "success": false,
+    "scope": "planning_only",
+    "requestedTps": 400,
+    "scenarioWallSeconds": 10.561906500020996,
+    "error": "[06:40:27] [Server thread/INFO]: VILLAGE_TEST FAIL stage=72 java.lang.AssertionError: seed bank excluded from shared food and builder access",
+    "jars": {
+      "autonomous-villages-0.2.1.jar": "494d482943fc0c756be3ebbd27f09ea5e72337fb9774887e5096398edc5f7b52",
+      "autonomous-villages-validation-0.2.1.jar": "7e37f12cc13758a760bf62404c2237d25f7e2d1a8ddc7398f4a3ff9249768f1a",
+      "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+      "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+    },
+    "checks": [
+      "[06:40:22] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+      "[06:40:26] [Server thread/INFO]: VILLAGE_TEST PASS road_dependency_blocks_earthworks_before_approach_is_built",
+      "[06:40:27] [Server thread/INFO]: VILLAGE_TEST PASS real_grading_preserves_drop_and_replacement_does_not_reopen_cut",
+      "[06:40:27] [Server thread/INFO]: VILLAGE_TEST PASS real_bucket_recipe_soil_mining_source_pickup_and_irrigation_conserve_materials"
+    ],
+    "junit": {
+      "tests": 69,
+      "failures": 0,
+      "errors": 0
+    }
+  },
+  {
+    "id": "server-20261017-064126-271583",
+    "success": true,
+    "scope": "planning_only",
+    "requestedTps": 400,
+    "scenarioWallSeconds": 10.734795500000473,
+    "error": null,
+    "jars": {
+      "autonomous-villages-0.2.1.jar": "7eca3e67346793ac755fdb7c0ba14f2a51f741321ee78814beee4f8d08891e05",
+      "autonomous-villages-validation-0.2.1.jar": "f8f5a59cc1b3c54c63fc41e846885c05e831edaadfed743e6e31d015a690532e",
+      "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+      "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+    },
+    "checks": [
+      "[06:41:50] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+      "[06:41:54] [Server thread/INFO]: VILLAGE_TEST PASS road_dependency_blocks_earthworks_before_approach_is_built",
+      "[06:41:55] [Server thread/INFO]: VILLAGE_TEST PASS real_grading_preserves_drop_and_replacement_does_not_reopen_cut",
+      "[06:41:55] [Server thread/INFO]: VILLAGE_TEST PASS real_bucket_recipe_soil_mining_source_pickup_and_irrigation_conserve_materials",
+      "[06:41:55] [Server thread/INFO]: VILLAGE_TEST PASS seed_bank_access_and_food_budget_preserve_real_planting_reserve",
+      "[06:41:56] [Server thread/INFO]: VILLAGE_TEST PASS distinct_workshops_pay_actual_blocks_and_measure_planks_bread_and_smelted_iron",
+      "[06:41:56] [Server thread/INFO]: VILLAGE_TEST PASS real_commands_preserve_boundary_chest_save_and_accept_removed_house_cell",
+      "[06:41:56] [Server thread/INFO]: VILLAGE_TEST PASS growth_prerequisites_precede_real_native_food_issue_without_spawning_children",
+      "[06:41:56] [Server thread/INFO]: VILLAGE_TEST PASS confirmed_death_transfers_role_and_order_and_preserves_real_drop_recovery"
+    ],
+    "junit": {
+      "tests": 69,
+      "failures": 0,
+      "errors": 0
+    }
+  },
+  {
+    "id": "server-20261017-064204-727863",
+    "success": true,
+    "scope": "planning_only",
+    "requestedTps": 40,
+    "scenarioWallSeconds": 18.006434899987653,
+    "error": null,
+    "jars": {
+      "autonomous-villages-0.2.1.jar": "7eca3e67346793ac755fdb7c0ba14f2a51f741321ee78814beee4f8d08891e05",
+      "autonomous-villages-validation-0.2.1.jar": "f8f5a59cc1b3c54c63fc41e846885c05e831edaadfed743e6e31d015a690532e",
+      "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+      "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+    },
+    "checks": [
+      "[06:42:29] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+      "[06:42:33] [Server thread/INFO]: VILLAGE_TEST PASS road_dependency_blocks_earthworks_before_approach_is_built",
+      "[06:42:33] [Server thread/INFO]: VILLAGE_TEST PASS real_grading_preserves_drop_and_replacement_does_not_reopen_cut",
+      "[06:42:34] [Server thread/INFO]: VILLAGE_TEST PASS real_bucket_recipe_soil_mining_source_pickup_and_irrigation_conserve_materials",
+      "[06:42:34] [Server thread/INFO]: VILLAGE_TEST PASS seed_bank_access_and_food_budget_preserve_real_planting_reserve",
+      "[06:42:39] [Server thread/INFO]: VILLAGE_TEST PASS distinct_workshops_pay_actual_blocks_and_measure_planks_bread_and_smelted_iron",
+      "[06:42:39] [Server thread/INFO]: VILLAGE_TEST PASS real_commands_preserve_boundary_chest_save_and_accept_removed_house_cell",
+      "[06:42:41] [Server thread/INFO]: VILLAGE_TEST PASS growth_prerequisites_precede_real_native_food_issue_without_spawning_children",
+      "[06:42:41] [Server thread/INFO]: VILLAGE_TEST PASS confirmed_death_transfers_role_and_order_and_preserves_real_drop_recovery"
+    ],
+    "junit": {
+      "tests": 69,
+      "failures": 0,
+      "errors": 0
+    }
+  }
+]

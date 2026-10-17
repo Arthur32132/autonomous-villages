@@ -133,7 +133,7 @@ final class LongRunRegression {
     }
     private static void builderAndFarmerPriorities(Village v,BlockPos origin){
         var builder=v.workers.values().stream().filter(r->v.builder(r.id)&&!v.steward(r.id)).findFirst().orElseThrow();
-        var farmer=v.workers.values().stream().filter(r->v.roleIndex(r.id)%6==2).findFirst().orElseThrow();
+        var farmer=v.workers.values().stream().filter(r->v.hasRole(r.id,ResidentRoles.Role.FARMER)).findFirst().orElseThrow();
         var selected=List.of(builder,farmer);var bags=new LinkedHashMap<Resident,List<ItemStack>>();
         for(var member:v.workers.values())bags.put(member,Supplies.copy(member.bot().inventory().snapshot().slots()));
         var positions=new LinkedHashMap<Resident,Vec3>();var noAi=new HashMap<Resident,Boolean>();var health=new HashMap<Resident,Float>();
@@ -188,7 +188,7 @@ final class LongRunRegression {
         }
     }
     private static void minerMaintainsPick(Village v,BlockPos origin){
-        var miner=v.workers.values().stream().filter(r->v.roleIndex(r.id)%6==4).findFirst().orElseThrow();
+        var miner=v.workers.values().stream().filter(r->v.hasRole(r.id,ResidentRoles.Role.MINER)).findFirst().orElseThrow();
         var b=miner.bot();var previous=miner.body().position();var bag=Supplies.copy(b.inventory().snapshot().slots());var previousDelays=new HashMap<>(delays(miner));
         var storage=Set.copyOf(v.state.storage);var tables=Set.copyOf(v.index.tables);
         var previousParty=v.state.expedition;long previousClock=v.level.getOverworldClockTime();
@@ -226,7 +226,7 @@ final class LongRunRegression {
         }
     }
     private static void guardReceivesMaterials(Village v,BlockPos origin){
-        var guard=v.workers.values().stream().filter(r->!v.steward(r.id)&&(v.roleIndex(r.id)%6==5||v.workers.size()<3)).findFirst().orElseThrow();
+        var guard=v.workers.values().stream().filter(r->!v.steward(r.id)&&v.guard(r.id)).findFirst().orElseThrow();
         var b=guard.bot();var previous=guard.body().position();var bag=Supplies.copy(b.inventory().snapshot().slots());
         var previousDelays=new HashMap<>(delays(guard));
         var storage=Set.copyOf(v.state.storage);var tables=Set.copyOf(v.index.tables);

@@ -1,0 +1,38 @@
+{
+  "success": true,
+  "scope": "builders_only",
+  "output": "C:\\minecraftWorkflow\\AutonomousVillages\\build\\validation\\20261017-121035-862590",
+  "requestedTps": 400,
+  "jars": {
+    "autonomous-villages-0.2.1.jar": "6fc32ec11688570bd562a383f6dfa4d00d84e382d867179f4f3d286ac98d20a9",
+    "autonomous-villages-validation-0.2.1.jar": "9d96d400bc8ab1a50af2e12f62e05fa5174ba2c91270adcdb83c382684676fee",
+    "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+    "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+  },
+  "scenarioWallSeconds": 14.872187600005418,
+  "checks": [
+    "[12:10:50] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS road_dependency_blocks_earthworks_before_approach_is_built",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS real_grading_preserves_drop_and_replacement_does_not_reopen_cut",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS real_bucket_recipe_soil_mining_source_pickup_and_irrigation_conserve_materials",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS seed_bank_access_and_food_budget_preserve_real_planting_reserve",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS distinct_workshops_pay_actual_blocks_and_measure_planks_bread_and_smelted_iron",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS real_commands_preserve_boundary_chest_save_and_accept_removed_house_cell",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS indoor_storage_below_roof_does_not_block_outdoor_building_access",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS growth_prerequisites_precede_real_native_food_issue_without_spawning_children",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS walkable_unlit_soil_approach_releases_building_while_road_improvements_remain_unpaid",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS primary_builder_bootstraps_missing_tools_before_grading_more_sites",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS paid_in_reach_assembly_does_not_wait_for_an_unnecessary_hidden_approach",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS twelve_adults_release_overnight_route_on_day_shift",
+    "[12:10:52] [Server thread/INFO]: VILLAGE_TEST PASS bootstrap_steward_physically_installs_paid_furnace_before_warehouse_and_road_lighting",
+    "[12:10:54] [Server thread/INFO]: VILLAGE_TEST PASS primary_builder_fetches_crafts_mines_and_finishes_real_uphill_road",
+    "[12:11:02] [Server thread/INFO]: VILLAGE_TEST PASS porter_physically_collects_and_delivers_refillable_construction_batches_preserving_donor_kit",
+    "[12:11:02] [Server thread/INFO]: VILLAGE_TEST PASS porter_physically_returns_after_handoff_instead_of_parking_on_future_entrance_stairs",
+    "[12:11:02] [Server thread/INFO]: VILLAGE_TEST PASS primary_builder_completes_paid_two_bed_house_using_normal_scheduler_without_placement_or_travel_shortcuts"
+  ],
+  "junit": {
+    "tests": 69,
+    "failures": 0,
+    "errors": 0
+  }
+}

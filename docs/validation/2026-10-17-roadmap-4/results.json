@@ -1,0 +1,121 @@
+{
+  "scope": "roadmap_4_persistent_roles_and_bounded_help",
+  "runs": [
+    {
+      "id": "server-20261017-001558-698374",
+      "success": false,
+      "scope": "roles_only",
+      "requestedTps": 40,
+      "checks": [
+        "[00:16:28] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections"
+      ],
+      "junit": {
+        "tests": 55,
+        "failures": 0,
+        "errors": 0
+      },
+      "error": "[00:16:32] [Server thread/INFO]: VILLAGE_TEST FAIL stage=1 java.lang.AssertionError: seven native professions cover seven explicit roles"
+    },
+    {
+      "id": "server-20261017-001752-557256",
+      "success": true,
+      "scope": "roles_only",
+      "requestedTps": 40,
+      "checks": [
+        "[00:18:20] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+        "[00:18:24] [Server thread/INFO]: VILLAGE_TEST PASS native_professions_assign_seven_explicit_permanent_specialties",
+        "[00:18:24] [Server thread/INFO]: VILLAGE_TEST PASS birth_unavailable_neighbour_and_save_reload_preserve_all_adult_assignments",
+        "[00:18:24] [Server thread/INFO]: VILLAGE_TEST PASS farmer_delivers_real_surplus_then_returns_to_ripe_harvest_with_same_role",
+        "[00:18:24] [Server thread/INFO]: VILLAGE_TEST PASS porter_collects_and_delivers_six_actual_planks_preserving_donor_kit",
+        "[00:18:24] [Server thread/INFO]: VILLAGE_TEST PASS native_work_schedule_and_profession_survive_even_during_party_assignment",
+        "[00:18:24] [Server thread/INFO]: VILLAGE_TEST PASS guard_stays_on_watch_and_expedition_requires_home_food_repair_and_guard",
+        "[00:18:24] [Server thread/INFO]: VILLAGE_TEST PASS actual_death_removes_only_deceased_role_without_reshuffling_survivors"
+      ],
+      "junit": {
+        "tests": 55,
+        "failures": 0,
+        "errors": 0
+      }
+    },
+    {
+      "id": "server-20261017-001831-901554",
+      "success": true,
+      "scope": "roles_only",
+      "requestedTps": 400,
+      "checks": [
+        "[00:18:57] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+        "[00:19:01] [Server thread/INFO]: VILLAGE_TEST PASS native_professions_assign_seven_explicit_permanent_specialties",
+        "[00:19:01] [Server thread/INFO]: VILLAGE_TEST PASS birth_unavailable_neighbour_and_save_reload_preserve_all_adult_assignments",
+        "[00:19:01] [Server thread/INFO]: VILLAGE_TEST PASS farmer_delivers_real_surplus_then_returns_to_ripe_harvest_with_same_role",
+        "[00:19:01] [Server thread/INFO]: VILLAGE_TEST PASS porter_collects_and_delivers_six_actual_planks_preserving_donor_kit",
+        "[00:19:01] [Server thread/INFO]: VILLAGE_TEST PASS native_work_schedule_and_profession_survive_even_during_party_assignment",
+        "[00:19:01] [Server thread/INFO]: VILLAGE_TEST PASS guard_stays_on_watch_and_expedition_requires_home_food_repair_and_guard",
+        "[00:19:01] [Server thread/INFO]: VILLAGE_TEST PASS actual_death_removes_only_deceased_role_without_reshuffling_survivors"
+      ],
+      "junit": {
+        "tests": 55,
+        "failures": 0,
+        "errors": 0
+      }
+    }
+  ],
+  "candidateJars": {
+    "autonomous-villages-0.2.1.jar": "7f4633d3325ec42d2b52d5a8f667996d9833330ae8c63fff3ae0b68e08528b32",
+    "autonomous-villages-validation-0.2.1.jar": "d65937243beed3ab4a9fd649ea8a85e6dfd720373049fde9e7600a330c73821e",
+    "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+    "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+  },
+  "candidateSources": {
+    "src\\test\\java\\dev\\autonomousvillages\\FileSnapshotWriterTest.java": "aa1562126e046ffd12930f7c6dd2631d4ba83f554cc67b390fe6da3f5ece49a9",
+    "src\\test\\java\\dev\\autonomousvillages\\OrdersTest.java": "fc3c37faf2b387c6692861abcf67f514bda800ca3be25430c7dc425bc9724f8a",
+    "src\\test\\java\\dev\\autonomousvillages\\ResidentRolesTest.java": "6ad3358f058ce71f53d52075b22122ef9333bfb95e81107bef40eacd8b3bf4ef",
+    "src\\test\\java\\dev\\autonomousvillages\\VillageRulesTest.java": "838cc1f121c6d9e5409ecca17b62295206ab57dde747d0e57704fe63bc80cd90",
+    "src\\main\\resources\\autonomous_villages.mixins.json": "aa17cb0a06d6e7adf4e826594a25c4314e55504401fe93ca7766ee6084dfad49",
+    "src\\main\\resources\\fabric.mod.json": "31a2a36d2fcda5b3ef99afdc7a1178f241b0c399b472368cce08b13b69ddc762",
+    "src\\main\\java\\dev\\autonomousvillages\\AccessWorks.java": "c5ed2d217c5de8f0d0b6fc79a6767b2d4b74c42bf85d429198e9b14239bb67b0",
+    "src\\main\\java\\dev\\autonomousvillages\\AutonomousVillagesMod.java": "ca71799319200c3b1d4343248aedadce8472e4137279666e22cf83394d9878a0",
+    "src\\main\\java\\dev\\autonomousvillages\\BreathingSafety.java": "70e29763e2a205f1d54c53e6360ff0d1f17e2b25e266be330ff58eba7c8cb79b",
+    "src\\main\\java\\dev\\autonomousvillages\\Construction.java": "d6e8b43a3fb1359b9e2a2728a05ac865f27f51b7c89b2d5f654bfa5beb2ad289",
+    "src\\main\\java\\dev\\autonomousvillages\\DeliveryRuns.java": "9c6aa88bc8642cda187950f4e1b302fe7b72e340e6e1741a51d74a037649f7ca",
+    "src\\main\\java\\dev\\autonomousvillages\\ExpeditionManager.java": "c29536ae2f07b0d2df74fbf7474147f018fe041c06a23faeebb9b4f382348b46",
+    "src\\main\\java\\dev\\autonomousvillages\\ExpeditionState.java": "be81a0924f3315dac16405484fb9b79fa379746bcb3c0ba6d25c0984ff77bd6c",
+    "src\\main\\java\\dev\\autonomousvillages\\FileSnapshotWriter.java": "d70aed5e38f494ddbc81859d5e940cc354c1d58a4ff641e9adc0eba35a74b32b",
+    "src\\main\\java\\dev\\autonomousvillages\\ForestWork.java": "7979c0f580a1759a07d32a7888e6b9443d67ed8524362af0e4f472f7e557f5d8",
+    "src\\main\\java\\dev\\autonomousvillages\\Orders.java": "d1c571290c022f32e92189166c836c9ec8154906267ea4de0baee359ecadfacd",
+    "src\\main\\java\\dev\\autonomousvillages\\Reservations.java": "dc56799b18ff9f4466c001a3f000f3283d2d5b2bf997b8da32ba7ca1b035125f",
+    "src\\main\\java\\dev\\autonomousvillages\\Resident.java": "26b35e838cab57b0f26610d0733ca7012d7f10f1b14beb28538c9043e45b21c5",
+    "src\\main\\java\\dev\\autonomousvillages\\ResidentRoles.java": "836d844b59900efe5d02cf30358107833cac6e0aebefc6202eef1fc9183aec9a",
+    "src\\main\\java\\dev\\autonomousvillages\\Supplies.java": "6fa7a3ee59c15d9c9bb211dcb9da97727dfbc904e965d8047563901f1353503f",
+    "src\\main\\java\\dev\\autonomousvillages\\SupplyRuns.java": "1831c40d170e926ef4d961c33f4e452fb3b289dfd7d5edcd0385a6edb53fbda9",
+    "src\\main\\java\\dev\\autonomousvillages\\TerrainRecovery.java": "33d126363859d7956c8d6b7958d362c507b10706d9341b5378703b011d6c0ca7",
+    "src\\main\\java\\dev\\autonomousvillages\\TownBuilding.java": "6dd44825ded07afb1cf55d21fb37979f54e58824c30b4a54c8d124f9f60d19f0",
+    "src\\main\\java\\dev\\autonomousvillages\\TownCrafting.java": "c4bde85312e12d9cb6b4901706d02b93b920271a01fc890855d864e41529efeb",
+    "src\\main\\java\\dev\\autonomousvillages\\TownPlanner.java": "97a912d58101b9474ee95d1b568316d2b0aff58f59719ef947385034ffc58e10",
+    "src\\main\\java\\dev\\autonomousvillages\\Village.java": "cbb71d847aabafc0d6cbd3028ed5222f2d78d76ac8de63ae316d70ca35436b39",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageDiscovery.java": "5f631da0bb1e4005e5b94210df856df06f244ac9b289a1963a1568b54742eab5",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageIndex.java": "0d28129c35d9954eed4e6e5062b5472b616c6e5501213bd9268da826e66cf97c",
+    "src\\main\\java\\dev\\autonomousvillages\\VillagePresentation.java": "eb434bf612d23299d95c529a4e7b48e2bc0b8c4213c695363b3cf719d19c7d25",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageRuntime.java": "49f38b67edce58279a75abf15512d3c8a2221864d3df1f7f4ead0548d813bed2",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageState.java": "bf87a59f9f0a1b89498719da3df7562b393a524ae495dbc8c89b620a137e7d8d",
+    "src\\main\\java\\dev\\autonomousvillages\\VillageWorkshop.java": "f8372c983f1cb9f365926e5d66c6ec3ca1a29c88ff4f52d911a43660aa4b44e1",
+    "src\\main\\java\\dev\\autonomousvillages\\mixin\\ServerEmptyPauseMixin.java": "bc92af38c7f2301d645de17986191e88c8e8cc70fdae7f27d677f159de66cfcc",
+    "tools\\validation\\read_item_entities.py": "8b20d752a210760d8e475c192b0293a5f4014385c4f090455dfb9e391f681e4a",
+    "tools\\validation\\run.py": "6cfd686ab35ff8fd1701a1377be5cba309020273ac4be89a01d06598cebe18e0",
+    "tools\\validation\\resources\\fabric.mod.json": "17c4fd9f75d63dce2ff98e3a50176a37877c17a67cc7b14f898c7a639fa07b14",
+    "tools\\validation\\java\\dev\\autonomousvillages\\HousingRegression.java": "0ebc0bb4c6f730d29da5aaf92e3bc0fa675055356a8376c3e7414d012aad23e1",
+    "tools\\validation\\java\\dev\\autonomousvillages\\LongRunRegression.java": "05cac80480b032ae47e00b1f1da929e824c93335ed53f7e14b20d46ad8d2e1f4",
+    "tools\\validation\\java\\dev\\autonomousvillages\\ReviewRegression.java": "6d74cb0317a816ed7549d40eab62fbeafcb09f18ce970e545a506d79b667bb8f",
+    "tools\\validation\\java\\dev\\autonomousvillages\\RolesRegression.java": "2e0e07d830c929d658ae745ae72b701f8f205a40d31e868f28a1ce9f91a7f41e",
+    "tools\\validation\\java\\dev\\autonomousvillages\\ShelterRegression.java": "50f675ce1b101ec8d0b38fe6dc98f3b3fdb0a5e4ca6f00203728703b82955ffc",
+    "tools\\validation\\java\\dev\\autonomousvillages\\UnloadingRegression.java": "6aac53cfdb52be733d2e4cf585ea46309d55a63558b7743689262db01e609547",
+    "tools\\validation\\java\\dev\\autonomousvillages\\VillageProbeMod.java": "cb9b32cde3e1dc137919a91a83e9825d63e1f058de397e3c7603fb376a9ae5f4",
+    "tools\\validation\\java\\dev\\autonomousvillages\\VillageSelfTest.java": "ae4b8dd09595364b064e7b4cdf3bd38f7fae2961ce4b781e001cb2783a6d18f4"
+  },
+  "limits": [
+    "Unavailable controller is simulated by removing it from workers, not a real chunk unload.",
+    "Save/reload is a Gson round-trip and validate, not a server restart.",
+    "Fixture gives actual items and positions the carrier for both handovers. No complete autonomous delivery-route or expedition run.",
+    "Native profession window and unchanged profession/level are tested; actual player trade and restocking are not.",
+    "Current temporary job restoration after server restart is outside this change."
+  ]
+}

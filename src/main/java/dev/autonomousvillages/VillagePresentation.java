@@ -15,6 +15,7 @@ final class VillagePresentation {
     private final Village v;
     private final ServerBossEvent bar;
     private final Map<Long,Long> opening=new HashMap<>();
+    private long nextDisplayNanos;
     VillagePresentation(Village v){this.v=v;bar=new ServerBossEvent(UUID.randomUUID(),Component.literal(v.state.name),BossEvent.BossBarColor.GREEN,BossEvent.BossBarOverlay.PROGRESS);}
     void tick(){
         long now=v.level.getGameTime();
@@ -22,6 +23,8 @@ final class VillagePresentation {
             BlockPos pos=BlockPos.of(p);v.level.blockEvent(pos,v.level.getBlockState(pos).getBlock(),1,0);opening.remove(p);
         }
         if(now%20!=0)return;
+        long realNow=System.nanoTime();if(realNow<nextDisplayNanos)return;
+        nextDisplayNanos=realNow+500_000_000L;
         for(var player:v.runtime.server.getPlayerList().getPlayers()){
             boolean near=player.level()==v.level&&VillageDiscovery.area(v.state,96).contains(player.position());
             if(near)bar.addPlayer(player);else bar.removePlayer(player);
@@ -34,6 +37,7 @@ final class VillagePresentation {
             v.state.residentNames.computeIfAbsent(r.id,id->{var n=new VillageState.ResidentName();n.visible=resident.isCustomNameVisible();
                 if(resident.getCustomName()!=null)n.json=ComponentSerialization.CODEC.encodeStart(JsonOps.INSTANCE,resident.getCustomName()).getOrThrow().toString();return n;});
             String text=v.role(r.id)+" • "+r.status;
+            if(r.job!=null&&Set.of("deliver","collect_order","supply").contains(r.job)&&!v.porter(r.id))text+=" • временная помощь";
             if(r.job!=null&&r.target!=null&&r.job.equals("wood")&&r.treeBase!=null)text+=" • осталось брёвен "+v.state.treeWork.getOrDefault(r.treeBase.asLong(),List.of()).size();
             resident.setCustomName(Component.literal(text));resident.setCustomNameVisible(true);
         }

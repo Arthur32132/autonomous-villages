@@ -2,6 +2,7 @@ package dev.autonomousvillages;
 
 import dev.navigationai.api.*;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import net.minecraft.core.*;
 import net.minecraft.core.component.DataComponents;
@@ -27,15 +28,20 @@ final class Resident {
     final Village v; final UUID id;
     final BreathingSafety breathing=new BreathingSafety(this);
     String status="осматривается", job;
-    BlockPos target, treeBase;
+    BlockPos target, treeBase, shelter;
     NavigationTask navigation;
     MiningTask mining;
     ExcavationTask excavation;
     CombatTask combat;
     UUID supplyRecipient;
+    UUID deliverRecipient;
+    Orders.Order deliverOrder;
+    UUID haulDonor;
+    private int deliveryKit=-1;
     Construction.Step build;
     TownBuilding.Plan townPlan;
     long since, cooldown, collectingUntil;
+    private final InfrastructureWaitAccounting workWait=new InfrastructureWaitAccounting();
     String lastFailure="";
     final Set<BlockPos> triedApproaches=new HashSet<>();
     BlockPos lastApproach;
@@ -51,7 +57,103 @@ final class Resident {
     BotHandle bot() { return v.runtime.bots.find(id).orElse(null); }
     Villager body() { return (Villager)bot().entity(); }
     long now() { return v.level.getGameTime(); }
+    int count(Orders.Material material){BotHandle b=bot();return b==null?0:Supplies.count(b.inventory().snapshot().slots(),material.accepts);}
+    /** Personal emergency kit for a whole material class; never shared with another worker. */
+    int kit(Orders.Material material){
+        BotHandle b=bot();if(b==null)return 0;
+        var bag=b.inventory().snapshot().slots();
+        int held=Supplies.count(bag,material.accepts);if(held==0)return 0;
+        int keep=0;var counted=new HashSet<Item>();
+        if(material==Orders.Material.SHEARS){
+            for(int slot:keptShears())if(material.accepts.test(bag.get(slot)))keep+=bag.get(slot).getCount();
+        }else for(ItemStack stack:bag)if(!stack.isEmpty()&&material.accepts.test(stack)&&counted.add(stack.getItem()))keep=Math.max(keep,reserve(stack,v.steward(id)));
+        // Cargo just accepted by a porter is not retroactively turned into his own kit.
+        if(deliveryKit>=0&&deliverOrder!=null&&deliverOrder.kind()==material)return Math.min(held,deliveryKit);
+        return Math.min(held,keep);
+    }
+    private Set<Integer> keptShears(){
+        var bag=bot().inventory().snapshot().slots();var kept=new HashSet<Integer>();int best=-1,life=-1;
+        boolean needs=v.farm.caretaker()==this||"shear".equals(job)
+                ||v.expeditions.owns(id)&&v.state.expedition!=null&&"wool".equals(v.state.expedition.purpose);
+        if(deliveryKit>=0&&deliverOrder!=null&&deliverOrder.kind()==Orders.Material.SHEARS)needs=deliveryKit>0;
+        boolean namedUsable=false;
+        for(int slot=0;slot<bag.size();slot++){
+            var s=bag.get(slot);if(!s.is(Items.SHEARS))continue;
+            if(s.has(DataComponents.CUSTOM_NAME)){kept.add(slot);namedUsable|=Supplies.usable(s);}
+            int remaining=s.getMaxDamage()-s.getDamageValue();
+            if(Supplies.usable(s)&&remaining>life){life=remaining;best=slot;}
+        }
+        if(needs&&!namedUsable&&best>=0)kept.add(best);
+        return kept;
+    }
+    private boolean shareableSlot(Orders.Material material,int slot){
+        var s=bot().inventory().snapshot().slots().get(slot);
+        return material.accepts.test(s)&&(material!=Orders.Material.SHEARS||!keptShears().contains(slot));
+    }
+    /** Inventory operations stop intents, so external exchanges use an idle boundary. */
+    boolean canExchange(){
+        // Inventory mutations stop library intents. Recheck this boundary at handoff.
+        var b=bot();return b!=null&&b.state()==BotState.ACTIVE&&body().isAlive()&&!body().isBaby()&&!body().isNoAi()
+                &&!body().isTrading()&&!body().isSleeping()&&!fleeing&&combat==null&&navigation==null
+                &&mining==null&&excavation==null&&collectingUntil==0&&b.miner().status()!=MiningStatus.RUNNING
+                &&b.navigator().status()!=NavigationStatus.RUNNING&&b.navigator().status()!=NavigationStatus.COMPUTING
+                &&b.combat().status()!=CombatStatus.RUNNING
+                &&(job==null||"farm_watch".equals(job));
+    }
+    boolean canFetch(Orders.Order order){
+        if(order.kind()==null||combat!=null||mining!=null||excavation!=null||v.expeditions.owns(id))return false;
+        if(v.claimableFromChests(order)==0)return false;
+        return v.chests().stream().anyMatch(chest->{
+            if(Supplies.count(Supplies.copy(chest),order.kind().accepts)==0)return false;
+            if(body().position().distanceToSqr(Vec3.atCenterOf(chest.getBlockPos()))<=16&&lineOfSight(bot(),chest.getBlockPos()))return true;
+            var path=body().getNavigation().createPath(chest.getBlockPos(),1);
+            return path!=null&&path.canReach();
+        });
+    }
+    /** Physically carry order material to the worker who needs it. */
+    void deliver(Orders.Order order,UUID recipient){
+        deliver(order,recipient,-1);
+    }
+    private void deliver(Orders.Order order,UUID recipient,int personalKit){
+        cancel();
+        deliverOrder=order;deliveryKit=personalKit;
+        order.inTransit=Math.min(order.outstanding(),Math.max(0,count(order.kind())-kit(order.kind())));
+        order.transit=order.inTransit>0;order.carrier=id.toString();
+        if(!order.transit){Orders.release(order);finish();return;}
+        deliverOrder=order;deliverRecipient=recipient;
+        job="deliver";target=v.workers.get(recipient).body().blockPosition();shelter=null;since=now();
+        workWait.reset();navigation=null;mining=null;collectingUntil=0;triedApproaches.clear();lastApproach=null;
+        status="несёт материалы по заказу исполнителю";
+    }
+    boolean ripeHarvest(){
+        return v.index.crops.stream().anyMatch(p->v.state.policy.allows("farm",p)&&v.level.getBlockState(p).getBlock() instanceof CropBlock c&&c.isMaxAge(v.level.getBlockState(p)));
+    }
+    boolean nativeDutyTime(){
+        long day=Math.floorMod(v.level.getOverworldClockTime(),24000);
+        int start=2000+roleIndexSlot()%8*600;
+        return day>=start&&day<start+600&&body().getBrain().getMemory(MemoryModuleType.JOB_SITE)
+                .filter(p->p.dimension().equals(v.level.dimension())).isPresent();
+    }
+    private int roleIndexSlot(){return v.roleIndex(id);}
+    /** Help is a bounded job, never a new specialization. Protect native schedules and urgent work. */
+    boolean canHelp(){
+        if(bot()==null||bot().state()!=BotState.ACTIVE||!body().isAlive()||body().isBaby()||body().isNoAi()
+                ||body().isSleeping()||body().isTrading()||combat!=null||mining!=null||excavation!=null||collectingUntil>0
+                ||body().getHealth()<12||v.expeditions.owns(id)||nativeDutyTime()||nightRestWindow())return false;
+        long day=Math.floorMod(v.level.getOverworldClockTime(),24000);int social=9000+roleIndexSlot()%3*1000;
+        if(day>=social&&day<social+1000||v.guard(id)||v.farmer(id)&&ripeHarvest())return false;
+        return job==null||Set.of("farm_watch","wood","seeds","pickup").contains(job);
+    }
+    void collectOrder(Orders.Order order,Resident donor,UUID recipient){
+        cancel();assign("collect_order",donor.body().blockPosition());
+        if(!"collect_order".equals(job))return;
+        deliverOrder=order;deliverRecipient=recipient;haulDonor=donor.id;
+        order.carrier=id.toString();status="забирает свободные материалы для доставки";
+    }
     void tick() {
+        tick(true);
+    }
+    void tick(boolean mayPlan) {
         BotHandle b=bot();
         if (b==null||b.state()!=BotState.ACTIVE||!b.entity().isAlive()) { status="не загружен";return; }
         if (fresh) { b.stopAll();fresh=false; }
@@ -67,7 +169,6 @@ final class Resident {
         if (combat!=null) { if (!combat.completion().isDone()&&now()-since<600)return;cancel(); }
         if(nightRestWindow()&&"escape".equals(job)&&mining==null&&excavation==null&&b.miner().status()!=MiningStatus.RUNNING
                 &&(atRestHome()||v.index.beds.stream().anyMatch(p->p.distSqr(e.blockPosition())<64)))cancel();
-        if(v.expeditions.work(this))return;
         if(recoverAtHome(b))return;
         if(job==null&&!v.state.contains(e.blockPosition())){
             pickup(b);
@@ -83,6 +184,10 @@ final class Resident {
         boolean socialTime=day>=socialStart&&day<socialStart+1000;
         boolean nightRest=nightRestWindow();
         boolean breakTime=nightRest || socialTime || professionTime;
+        // A failed overnight route must not consume the next working day. The resident
+        // is already inside the village; injuries and expedition returns retain their own recovery.
+        if("home".equals(job)&&!nightRest&&e.getHealth()>=e.getMaxHealth()&&v.state.contains(e.blockPosition())&&!v.expeditions.owns(id))cancel();
+        if("native_work".equals(job)&&!professionTime)cancel();
         // A social/work schedule is not a reason to erase block-damage progress. Complete the atomic
         // action and collect its drops first. Dangerous combat still preempts immediately above.
         boolean finishingBlock=mining!=null||excavation!=null||collectingUntil>0||"escape".equals(job);
@@ -105,7 +210,9 @@ final class Resident {
                 return; // release native Brain for social behavior and reproduction, at least 3000 ticks/day
             }
         }
+        if(!breakTime&&v.expeditions.work(this))return;
         if (job!=null) { work(b);return; }
+        if(!mayPlan)return;
         if (now()<cooldown) return;
         cooldown=now()+20;
         pickup(b);
@@ -114,11 +221,23 @@ final class Resident {
         if(v.expeditions.preparingSurveyPick(id)&&(prepareCrafting(b,steward)||depositOrFetch(b,steward)))return;
         if((Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))<0
                 ||Supplies.find(b,s->s.is(ItemTags.AXES)&&Supplies.usable(s))<0)&&prepareCrafting(b,steward))return;
+        if(constructionWork(b))return;
         // Bring excess cargo to the shared store before accepting another project. Otherwise a
         // repeatable renovation can keep the equipped shearer ineligible for every wool outing.
         // depositAmount retains the tools, food and materials needed by the current building plan.
         if(shouldUnloadBeforeWork()&&depositOrFetch(b,steward))return;
         if(foodWork(b))return;
+        if(v.farm.planWork(this))return;
+        if(ProductionBuildings.work(this))return;
+        if(Infrastructure.work(this))return;
+        if(v.guard(id)){
+            if(prepareCrafting(b,steward))return;
+            guardDuty(b);return;
+        }
+        if(v.porter(id)){
+            if(depositOrFetch(b,steward)||salvage(b))return;
+            status="ждёт заявки на переноску; носильщик";return;
+        }
         if(v.builder(id)&&startBuilding(b,true))return;
         if(steward&&production(b))return;
         if(infrastructure(b,steward))return;
@@ -126,6 +245,7 @@ final class Resident {
         if(buildingTimber(b))return;
         if(Supplies.find(b,s->s.is(ItemTags.AXES)&&Supplies.usable(s))>=0&&startBuilding(b,true))return;
         if(prepareCrafting(b,steward))return;
+        if(requestedResourceWork(b))return;
         if(startBuilding(b))return;
         if (depositOrFetch(b,steward)) return;
         if(!needsWorkbench&&recoverWorkbench(b))return;
@@ -135,11 +255,11 @@ final class Resident {
             BlockPos log=nearest(v.index.trees,this::treeCandidate);
             if(log!=null){assign("wood",log);return;}
         }
-        BlockPos crop=nearest(v.index.crops,p->v.level.getBlockState(p).getBlock() instanceof CropBlock c&&c.isMaxAge(v.level.getBlockState(p)));
-        if (crop!=null&&v.count(Supplies::food)<Math.max(64,v.state.residents.size()*24)&&v.activeJobs("harvest","plant","hoe")<Math.max(1,v.workers.size()/3)) {assign("harvest",crop);return;}
-        BlockPos soil=nearest(v.index.soil,p->v.level.getBlockState(p).isAir()&&v.level.getBlockState(p.below()).is(Blocks.FARMLAND));
+        BlockPos crop=nearest(v.index.crops,p->v.state.policy.allows("farm",p)&&v.level.getBlockState(p).getBlock() instanceof CropBlock c&&c.isMaxAge(v.level.getBlockState(p)));
+        if (crop!=null&&SettlementEconomy.food(v)<SettlementEconomy.budget(v).food()&&v.activeJobs("harvest","plant","hoe")<Math.max(1,v.workers.size()/3)) {assign("harvest",crop);return;}
+        BlockPos soil=nearest(v.index.soil,p->v.state.policy.allows("farm",p)&&v.level.getBlockState(p).isAir()&&v.level.getBlockState(p.below()).is(Blocks.FARMLAND));
         if (soil!=null&&seed(b)!=null) {assign("plant",soil);return;}
-        if(v.roleIndex(id)%6==2||v.workers.size()<3){
+        if(v.farmer(id)){
             if(farmExpand(b))return;
             if(seed(b)==null&&v.count(s->s.is(Items.WHEAT_SEEDS))<32){
                 BlockPos grass=nearest(v.index.grass,p->v.level.getBlockState(p).is(Blocks.SHORT_GRASS)||v.level.getBlockState(p).is(Blocks.TALL_GRASS));
@@ -160,7 +280,7 @@ final class Resident {
             if(v.level.getBlockEntity(p) instanceof FurnaceBlockEntity f && !f.isLocked() && VillageWorkshop.wantsFurnace(b,v,f)) {assign("furnace",p);return;}
         }
         int wood=v.count(s->s.is(ItemTags.LOGS)||s.is(ItemTags.PLANKS));
-        if(v.roleIndex(id)%6==4&&v.state.expedition==null&&miningWork(b))return;
+        if(v.hasRole(id,ResidentRoles.Role.MINER)&&v.state.expedition==null&&miningWork(b))return;
         if (wood<Math.max(v.town.woodDemand(),v.workers.size()*24)) {
             BlockPos log=nearest(v.index.trees,this::treeCandidate);
             if(log!=null){assign("wood",log);return;}
@@ -179,18 +299,73 @@ final class Resident {
         if (e.blockPosition().distSqr(v.state.center())>20*20&&ready("home")) {assign("home",v.state.center());return;}
         status="отдыхает; ждёт урожай и потребности деревни";
     }
+    private void guardDuty(BotHandle b){
+        BlockPos post=ProductionBuildings.post(v);
+        if(body().blockPosition().distSqr(post)>36&&ready("guard")){assign("guard",post);return;}
+        b.activities().run(List.of(new BotActivity.Wait(20)));status="охраняет жилую часть деревни";
+    }
     private boolean miningWork(BotHandle b){
-        if (Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))>=0) {
-            if(v.count(s->s.is(Items.COBBLESTONE))<Math.max(32,v.workers.size()*12)) {
-                BlockPos stone=nearest(v.index.stone,p->v.level.getBlockState(p).is(Blocks.STONE)&&VillageIndex.exposed(v.level,p));
-                if(stone!=null){assign("stone",stone);return job!=null;}
-            }
-            if(v.count(s->s.is(Items.RAW_IRON)||s.is(Items.IRON_INGOT))<Math.max(8,v.workers.size()*3)||v.count(s->s.is(Items.COAL))<16) {
-                BlockPos ore=nearest(v.index.ore,p->VillageIndex.exposed(v.level,p)&&oreHarvestable(b,p));
+            if(IronSupply.rawNeeded(v)>0) {
+                BlockPos ore=nearest(v.index.ore,p->MineKnowledge.iron(v,p)&&VillageIndex.exposed(v.level,p)&&oreHarvestable(b,p));
                 if(ore!=null){assign("ore",ore);return job!=null;}
             }
+        if (Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))>=0) {
+            if(v.count(s->s.is(Items.COBBLESTONE))<Math.max(32,v.workers.size()*12)) {
+                BlockPos stone=nearest(v.index.stone,p->v.state.policy.allows("mine",p)&&v.level.getBlockState(p).is(Blocks.STONE)&&VillageIndex.exposed(v.level,p));
+                if(stone!=null){assign("stone",stone);return job!=null;}
+            }
             if((v.count(s->s.is(Items.COBBLESTONE))<Math.max(32,v.workers.size()*12)
-                    ||v.count(s->s.is(Items.IRON_INGOT)||s.is(Items.RAW_IRON))<12)&&startMine(b))return true;
+                    ||IronSupply.rawNeeded(v)>0)&&startMine(b))return true;
+        }
+        return false;
+    }
+    /** A primary builder services construction before optional hauling, harvesting or logging. */
+    private boolean constructionWork(BotHandle b){
+        if(!v.hasRole(id,ResidentRoles.Role.BUILDER)||v.smallCrew())return false;
+        // Grading is possible bare-handed, but must not consume every shift before
+        // this specialist obtains the kit needed for the actual building and its inputs.
+        if(needsBasicTools()){
+            if(prepareCrafting(b,false)||infrastructure(b,false)||depositOrFetch(b,false))return true;
+            if(!ConstructionSupply.awaiting(this)){
+                var tree=nearest(v.index.trees,this::treeCandidate);if(tree!=null){assign("wood",tree);return true;}
+            }
+            b.activities().run(List.of(new BotActivity.Wait(20)));status="строитель готовит инструменты перед земляными работами";return true;
+        }
+        if(startBuilding(b,true)||constructionInputs(b)||startBuilding(b)||Infrastructure.work(this))return true;
+        var plans=v.town.wantedPlans(this);if(plans.isEmpty())return false;
+        if(prepareCrafting(b,false)||infrastructure(b,false)||depositOrFetch(b,false))return true;
+        if(ConstructionSupply.awaiting(this)){b.activities().run(List.of(new BotActivity.Wait(20)));status="строитель ждёт носильщика с материалами своей стройки";return true;}
+        int timber=Supplies.count(b.inventory().snapshot().slots(),s->s.is(ItemTags.PLANKS))+4*Supplies.count(b.inventory().snapshot().slots(),s->s.is(ItemTags.LOGS));
+        if(timber<16||needsBasicTools()){
+            var tree=nearest(v.index.trees,this::treeCandidate);if(tree!=null){assign("wood",tree);return true;}
+        }
+        if(TownCrafting.ingredientReserve(this,new ItemStack(Items.COBBLESTONE))>b.inventory().count(Items.COBBLESTONE)
+                &&Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))>=0){
+            var stone=nearest(v.index.stone,p->v.state.policy.allows("mine",p)&&v.level.getBlockState(p).is(Blocks.STONE)&&VillageIndex.exposed(v.level,p));
+            if(stone!=null){assign("stone",stone);return true;}
+        }
+        status="строитель ждёт материалы или доступ к текущей стройке";return true;
+    }
+    private boolean constructionInputs(BotHandle b){
+        needsWorkbench=false;
+        int planks=Supplies.count(b.inventory().snapshot().slots(),VillageWorkshop.PLANK);
+        if(planks<16&&VillageWorkshop.craft(b,v,new String[]{"M"},s->s.is(ItemTags.LOGS_THAT_BURN),VillageWorkshop.PLANK)
+                ||TownCrafting.make(b,v)){
+            b.activities().run(List.of(new BotActivity.Wait(20)));status="готовит строительную партию и детали перед кладкой";return true;
+        }
+        return needsWorkbench&&(infrastructure(b,false)||prepareWorkbench(b,false));
+    }
+    private boolean requestedResourceWork(BotHandle b){
+        if(v.smallCrew()||SettlementEconomy.food(v)<Math.max(6,v.state.residents.size()))return false;
+        boolean timber=v.hasRole(id,ResidentRoles.Role.LOGGER)&&v.state.orders.stream().anyMatch(o->o.open()&&!o.returnCargo()&&(o.kind()==Orders.Material.LOGS||o.kind()==Orders.Material.PLANKS));
+        boolean minerals=v.hasRole(id,ResidentRoles.Role.MINER)&&v.state.orders.stream().anyMatch(o->o.open()&&!o.returnCargo()&&(o.kind()==Orders.Material.COBBLESTONE||o.kind()==Orders.Material.IRON));
+        // The full growth reserve remains unchanged. With basic food already covered,
+        // concrete input orders take precedence over optional harvest help and small unloading trips.
+        if(minerals&&miningWork(b)){status="шахтёр добывает материалы по открытой заявке";return true;}
+        if(timber&&v.count(s->s.is(ItemTags.LOGS)||s.is(ItemTags.PLANKS))<Math.max(v.town.woodDemand(),v.workers.size()*24)
+                ||minerals&&needsBasicTools()){
+            BlockPos tree=nearest(v.index.trees,this::treeCandidate);
+            if(tree!=null){assign("wood",tree);status=timber?"лесоруб снабжает стройку по заявке":"шахтёр готовит древесину для своих инструментов";return job!=null;}
         }
         return false;
     }
@@ -203,7 +378,7 @@ final class Resident {
         townPlan=plan;build=step;assign(!Construction.clear(v.level.getBlockState(step.pos()))?"renovate":"build",step.pos());return true;
     }
     private boolean oreHarvestable(BotHandle b,BlockPos p) {
-        return VillageWorkshop.hasPickFor(b,v.level.getBlockState(p));
+        return v.state.policy.allows("mine",p)&&VillageWorkshop.hasPickFor(b,v.level.getBlockState(p));
     }
     private boolean production(BotHandle b){
         if(v.state.furnaces.isEmpty())return false;
@@ -227,6 +402,9 @@ final class Resident {
             status="изготавливает инструменты и припасы";return true;
         }
         if(infrastructure(b,steward))return true;
+        return prepareWorkbench(b,steward);
+    }
+    private boolean prepareWorkbench(BotHandle b,boolean steward){
         if(needsWorkbench){
             BlockPos table=nearest(v.index.tables,p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)&&p.distSqr(b.entity().blockPosition())<32*32);
             if(table!=null&&!VillageWorkshop.nearTable(b,v,table)&&ready("table")){assign("table",table);return true;}
@@ -263,7 +441,7 @@ final class Resident {
         v.index.trees.add(nearby);assign("wood",nearby);status="заготавливает дерево для замены походного инструмента";return job!=null;
     }
     private boolean treeCandidate(BlockPos base){
-        if(v.town.protects(base))return false;
+        if(v.town.protects(base)||!v.state.policy.allows("wood",base)||!ManagedLand.mayHarvest(v,base))return false;
         if(VillageIndex.naturalLog(v.level,base))return true;
         if(!v.state.fellingTrees.contains(base.asLong()))return false;
         BlockPos next=ForestWork.next(v,base);
@@ -278,6 +456,7 @@ final class Resident {
                 .min(Comparator.comparingDouble(p->{double dy=p.getY()-b.entity().getY();return b.entity().position().distanceToSqr(Vec3.atCenterOf(p))+15*dy*dy;})).orElse(null);
     }
     void assign(String kind,BlockPos p){
+        if(!v.state.policy.allows(kind.equals("build")&&build!=null&&build.state().getBlock() instanceof SaplingBlock?"wood":activity(kind),p))return;
         if(exclusiveJob(kind)&&!v.reservations.acquire(p.asLong(),id,now()))return;
         if(kind.equals("wood")){
             if(!v.state.fellingTrees.contains(p.asLong())&&v.state.fellingTrees.size()>=128){v.reservations.release(id);return;}
@@ -285,15 +464,24 @@ final class Resident {
             BlockPos next=ForestWork.next(v,treeBase);if(next==null){ForestWork.complete(v,treeBase);return;}p=next;
             v.state.fellingTrees.add(treeBase.asLong());v.runtime.save();
         }
-        job=kind;target=p.immutable();since=now();navigation=null;mining=null;collectingUntil=0;
+        job=kind;target=p.immutable();shelter=null;since=now();workWait.reset();navigation=null;mining=null;collectingUntil=0;
         triedApproaches.clear();lastApproach=null;
         status=switch(kind){case "wood"->"лесозаготовка";case "stone","ore"->"добывает камень и руду";case "harvest","plant","hoe"->"работает на грядках";
-            case "storage"->"идёт на общий склад";case "build"->"строит инфраструктуру";case "home"->"возвращается домой";
+            case "storage"->"идёт на общий склад";case "delivery_return"->"освобождает стройку после доставки, возвращается к складу";case "build"->"строит инфраструктуру";case "home"->"возвращается домой";
             case "table"->"идёт к верстаку";case "furnace"->"обслуживает печь";case "seeds"->"ищет семена";
             case "mine"->"идёт ко входу в шахту";case "native_work"->"возвращается к рабочему месту";
             case "pickup"->"собирает припасы";case "shear"->"идёт стричь овец";case "supply"->"несёт припасы застрявшему путнику";default->"работает";};
     }
     void work(BotHandle b){
+        if(!v.state.policy.allows(job.equals("build")&&build!=null&&build.state().getBlock() instanceof SaplingBlock?"wood":activity(job),target)){cancel();status="работа запрещена границей игрока";return;}
+        if(job.equals("herd")){v.farm.herd(this);return;}
+        if(job.equals("collect_order")){
+            var donor=v.workers.get(haulDonor);
+            if(donor==null||donor.bot()==null||!donor.body().isAlive()||deliverOrder==null||!deliverOrder.open()
+                    ||!v.state.orders.contains(deliverOrder)||!id.toString().equals(deliverOrder.carrier)
+                    ||!Objects.toString(deliverRecipient,"").equals(deliverOrder.recipient)){cancel();return;}
+            target=donor.body().blockPosition();
+        }
         if(job.equals("supply")){
             var recipient=v.workers.get(supplyRecipient);
             if(recipient==null||recipient.bot()==null||!recipient.body().isAlive()||Supplies.find(recipient.bot(),s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))>=0){finish();return;}
@@ -301,14 +489,22 @@ final class Resident {
                 v.reservations.release(target.asLong(),id);target=recipient.body().blockPosition();
             }
         }
-        if(now()-since>(job.equals("mine")||job.equals("escape")?6000:2400)){fail("цель недоступна; выбирает другую работу");return;}
+        if(job.equals("deliver")){
+            var recipient=v.workers.get(deliverRecipient);
+            // The order itself is the reason to walk: a completed or cancelled order ends the run.
+            if(recipient==null||recipient.bot()==null||!recipient.body().isAlive()||deliverOrder==null||!v.state.orders.contains(deliverOrder)||!deliverOrder.open()
+                    ||!recipient.id.toString().equals(deliverOrder.recipient)||!id.toString().equals(deliverOrder.carrier)){cancel();return;}
+            target=recipient.body().blockPosition();
+        }
+        long infrastructureTicks=workWait.observe(navigation,excavation);
+        if(now()-since-infrastructureTicks>(job.equals("mine")||job.equals("escape")?6000:2400)){fail("цель недоступна; выбирает другую работу");return;}
         if((exclusiveJob(job)&&!v.reservations.acquire(target.asLong(),id,now())) || treeBase!=null&&!v.reservations.acquire(treeBase.asLong(),id,now())){fail("цель занята другим работником");return;}
         // A route's preferred standing cell is only a means to reach the actual block. Do not
         // overshoot a visible reachable ore, then reject it because that cell is inaccessible.
         if(navigation!=null&&mining==null&&excavation==null&&collectingUntil==0
-                &&!Set.of("mine","escape","supply","pickup").contains(job)
+                &&!Set.of("mine","escape","supply","pickup","delivery_return").contains(job)
                 &&b.entity().getEyePosition().distanceToSqr(Vec3.atCenterOf(target))<=workReach()*workReach()
-                &&lineOfSight(b,target)&&!(job.equals("build")&&build!=null&&Construction.intersectsActor(v,b,build))
+                &&(job.equals("build")||lineOfSight(b,target))&&!(job.equals("build")&&build!=null&&Construction.intersectsActor(v,b,build))
                 &&!(job.equals("renovate")&&b.entity().blockPosition().below().equals(target))){
             navigation.cancel();navigation=null;lastApproach=null;
         }
@@ -316,6 +512,12 @@ final class Resident {
             if(!excavation.completion().isDone())return;
             if(excavation.status()==ExcavationStatus.SUCCESS&&job.equals("mine")){v.state.mineLength=Math.min(32,v.state.mineLength+8);v.runtime.save();}
             else if(excavation.status()!=ExcavationStatus.SUCCESS){lastFailure="проходка: "+excavation.completion().join().reason();delays.put("mine",now()+1800);}
+            if(job.equals("mine")&&v.state.mineEntrance!=null){
+                var seen=MineKnowledge.record(v,v.state.mineEntrance,v.state.mineDirection);
+                if(seen!=null){seen.length=Math.max(seen.length,excavation.completedSegments());seen.lastSurvey=now();
+                    if(excavation.status()!=ExcavationStatus.SUCCESS){seen.blocked=true;var reason=excavation.completion().join().reason();seen.hazard=reason.substring(0,Math.min(160,reason.length()));}}
+                v.runtime.save();
+            }
             finish();return;
         }
         if(navigation!=null){
@@ -368,14 +570,14 @@ final class Resident {
                     // A builder returns with a useful load instead of spending the entire day clearing
                     // the canopy before making the first tools or placing available project blocks.
                     // The marked branches remain a shared persistent forestry job.
-                    boolean productionRole=!v.builder(id)&&v.roleIndex(id)%6!=3&&v.roleIndex(id)%6!=5;
+                    boolean productionRole=!v.builder(id)&&!v.logger(id);
                     if((v.builder(id)&&buildingWood>=v.town.timberBatch())||(carriedWood>=4&&(productionRole||Supplies.find(b,s->s.is(ItemTags.AXES)&&Supplies.usable(s))<0))){
                         finish();status="несёт древесину в мастерскую и на стройку";return;
                     }
                     long day=Math.floorMod(v.level.getOverworldClockTime(),24_000);
                     int socialStart=9000+(v.roleIndex(id)%3)*1000;
                     if(nightRestWindow()||day>=socialStart&&day<socialStart+1000){finish();status="вернётся к отмеченному дереву после отдыха";return;}
-                    if(!target.equals(treeBase))v.reservations.release(target.asLong(),id);target=next;navigation=null;collectingUntil=0;since=now();return;
+                    if(!target.equals(treeBase))v.reservations.release(target.asLong(),id);target=next;navigation=null;collectingUntil=0;since=now();workWait.reset();return;
                 }
                 replantTree(b,treeBase);ForestWork.complete(v,treeBase);
             }
@@ -385,6 +587,9 @@ final class Resident {
         double reach=workReach();
         boolean close=b.entity().getEyePosition().distanceToSqr(Vec3.atCenterOf(target))<=reach*reach;
         if(job.equals("supply"))close=b.entity().distanceToSqr(v.workers.get(supplyRecipient).body())<=9&&b.entity().hasLineOfSight(v.workers.get(supplyRecipient).body());
+        if(job.equals("collect_order")){var donor=v.workers.get(haulDonor);close=donor!=null&&donor.bot()!=null&&b.entity().distanceToSqr(donor.body())<=9&&b.entity().hasLineOfSight(donor.body());}
+        if(job.equals("deliver")){var recipient=v.workers.get(deliverRecipient);close=recipient!=null&&recipient.bot()!=null&&b.entity().distanceToSqr(recipient.body())<=9&&b.entity().hasLineOfSight(recipient.body());}
+        if(job.equals("delivery_return"))close=b.entity().position().distanceToSqr(v.feetPosition(target))<=.64;
         if(job.equals("build")&&build!=null&&Construction.intersectsActor(v,b,build))close=false;
         if(job.equals("renovate")&&b.entity().blockPosition().below().equals(target))close=false;
         if(Set.of("wood","stone","ore","renovate").contains(job)){
@@ -401,25 +606,29 @@ final class Resident {
         // Builders assemble paid adjacent blocks in reach; aiming at the center of an empty roof cell
         // would incorrectly reject it whenever a previously placed roof edge crosses that ray.
         if(!close||!job.equals("build")&&!job.equals("supply")&&!nativeWork&&!lineOfSight(b,target)){
-            if(job.equals("pickup")){navigation=b.navigator().goTo(new NavigationGoal.PositionGoal(Vec3.atBottomCenterOf(target),.65),TRAVEL);return;}
+            if(job.equals("pickup")||job.equals("delivery_return")){navigation=b.navigator().goTo(new NavigationGoal.PositionGoal(job.equals("pickup")?Vec3.atBottomCenterOf(target):v.feetPosition(target),job.equals("pickup")?.65:.35),TRAVEL);return;}
             BlockPos stand=v.stand(target,b.entity().position(),reach,!job.equals("build")&&!job.equals("wood")&&!nativeWork,triedApproaches);
             if(stand==null){if(job.equals("wood")&&AccessWorks.tree(this))return;fail("нет безопасного подхода");return;}
             lastApproach=stand;navigation=b.navigator().goTo(new NavigationGoal.PositionGoal(v.feetPosition(stand),job.equals("build")||job.equals("renovate")?.15:.35),TRAVEL);return;
         }
         switch(job){
-            case "wood","stone","ore","harvest","seeds","renovate","hazard","sand","scaffold","bench" -> {lastApproach=null;mining=b.miner().breakBlock(target);}
+            case "wood","stone","ore","harvest","seeds","renovate","hazard","sand","scaffold","bench","grade","dig_irrigation" -> {lastApproach=null;mining=b.miner().breakBlock(target);}
             case "mine" -> {
+                if(!MineSupplies.inspect(this).ready()){fail("не хватает припасов для шахты");return;}
                 BlockPos entrance=BlockPos.of(v.state.mineEntrance);
+                if(!Infrastructure.mineAccess(v,entrance)){finish();status="шахта ждёт подготовки пути снабжения";return;}
                 var request=new ExcavationRequest(entrance,Direction.from2DDataValue(v.state.mineDirection),ExcavationMode.STAIRCASE_DOWN,
-                        Math.min(32,v.state.mineLength+8),v.state.mineLength);
+                        Math.min(32,v.state.mineLength+Math.min(8,MineSupplies.inspect(this).segments())),v.state.mineLength);
                 if(!v.state.contains(request.positionAt(request.length()))){fail("шахта достигла границы деревни");return;}
                 excavation=b.miner().excavate(request,new ExcavationPolicy(64,2400,4,true,true));status="прокладывает лестничную шахту";
             }
+            case "fill_bucket","irrigate" -> {ManagedLand.transferWater(this,target,job.equals("fill_bucket"));finish();}
+            case "workshop" -> {finish();}
             case "plant" -> {plant(b,target);finish();}
             case "hoe" -> {
                 int hoe=Supplies.find(b,s->s.is(ItemTags.HOES)&&Supplies.usable(s));
                 if(!v.level.getBlockState(target).isAir()&&Construction.clear(v.level.getBlockState(target))){mining=b.miner().breakBlock(target);return;}
-                if(hoe>=0&&v.level.getBlockState(target).isAir()&&VillageIndex.naturalSoil(v.level.getBlockState(target.below()))){
+                if(hoe>=0&&v.state.policy.allows("farm",target.below())&&watered(target.below())&&v.level.getBlockState(target).isAir()&&VillageIndex.naturalSoil(v.level.getBlockState(target.below()))){
                     b.inventory().select(hoe);v.level.setBlock(target.below(),Blocks.FARMLAND.defaultBlockState(),3);
                     b.entity().getMainHandItem().hurtAndBreak(1,b.entity(),EquipmentSlot.MAINHAND);
                     v.index.soil.add(target);v.state.plantedCrops.add(target.asLong());plant(b,target);
@@ -427,10 +636,11 @@ final class Resident {
             }
             case "storage" -> {storage(b,v.steward(id));finish();delays.put("storage",now()+100);}
             case "pickup" -> {pickup(b);finish();}
+            case "breed_sheep" -> {v.farm.feedPair(this);finish();}
             case "shear" -> {if(shearNearby(b))collectingUntil=now()+400;else finish();}
             case "supply" -> {
                 var recipient=v.workers.get(supplyRecipient);
-                if(recipient.combat!=null||recipient.mining!=null||recipient.excavation!=null){finish();return;}
+                if(!recipient.canExchange()){status="ждёт окончания действия путника перед передачей припасов";return;}
                 int slot=Supplies.find(b,s->s.is(Items.CRAFTING_TABLE));
                 if(slot<0)slot=Supplies.find(b,s->s.is(ItemTags.PLANKS)&&s.getCount()>=8);
                 if(slot>=0){
@@ -443,14 +653,72 @@ final class Resident {
                 finish();
             }
             case "table" -> {finish();delays.put("table",now()+200);}
+            case "collect_order" -> {
+                var order=deliverOrder;UUID recipient=deliverRecipient;var donor=v.workers.get(haulDonor);
+                if(!donor.canExchange()){status="ждёт окончания действия владельца груза";return;}
+                donor.cancel();
+                Orders.refreshStock(v);
+                var material=order.kind();int moved=0,personalKit=kit(material);
+                int limit=Math.min(order.outstanding(),Math.max(0,donor.count(material)-donor.kit(material)));
+                var slots=donor.bot().inventory().snapshot().slots();
+                for(int slot=0;slot<slots.size()&&moved<limit;slot++)if(donor.shareableSlot(material,slot))
+                    moved+=donor.bot().inventory().transferTo(b.inventory(),slot,limit-moved);
+                finish();
+                if(moved>0&&v.workers.containsKey(recipient))deliver(order,recipient,personalKit);
+                else order.retryAfter=now()+200;
+            }
+            case "deliver" -> {
+                var recipient=v.workers.get(deliverRecipient);
+                if(!recipient.canExchange()){status="ждёт окончания действия получателя перед передачей груза";return;}
+                recipient.cancel();
+                Orders.refreshStock(v);
+                var material=deliverOrder==null?null:deliverOrder.kind();
+                int moved=0;
+                if(recipient!=null&&recipient.bot()!=null&&material!=null){
+                    int limit=Math.min(deliverOrder.outstanding(),Math.max(0,count(material)-kit(material)));
+                    var slots=b.inventory().snapshot().slots();
+                    for(int slot=0;slot<slots.size()&&moved<limit;slot++)if(shareableSlot(material,slot)){
+                        int amount=b.inventory().transferTo(recipient.bot().inventory(),slot,limit-moved);
+                        moved+=amount;deliverOrder.delivered+=amount;
+                    }
+                    if(moved>0){
+                        b.entity().swing(net.minecraft.world.InteractionHand.MAIN_HAND);recipient.body().swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+                        v.event("Материалы по заказу переданы исполнителю: "+moved);
+                    }
+                    Orders.refreshStock(v);
+                    if(deliverOrder.open()){
+                        deliverOrder.retryAfter=now()+200;
+                        status="Доставка неполная: передано "+moved+", осталось "+deliverOrder.outstanding()+"; груз сохранён у носителя";
+                        v.event(status);
+                    }
+                }
+                boolean clearSite=moved>0&&v.porter(id);
+                finish();
+                if(clearSite){var waiting=deliveryWaitingPoint();if(waiting!=null&&b.entity().position().distanceToSqr(v.feetPosition(waiting))>1)assign("delivery_return",waiting);}
+                v.runtime.save();
+            }
             case "furnace" -> {if(v.level.getBlockEntity(target)instanceof FurnaceBlockEntity f)VillageWorkshop.serviceFurnace(b,v,f);finish();delays.put("furnace",now()+200);}
             case "build" -> {if(build!=null&&!Construction.place(v,b,build))v.rejected.put(target.asLong(),now()+400);finish();}
             case "home" -> {finish();delays.put("home",now()+10);}
+            case "guard" -> {finish();delays.put("guard",now()+20);}
             case "native_work" -> {finish();delays.put("native_work",now()+400);}
             default -> finish();
         }
     }
-    private double workReach(){return job.equals("home")?2.4:job.equals("native_work")?2.8:job.equals("build")||job.equals("renovate")||job.equals("wood")?4.2:job.equals("pickup")?1.3:job.equals("supply")?2.5:3.0;}
+    private BlockPos deliveryWaitingPoint(){
+        BlockPos hub=v.chests().stream().min(Comparator.comparingDouble(c->c.getBlockPos().distSqr(body().blockPosition())))
+                .map(ChestBlockEntity::getBlockPos).orElse(v.meetingPoint());
+        var doors=List.copyOf(v.town.doors());BlockPos best=null;double score=Double.MAX_VALUE;
+        for(var p:BlockPos.betweenClosed(hub.offset(-5,-2,-5),hub.offset(5,2,5))){
+            if(!v.state.contains(p)||!v.level.hasChunkAt(p)||!v.safeFeet(p)||p.distSqr(hub)<4||p.distSqr(hub)>25
+                    ||v.town.constructionCell(p)||v.town.constructionCell(p.below())||v.town.constructionCell(p.above())
+                    ||doors.stream().anyMatch(d->d.distSqr(p)<9))continue;
+            double distance=p.distSqr(hub)+.01*p.distSqr(body().blockPosition());
+            if(distance<score){score=distance;best=p.immutable();}
+        }
+        return best;
+    }
+    private double workReach(){return job.equals("home")?2.4:job.equals("native_work")?2.8:job.equals("build")||job.equals("renovate")||job.equals("wood")?4.2:job.equals("pickup")?1.3:job.equals("supply")||job.equals("deliver")?2.5:3.0;}
     private boolean lineOfSight(BotHandle b,BlockPos p){
         var hit=v.level.clip(new ClipContext(b.entity().getEyePosition(),Vec3.atCenterOf(p),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,b.entity()));
         return hit.getType()==HitResult.Type.MISS||hit.getBlockPos().equals(p);
@@ -525,23 +793,29 @@ final class Resident {
         status="отдыхает дома и восстанавливает здоровье";return true;
     }
     private boolean foodWork(BotHandle b){
-        if(v.count(Supplies::food)>=Math.max(24,v.workers.size()*6))return false;
+        if(v.farmer(id)&&v.activeJobs("harvest","plant","hoe")<Math.max(1,v.workers.size()/3)){
+            BlockPos ripe=nearest(v.index.crops,p->v.state.policy.allows("farm",p)&&v.level.getBlockState(p).getBlock() instanceof CropBlock c&&c.isMaxAge(v.level.getBlockState(p)));
+            if(ripe!=null){assign("harvest",ripe);return job!=null;}
+        }
+        if(ManagedLand.work(this))return true;
+        if(SettlementEconomy.food(v)>=SettlementEconomy.budget(v).food())return false;
         // Turn carried wheat into food before accepting another remote logging job.
         if(b.inventory().count(Items.WHEAT)>=3&&prepareCrafting(b,v.steward(id)))return true;
-        boolean farmer=v.roleIndex(id)%6==2||v.workers.size()<3;
+        boolean farmer=v.farmer(id);
         // Early farm duty belongs to the farmer. Other roles can still help in the
         // ordinary idle-work pass, after their available projects and supplies.
         if(!farmer)return false;
         if(v.activeJobs("harvest","plant","hoe")<Math.max(1,v.workers.size()/3)){
-            BlockPos ripe=nearest(v.index.crops,p->v.level.getBlockState(p).getBlock() instanceof CropBlock c&&c.isMaxAge(v.level.getBlockState(p)));
+            BlockPos ripe=nearest(v.index.crops,p->v.state.policy.allows("farm",p)&&v.level.getBlockState(p).getBlock() instanceof CropBlock c&&c.isMaxAge(v.level.getBlockState(p)));
             if(ripe!=null){assign("harvest",ripe);return job!=null;}
         }
         if(Supplies.find(b,s->s.is(ItemTags.HOES)&&Supplies.usable(s))<0){if(prepareCrafting(b,v.steward(id)))return true;return false;}
-        BlockPos field=nearest(v.index.crops,p->v.level.getBlockState(p).getBlock() instanceof CropBlock);
-        if(v.workers.size()>=3&&field!=null&&body().blockPosition().distSqr(field)>16){assign("farm_watch",field);return job!=null;}
-        BlockPos empty=nearest(v.index.soil,p->v.level.getBlockState(p).isAir()&&v.level.getBlockState(p.below()).is(Blocks.FARMLAND));
+        BlockPos field=nearest(v.index.crops,p->v.state.policy.allows("farm",p)&&v.level.getBlockState(p).getBlock() instanceof CropBlock);
+        if(v.farm.needsAttention(this))return false;
+        BlockPos empty=nearest(v.index.soil,p->v.state.policy.allows("farm",p)&&v.level.getBlockState(p).isAir()&&v.level.getBlockState(p.below()).is(Blocks.FARMLAND));
         if(empty!=null&&seed(b)!=null){assign("plant",empty);return job!=null;}
         if(farmExpand(b))return true;
+        if(v.workers.size()>=3&&field!=null&&body().blockPosition().distSqr(field)>16){assign("farm_watch",field);return job!=null;}
         if(v.workers.size()>=3&&!v.index.crops.isEmpty()){
             status="следит за посадками, ждёт созревания урожая";return true;
         }
@@ -566,12 +840,14 @@ final class Resident {
     }
     private boolean feed(BotHandle b){
         Villager e=(Villager)b.entity();
-        if(e.getInventory().countItem(Items.BREAD)>=3||e.getInventory().countItem(Items.CARROT)>=12||e.getInventory().countItem(Items.POTATO)>=12||e.getInventory().countItem(Items.BEETROOT)>=12)return false;
+        int portions=SettlementEconomy.canGrow(v)?3:2;
+        int nativeUnits=e.getInventory().countItem(Items.BREAD)*4+e.getInventory().countItem(Items.CARROT)+e.getInventory().countItem(Items.POTATO)+e.getInventory().countItem(Items.BEETROOT);
+        if(nativeUnits>=portions*4)return false;
         int slot=Supplies.find(b,Supplies::food);if(slot<0)return false;
         ItemStack stack=b.inventory().snapshot().slots().get(slot);
-        boolean plantingReserve=body().getHealth()>=body().getMaxHealth()&&(v.roleIndex(id)%6==2||v.workers.size()<3)
+        boolean plantingReserve=(v.farmer(id))
                 &&(stack.is(Items.CARROT)||stack.is(Items.POTATO));
-        int n=Math.min(Math.max(0,stack.getCount()-(plantingReserve?1:0)),stack.is(Items.BREAD)?3:12);
+        int n=Math.min(Math.max(0,stack.getCount()-(plantingReserve?8:0)),stack.is(Items.BREAD)?Math.max(0,(portions*4-nativeUnits)/4):portions*4-nativeUnits);
         if(n==0)return false;
         ItemStack moving=stack.copyWithCount(n);
         // Native food inventory insertion can be partial; only debit what it accepted.
@@ -583,7 +859,7 @@ final class Resident {
         for(Item item:new Item[]{Items.WHEAT_SEEDS,Items.CARROT,Items.POTATO,Items.BEETROOT_SEEDS})if(b.inventory().count(item)>0)return item;return null;
     }
     private void plant(BotHandle b,BlockPos p){
-        Item item=seed(b);if(item==null||!v.state.contains(p)||!v.level.getBlockState(p).isAir()||!v.level.getBlockState(p.below()).is(Blocks.FARMLAND))return;
+        Item item=seed(b);if(item==null||!v.state.policy.allows("farm",p)||!v.state.contains(p)||!v.level.getBlockState(p).isAir()||!v.level.getBlockState(p.below()).is(Blocks.FARMLAND))return;
         Block block=item==Items.WHEAT_SEEDS?Blocks.WHEAT:item==Items.CARROT?Blocks.CARROTS:item==Items.POTATO?Blocks.POTATOES:Blocks.BEETROOTS;
         if(block.defaultBlockState().canSurvive(v.level,p)&&Supplies.consume(b,item,1)){
             v.level.setBlock(p,block.defaultBlockState(),3);v.index.crops.add(p);v.state.plantedCrops.add(p.asLong());
@@ -593,7 +869,7 @@ final class Resident {
         for(BlockPos p:BlockPos.betweenClosed(soil.offset(-4,0,-4),soil.offset(4,1,4)))if(v.level.getFluidState(p).is(FluidTags.WATER))return true;return false;
     }
     private boolean startMine(BotHandle b){
-        if(!ready("mine")||v.state.mineLength>=32)return false;
+        if(!ready("mine")||v.state.mineLength>=32||!MineSupplies.inspect(this).ready())return false;
         if(v.state.mineEntrance==null){
             for(Direction d:Direction.Plane.HORIZONTAL){
                 BlockPos column=v.state.localMineColumn(d);int x=column.getX(),z=column.getZ();
@@ -605,22 +881,24 @@ final class Resident {
             }
         }
         if(v.state.mineEntrance!=null){
+            if(v.state.mines.stream().anyMatch(m->m.entrance==v.state.mineEntrance&&m.direction==v.state.mineDirection&&(m.blocked||m.exhausted)))return false;
             BlockPos p=BlockPos.of(v.state.mineEntrance);
-            if(v.ready(p,id)){assign("mine",p);delays.put("mine",now()+400);return true;}
+            if(v.state.policy.allows("mine",p)&&v.ready(p,id)){assign("mine",p);delays.put("mine",now()+400);return true;}
         }
         return false;
     }
     boolean farmExpand(BotHandle b){
+        if(!v.state.land.fields.isEmpty())return ManagedLand.work(this);
         if(v.index.soil.size()>=Math.min(64,16+v.state.residents.size()*4)||seed(b)==null||Supplies.find(b,s->s.is(ItemTags.HOES)&&Supplies.usable(s))<0||!ready("hoe"))return false;
         BlockPos center=b.entity().blockPosition();
         for(BlockPos mutable:BlockPos.betweenClosed(center.offset(-5,-1,-5),center.offset(5,1,5))){BlockPos p=mutable.immutable();
-            if(v.ready(p,id)&&VillageIndex.surfaceFarmSite(v.level,p)&&v.level.getBlockState(p).isAir()&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))&&watered(p.below())&&v.safeFeet(p)){
+            if(v.state.policy.allows("farm",p)&&v.ready(p,id)&&VillageIndex.surfaceFarmSite(v.level,p)&&v.level.getBlockState(p).isAir()&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))&&watered(p.below())&&v.safeFeet(p)){
                 assign("hoe",p);delays.put("hoe",now()+200);return true;}}
-        BlockPos bank=nearest(v.index.farmSites,p->VillageIndex.surfaceFarmSite(v.level,p)&&Construction.clear(v.level.getBlockState(p))&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))
+        BlockPos bank=nearest(v.index.farmSites,p->v.state.policy.allows("farm",p)&&VillageIndex.surfaceFarmSite(v.level,p)&&Construction.clear(v.level.getBlockState(p))&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))
                 &&watered(p.below())&&v.safeFeet(p)&&!v.town.protects(p.below()));
         if(bank!=null){assign("hoe",bank);delays.put("hoe",now()+100);return true;}
         for(BlockPos mutable:BlockPos.betweenClosed(center.offset(-6,-1,-6),center.offset(6,1,6))){BlockPos p=mutable.immutable();
-            if(v.ready(p,id)&&VillageIndex.surfaceFarmSite(v.level,p)&&Construction.clear(v.level.getBlockState(p))&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))
+            if(v.state.policy.allows("farm",p)&&v.ready(p,id)&&VillageIndex.surfaceFarmSite(v.level,p)&&Construction.clear(v.level.getBlockState(p))&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))
                     &&v.safeFeet(p)&&!v.town.protects(p.below())&&v.index.beds.stream().noneMatch(bed->bed.distSqr(p)<9)){
                 assign("hoe",p);delays.put("hoe",now()+100);return true;
             }
@@ -630,7 +908,7 @@ final class Resident {
     private boolean plantTree(BotHandle b){
         if(!ready("sapling")||Supplies.find(b,s->s.is(ItemTags.SAPLINGS))<0)return false;
         for(long position:List.copyOf(v.state.reforestation)){
-            BlockPos p=BlockPos.of(position);if(!v.ready(p,id)||!Construction.clear(v.level.getBlockState(p)))continue;
+            BlockPos p=BlockPos.of(position);if(!v.state.policy.allows("wood",p)||!v.ready(p,id)||!Construction.clear(v.level.getBlockState(p)))continue;
             int slot=Supplies.find(b,s->s.is(ItemTags.SAPLINGS));var stack=b.inventory().snapshot().slots().get(slot);
             if(stack.getItem() instanceof BlockItem item&&item.getBlock().defaultBlockState().canSurvive(v.level,p)){
                 build=new Construction.Step(p,item.getBlock().defaultBlockState(),item);assign("build",p);delays.put("sapling",now()+200);return true;
@@ -642,7 +920,7 @@ final class Resident {
             int x=v.state.x+(int)(Math.cos(rad)*(v.state.radius-8)),z=v.state.z+(int)(Math.sin(rad)*(v.state.radius-8));
             int y=v.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x,z);
             BlockPos p=new BlockPos(x,y,z);
-            if(v.ready(p,id)&&v.safeFeet(p)&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))&&p.distSqr(v.state.center())>100){
+            if(v.state.policy.allows("wood",p)&&v.ready(p,id)&&v.safeFeet(p)&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))&&p.distSqr(v.state.center())>100){
                 int slot=Supplies.find(b,s->s.is(ItemTags.SAPLINGS));ItemStack stack=b.inventory().snapshot().slots().get(slot);
                 if(stack.getItem()instanceof BlockItem item&&item.getBlock()instanceof SaplingBlock){build=new Construction.Step(p,item.getBlock().defaultBlockState(),item);assign("build",p);delays.put("sapling",now()+600);return true;}
             }
@@ -655,11 +933,13 @@ final class Resident {
             Construction.place(v,b,new Construction.Step(p,item.getBlock().defaultBlockState(),item));
     }
     private boolean infrastructure(BotHandle b,boolean steward){
-        for(Item item:new Item[]{Items.CRAFTING_TABLE}){
+        for(Item item:new Item[]{Items.CRAFTING_TABLE,Items.FURNACE}){
             if(b.inventory().count(item)==0)continue;
-            if(!needsWorkbench)continue;
-            BlockPos shared=nearest(v.index.tables,p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)&&p.distSqr(b.entity().blockPosition())<32*32);
-            if(shared!=null){if(!VillageWorkshop.nearTable(b,v,shared)&&ready("table")){assign("table",shared);return job!=null;}continue;}
+            if(item==Items.CRAFTING_TABLE){
+                if(!needsWorkbench)continue;
+                BlockPos shared=nearest(v.index.tables,p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)&&p.distSqr(b.entity().blockPosition())<32*32);
+                if(shared!=null){if(!VillageWorkshop.nearTable(b,v,shared)&&ready("table")){assign("table",shared);return job!=null;}continue;}
+            }else if(!steward)continue;
             boolean needed=item==Items.CRAFTING_TABLE?!v.index.tables.stream().anyMatch(p->VillageWorkshop.nearTable(b,v,p)):item==Items.CHEST?v.needsChest():v.state.furnaces.isEmpty();
             if(!needed)continue;
             for(int r=2;r<=6;r++)for(Direction d:Direction.Plane.HORIZONTAL){
@@ -691,43 +971,64 @@ final class Resident {
         var bag=b.inventory().snapshot().slots();
         var extras=bag.stream().filter(s->depositAmount(b,s,steward)>0).toList();
         ChestBlockEntity chest=chests.stream().filter(c->{var contents=Supplies.copy(c);
-            return contents.stream().anyMatch(s->needed(b,s,steward))||extras.stream().anyMatch(s->Supplies.insert(Supplies.copy(contents),s.copyWithCount(1)));
+            return contents.stream().anyMatch(s->unreservedWithdrawal(b,c,s,steward)>0)
+                    ||v.state.orders.stream().anyMatch(o->o.open()&&!o.returnCargo()&&id.toString().equals(o.recipient)
+                        &&o.kind()!=null&&v.claimableFromChests(o)>0&&Supplies.count(contents,o.kind().accepts)>0)
+                    ||extras.stream().anyMatch(s->ManagedLand.acceptsDeposit(v,c.getBlockPos().asLong(),s)&&Supplies.insert(Supplies.copy(contents),s.copyWithCount(1)));
         }).min(Comparator.comparingDouble(c->{double dy=c.getBlockPos().getY()-b.entity().getY();
-            return b.entity().position().distanceToSqr(Vec3.atCenterOf(c.getBlockPos()))+15*dy*dy;})).orElse(null);
+            return b.entity().position().distanceToSqr(Vec3.atCenterOf(c.getBlockPos()))+15*dy*dy
+                    -(extras.stream().anyMatch(stack->ManagedLand.acceptsDeposit(v,c.getBlockPos().asLong(),stack))
+                        &&(ManagedLand.seedChest(v,c.getBlockPos().asLong())||!ProductionBuildings.storagePurpose(v,c.getBlockPos().asLong()).equals("shared"))?256:0);})).orElse(null);
         if(chest==null)return false;
         if(b.entity().position().distanceToSqr(Vec3.atCenterOf(chest.getBlockPos()))>12||!lineOfSight(b,chest.getBlockPos())){assign("storage",chest.getBlockPos());return true;}
         boolean changed=storage(b,steward);delays.put("storage",now()+100);return changed;
     }
     private int reserve(ItemStack s,boolean steward){
+        int base=baseReserve(s,steward);if(base==Integer.MAX_VALUE)return base;
+        // Inputs already allocated to this resident's projects are not another
+        // worker's surplus, even after their immediate delivery is complete.
+        int ordered=v.state.orders.stream().filter(o->!o.returnCargo()&&id.toString().equals(o.recipient)
+                &&o.kind()!=null&&o.kind().accepts.test(s)).mapToInt(o->o.quantity).sum();
+        return Math.max(base,ordered);
+    }
+    private int baseReserve(ItemStack s,boolean steward){
         if(Supplies.tool(s)||s.has(DataComponents.EQUIPPABLE))return Integer.MAX_VALUE;
         if(v.expeditions.owns(id)&&"unload".equals(v.state.expedition.phase)&&!Supplies.food(s)){
             if(s.is(ItemTags.PLANKS))return 8;
             if(s.is(Items.STICK))return 4;
             return 0;
         }
-        if(v.builder(id)&&v.town.needs(this,s))return s.is(ItemTags.PLANKS)?BUILDING_TIMBER:16;
+        if(v.builder(id)&&v.town.needs(this,s))return s.is(ItemTags.PLANKS)?(v.hasRole(id,ResidentRoles.Role.BUILDER)?BUILDING_TIMBER:16):16;
+        int ingredient=TownCrafting.ingredientReserve(this,s);if(ingredient>0)return ingredient;
         if(s.is(ItemTags.BEDS))return steward?2:0;
         if(s.is(ItemTags.WOODEN_DOORS)||s.is(ItemTags.WOODEN_STAIRS))return steward?1:0;
         if(s.is(Items.TORCH))return steward?8:0;
         if(s.is(Items.CHEST))return steward&&v.needsChest()?1:0;
         if(s.is(Items.CRAFTING_TABLE))return 1;
         if(s.is(Items.FURNACE))return steward&&v.state.furnaces.isEmpty()?1:0;
-        if(s.is(ItemTags.LOGS_THAT_BURN))return v.builder(id)?BUILDING_TIMBER/4:needsBasicTools()?4:1;
-        if(s.is(ItemTags.PLANKS))return v.builder(id)?BUILDING_TIMBER:needsBasicTools()?16:8;
+        if(v.expeditions.preparingMine(id)&&s.is(ItemTags.PLANKS))return 16;
+        if(v.expeditions.preparingMine(id)&&s.is(Items.COBBLESTONE))return 6;
+        if(s.is(ItemTags.LOGS_THAT_BURN))return v.hasRole(id,ResidentRoles.Role.BUILDER)?BUILDING_TIMBER/4:needsBasicTools()?4:1;
+        if(s.is(ItemTags.PLANKS))return v.hasRole(id,ResidentRoles.Role.BUILDER)?BUILDING_TIMBER:needsBasicTools()||steward?16:8;
         if(s.is(Items.STICK))return 8;
         if(s.is(Items.COBBLESTONE))return steward?8:((!v.builder(id)||v.workers.size()<3)&&bNeedsStonePick()?3:0)
-                +((v.roleIndex(id)%6==5||v.workers.size()<3)&&!VillageWorkshop.hasDefensiveSword(bot())?2:0);
+                +((v.guard(id))&&!VillageWorkshop.hasDefensiveSword(bot())?2:0);
         if(s.is(Items.IRON_INGOT)){
+            var need=IronSupply.next(v);if(need!=null)return need.recipient()==this?need.ingots():0;
             if(steward&&Supplies.find(bot(),st->st.is(Items.SHEARS)&&Supplies.usable(st))<0)return 2;
-            if((v.roleIndex(id)%6==4||v.workers.size()<3)&&!VillageWorkshop.hasPickFor(bot(),Blocks.DIAMOND_ORE.defaultBlockState()))return 3;
-            return v.roleIndex(id)%6==5||v.workers.size()<3?8:0;
+            if((v.miner(id))&&!VillageWorkshop.hasPickFor(bot(),Blocks.DIAMOND_ORE.defaultBlockState()))return 3;
+            return v.guard(id)?8:0;
         }
         if(s.is(Items.SAND))return steward?16:0;
         if(s.is(Items.GLASS))return v.builder(id)?16:0;
         if(s.is(Items.STONE))return v.builder(id)?32:0;
-        if(s.is(Items.WHEAT_SEEDS)||s.is(Items.BEETROOT_SEEDS))return 8;
+        if(s.is(Items.BUCKET)||s.is(Items.WATER_BUCKET))return v.farmer(id)?1:0;
+        if(s.is(Items.WHEAT_SEEDS)||s.is(Items.BEETROOT_SEEDS))return v.farmer(id)?8:0;
+        if(s.is(Items.WHEAT)&&v.farm.wheatReserve(this)>0)return v.farm.wheatReserve(this);
+        if(s.is(ItemTags.WOOL)&&this==v.farm.caretaker()&&v.state.orders.stream().anyMatch(o->o.purpose.equals("bed_wool")&&!o.recipient.equals(id.toString())))return 0;
         if(s.is(ItemTags.WOOL)&&v.builder(id)&&v.town.wantedPlans(this).stream().anyMatch(p->p.block().getBlock() instanceof BedBlock))return 6;
-        if(Supplies.food(s))return body().hasExcessFood()?((v.roleIndex(id)%6==2||v.workers.size()<3)&&(s.is(Items.CARROT)||s.is(Items.POTATO))?4:0):s.is(Items.BREAD)?3:12;
+        if(v.farmer(id)&&(s.is(Items.CARROT)||s.is(Items.POTATO)))return 8;
+        if(Supplies.food(s))return body().hasExcessFood()?((v.farmer(id))&&(s.is(Items.CARROT)||s.is(Items.POTATO))?4:0):s.is(Items.BREAD)?3:12;
         if(s.is(ItemTags.SAPLINGS))return 2;
         if(steward&&(s.is(Items.WHEAT)||s.is(ItemTags.WOOL)||s.is(Items.RAW_IRON)||s.is(Items.COAL)||s.is(Items.CHARCOAL)))return 32;
         if(s.getItem() instanceof BlockItem && !s.is(ItemTags.LOGS) && !s.is(ItemTags.PLANKS))return 0;
@@ -735,10 +1036,15 @@ final class Resident {
     }
     private int depositAmount(BotHandle b,ItemStack s,boolean steward){
         if(s.isEmpty())return 0;
+        if(s.is(Items.SHEARS)){
+            var bag=b.inventory().snapshot().slots();int total=Supplies.count(bag,t->ItemStack.isSameItemSameComponents(t,s));
+            for(int slot:keptShears())if(ItemStack.isSameItemSameComponents(bag.get(slot),s))total-=bag.get(slot).getCount();
+            return Math.max(0,total);
+        }
         return Math.max(0,Supplies.count(b.inventory().snapshot().slots(),st->st.is(s.getItem()))-reserve(s,steward));
     }
     private boolean bNeedsStonePick(){return !VillageWorkshop.hasPickFor(bot(),Blocks.IRON_ORE.defaultBlockState())
-            ||(v.roleIndex(id)%6==4||v.workers.size()<3)&&VillageWorkshop.needsIronSurvey(v)&&!VillageWorkshop.hasSurveyPick(bot())&&v.count(s->s.is(Items.COBBLESTONE))>=6;}
+            ||(v.miner(id))&&VillageWorkshop.needsIronSurvey(v)&&!VillageWorkshop.hasSurveyPick(bot())&&v.count(s->s.is(Items.COBBLESTONE))>=6;}
     private boolean needsBasicTools(){return Supplies.find(bot(),s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))<0
             ||Supplies.find(bot(),s->s.is(ItemTags.AXES)&&Supplies.usable(s))<0;}
     boolean hasSurplus(){var b=bot();return b.inventory().snapshot().slots().stream().anyMatch(s->depositAmount(b,s,v.steward(id))>0);}
@@ -760,33 +1066,43 @@ final class Resident {
         return Math.max(0,wanted-b.inventory().count(s.getItem()));
     }
     private boolean needed(BotHandle b,ItemStack s,boolean steward){return shortage(b,s,steward)>0;}
+    private int unreservedWithdrawal(BotHandle b,ChestBlockEntity chest,ItemStack stack,boolean steward){
+        int need=ManagedLand.withdrawLimit(this,chest.getBlockPos().asLong(),stack,shortage(b,stack,steward));
+        for(var material:Orders.Material.values())if(material.accepts.test(stack))need=Math.min(need,v.ledger(material).free());
+        return need;
+    }
     private boolean storage(BotHandle b,boolean steward){
         boolean changed=false;
         for(ChestBlockEntity chest:v.chests()){
             if(b.entity().position().distanceToSqr(Vec3.atCenterOf(chest.getBlockPos()))>16||!lineOfSight(b,chest.getBlockPos()))continue;
             boolean used=false;
             for(ItemStack stack:b.inventory().snapshot().slots()){
-                int extra=depositAmount(b,stack,steward);
-                if(extra>0){int amount=Supplies.transfer(b,chest,true,s->s.is(stack.getItem()),extra);used|=amount>0;if(amount>0){v.state.deposits.merge(id,(long)amount,Long::sum);if(mineral(stack))v.state.mineralDeposits.merge(id,(long)amount,Long::sum);}}
+                int extra=ManagedLand.depositLimit(v,chest.getBlockPos().asLong(),stack,depositAmount(b,stack,steward));
+                if(extra>0&&ManagedLand.acceptsDeposit(v,chest.getBlockPos().asLong(),stack)){int amount=Supplies.transfer(b,chest,true,s->stack.is(Items.SHEARS)?ItemStack.isSameItemSameComponents(s,stack):s.is(stack.getItem()),extra);used|=amount>0;if(amount>0){v.state.deposits.merge(id,(long)amount,Long::sum);if(mineral(stack))v.state.mineralDeposits.merge(id,(long)amount,Long::sum);}}
+            }
+            for(var order:v.state.orders)if(order.open()&&!order.returnCargo()&&id.toString().equals(order.recipient)&&order.kind()!=null){
+                int moved=Supplies.transfer(b,chest,false,order.kind().accepts,v.claimableFromChests(order));
+                order.delivered+=moved;used|=moved>0;
             }
             for(ItemStack stack:Supplies.copy(chest)){
-                int need=shortage(b,stack,steward);
+                int need=unreservedWithdrawal(b,chest,stack,steward);
                 if(need>0)used|=Supplies.transfer(b,chest,false,s->s.is(stack.getItem()),Math.min(need,stack.getCount()))>0;
             }
             if(used)v.presentation.chest(chest);changed|=used;
         }return changed;
     }
     private boolean shear(BotHandle b){
-        int slot=Supplies.find(b,s->s.is(Items.SHEARS)&&Supplies.usable(s));if(slot<0||v.count(s->s.is(ItemTags.WOOL))>=12||!ready("shear"))return false;
+        int slot=Supplies.find(b,s->s.is(Items.SHEARS)&&Supplies.usable(s));if(slot<0||!v.farm.wantsWool()||!ready("shear"))return false;
         if(shearNearby(b))return true;
-        Sheep sheep=v.level.getEntitiesOfClass(Sheep.class,b.entity().getBoundingBox().inflate(v.state.radius),s->s.readyForShearing()&&!s.hasCustomName()&&!s.isLeashed()&&v.ready(s.blockPosition(),id))
+        Sheep sheep=v.level.getEntitiesOfClass(Sheep.class,b.entity().getBoundingBox().inflate(v.state.radius),s->s.readyForShearing()&&!s.hasCustomName()&&!s.isLeashed()&&(v.farm.state().flock.isEmpty()||v.farm.owns(s))&&v.ready(s.blockPosition(),id))
                 .stream().min(Comparator.comparingDouble(b.entity()::distanceToSqr)).orElse(null);
         if(sheep!=null){assign("shear",sheep.blockPosition());delays.put("shear",now()+200);return true;}
         delays.put("shear",now()+400);return false;
     }
     private boolean shearNearby(BotHandle b){
+        if(!v.farm.wantsWool())return false;
         int slot=Supplies.find(b,s->s.is(Items.SHEARS)&&Supplies.usable(s));if(slot<0)return false;
-        for(Sheep sheep:v.level.getEntitiesOfClass(Sheep.class,b.entity().getBoundingBox().inflate(3),s->s.readyForShearing()&&!s.hasCustomName()&&!s.isLeashed())){
+        for(Sheep sheep:v.level.getEntitiesOfClass(Sheep.class,b.entity().getBoundingBox().inflate(3),s->s.readyForShearing()&&!s.hasCustomName()&&!s.isLeashed()&&(v.farm.state().flock.isEmpty()||v.farm.owns(s)))){
             if(!v.canWork(sheep.blockPosition())||!b.entity().hasLineOfSight(sheep))continue;
             b.inventory().select(slot);sheep.shear(v.level,net.minecraft.sounds.SoundSource.NEUTRAL,b.entity().getMainHandItem());
             if("shear".equals(job))target=sheep.blockPosition();
@@ -813,15 +1129,59 @@ final class Resident {
                 &&v.level.getEntitiesOfClass(Villager.class,new AABB(q).move(0,1,0).inflate(.05),Entity::isAlive).isEmpty());
         if(p==null)return false;assign("scaffold",p);status="разбирает подмости, возвращает материалы";return true;
     }
+    static final double SHELTER_CORRIDOR=4.0;
+    static boolean approachExposed(Vec3 from,Vec3 to,Vec3 enemy){
+        double dx=to.x-from.x,dz=to.z-from.z,lengthSquared=dx*dx+dz*dz;
+        if(lengthSquared<=0)return false;
+        double along=(enemy.x-from.x)*dx+(enemy.z-from.z)*dz;
+        if(along<=0||along>=lengthSquared)return false;
+        double perpendicular=(enemy.x-from.x)*dz-(enemy.z-from.z)*dx;
+        return perpendicular*perpendicular<=SHELTER_CORRIDOR*SHELTER_CORRIDOR*lengthSquared;
+    }
+    static boolean standExposed(Vec3 from,BlockPos stand,Vec3 enemy){
+        Vec3 point=Vec3.atBottomCenterOf(stand);
+        return point.distanceToSqr(enemy)<from.distanceToSqr(enemy)||approachExposed(from,point,enemy);
+    }
+    static List<BlockPos> orderedShelters(Vec3 from,Vec3 enemy,List<BlockPos> beds,Predicate<BlockPos> knownIntact){
+        Comparator<BlockPos> order=Comparator.comparingDouble(bed->{
+            double dx=bed.getX()-from.x,dy=bed.getY()-from.y,dz=bed.getZ()-from.z;
+            return dx*dx+dz*dz+15*dy*dy;
+        });
+        return beds.stream().filter(bed->{
+            double dx=bed.getX()-enemy.x,dy=bed.getY()-enemy.y,dz=bed.getZ()-enemy.z;
+            return dx*dx+dy*dy+dz*dz>16;
+        }).filter(knownIntact).sorted(order).toList();
+    }
+    record Retreat(BlockPos bed,BlockPos stand){ }
+    static Retreat shelteredStand(Vec3 from,Vec3 enemy,List<BlockPos> beds,Predicate<BlockPos> knownIntact,Function<BlockPos,BlockPos> standFor){
+        for(BlockPos bed:orderedShelters(from,enemy,beds,knownIntact)){
+            BlockPos stand=standFor.apply(bed);
+            if(stand==null||Vec3.atBottomCenterOf(stand).distanceToSqr(from)<9||standExposed(from,stand,enemy))continue;
+            return new Retreat(bed,stand);
+        }
+        return null;
+    }
+    private BlockPos safeStandNear(Vec3 from,BlockPos desired,Vec3 enemy,double reach,boolean sight){
+        BlockPos stand=v.stand(desired,from,reach,sight);
+        return stand!=null&&!standExposed(from,stand,enemy)?stand:null;
+    }
     private boolean danger(BotHandle b){
         var e=b.entity();
         Monster enemy=v.level.getEntitiesOfClass(Monster.class,e.getBoundingBox().inflate(12),m->m.isAlive()&&threat(m)&&v.canWork(m.blockPosition())&&e.hasLineOfSight(m))
                 .stream().min(Comparator.comparingDouble(e::distanceToSqr)).orElse(null);
-        if(enemy==null){fleeing=false;return false;}
+        if(enemy==null){
+            boolean shelterValid=shelter==null||v.town.knownShelter(shelter);
+            if(fleeing&&navigation!=null&&!navigation.completion().isDone()&&now()-since<400&&shelterValid)return true;
+            if(fleeing&&shelter!=null&&!shelterValid){cancel();return false;}
+            fleeing=false;return false;
+        }
+        Vec3 enemyAt=enemy.position();
+        boolean standThreatened=target!=null&&standExposed(e.position(),target,enemyAt);
         if(combat!=null&&!combat.completion().isDone())return true;
-        // A path capture may take longer than the threat scan interval. Keep an existing retreat
-        // alive instead of cancelling it every ten ticks while the attacker continues to move.
-        if(fleeing&&navigation!=null&&!navigation.completion().isDone()&&now()-since<400&&e.distanceToSqr(enemy)>9)return true;
+        boolean shelterValid=fleeing&&shelter!=null&&v.town.knownShelter(shelter);
+        if(fleeing&&navigation!=null&&!navigation.completion().isDone()&&now()-since<400&&e.distanceToSqr(enemy)>9
+                &&(shelter==null||shelterValid)&&!standThreatened)return true;
+        if(shelterValid&&navigation==null&&target!=null&&e.blockPosition().distSqr(target)<9&&!standThreatened)return true;
         boolean trapped=fleeing&&navigation!=null&&navigation.completion().isDone()&&navigation.status()!=NavigationStatus.SUCCESS;
         if(!(enemy instanceof Creeper))v.raiseAlarm(this,enemy);
         cancel();
@@ -829,14 +1189,20 @@ final class Resident {
         if(!(enemy instanceof Creeper)&&(e.getHealth()>=16&&equipped||trapped)&&Supplies.find(b,s->s.is(ItemTags.SWORDS)&&Supplies.usable(s))>=0){
             defend(enemy);return true;
         }
-        BlockPos home=v.index.beds.stream().filter(p->p.distSqr(enemy.blockPosition())>16)
-                .min(Comparator.comparingDouble(p->{double dy=p.getY()-e.getY();return p.distSqr(e.blockPosition())+15*dy*dy;})).orElse(null);
-        BlockPos stand=home==null?null:v.stand(home,e.position(),2.5,false);
-        if(stand!=null&&(stand.distSqr(e.blockPosition())<9||stand.distSqr(enemy.blockPosition())<e.blockPosition().distSqr(enemy.blockPosition())))stand=null;
-        Vec3 away=e.position().subtract(enemy.position()).normalize().scale(8).add(e.position());
-        BlockPos goal=BlockPos.containing(away);if(stand==null)stand=v.stand(goal,e.position());
-        if(stand==null)stand=v.stand(v.state.center(),e.position());
-        if(stand!=null){navigation=b.navigator().goTo(new NavigationGoal.PositionGoal(Vec3.atBottomCenterOf(stand),.7),TRAVEL);job="home";target=stand;since=now();fleeing=true;}
+        Retreat retreat=shelteredStand(e.position(),enemyAt,v.index.beds,bed->v.town.knownShelter(bed),bed->v.stand(bed,e.position(),2.5,true));
+        BlockPos refuge=retreat==null?null:retreat.bed();
+        BlockPos stand=retreat==null?null:retreat.stand();
+        if(stand==null){
+            Vec3 offset=e.position().subtract(enemyAt);
+            double length=Math.hypot(offset.x,offset.z);
+            Vec3 direction=length<=1e-4?new Vec3(1,0,0):new Vec3(offset.x/length,0,offset.z/length);
+            for(double distance:new double[]{8,12,16}){
+                stand=safeStandNear(e.position(),BlockPos.containing(e.position().add(direction.scale(distance))),enemyAt,3.0,true);
+                if(stand!=null)break;
+            }
+        }
+        if(stand==null)stand=safeStandNear(e.position(),v.state.center(),enemyAt,3.0,true);
+        if(stand!=null){navigation=b.navigator().goTo(new NavigationGoal.PositionGoal(Vec3.atBottomCenterOf(stand),.7),TRAVEL);job="home";target=stand;shelter=refuge;since=now();fleeing=true;}
         status="укрывается от угрозы";return true;
     }
     private boolean threat(Monster m){
@@ -845,7 +1211,8 @@ final class Resident {
                 ||m instanceof Creeper creeper&&creeper.getSwellDir()>0;
     }
     void secureDoors(BotHandle b){
-        if(!nightRestWindow()||combat!=null)return;
+        boolean emergencyRetreat=fleeing&&"home".equals(job);
+        if(!(nightRestWindow()||emergencyRetreat)||combat!=null)return;
         boolean walking=navigation!=null&&!navigation.completion().isDone();
         // Native Brain can finish the last few steps to a bed after our navigation releases.
         // Even five ticks can miss the short interval between crossing and native sleep.
@@ -873,10 +1240,10 @@ final class Resident {
     void defend(Monster enemy){
         cancel();combat=bot().combat().fight(enemy,new CombatPolicy(CombatSkill.EXPERT,16,3,24,false,true,false).swordOnly());since=now();status="защищает деревню";
     }
-    void finish(){v.reservations.release(id);treeBase=null;job=null;target=null;navigation=null;mining=null;excavation=null;build=null;townPlan=null;collectingUntil=0;clearingLeaves=false;fleeing=false;supplyRecipient=null;}
-    void cancel(){BotHandle b=bot();if(b!=null&&b.state()==BotState.ACTIVE)b.stopAll();v.reservations.release(id);combat=null;finish();}
+    void finish(){if("herd".equals(job)){v.farm.state().leading=null;v.farm.gate(false);}if(deliverOrder!=null&&id.toString().equals(deliverOrder.carrier))Orders.release(deliverOrder);v.reservations.release(id);treeBase=null;job=null;target=null;shelter=null;navigation=null;mining=null;excavation=null;build=null;townPlan=null;collectingUntil=0;clearingLeaves=false;fleeing=false;supplyRecipient=null;deliverRecipient=null;deliverOrder=null;haulDonor=null;deliveryKit=-1;}
+    void cancel(){workWait.reset();BotHandle b=bot();if(b!=null&&b.state()==BotState.ACTIVE)b.stopAll();v.reservations.release(id);combat=null;finish();}
     void fail(String reason){
-        BlockPos destination=lastApproach!=null?lastApproach:target;boolean recovery=!"escape".equals(job)&&(reason.startsWith("маршрут")||reason.startsWith("цель недоступна"));
+        BlockPos destination=lastApproach!=null?lastApproach:target;boolean recovery=!"escape".equals(job)&&(reason.startsWith("маршрут")||reason.startsWith("цель недоступна")||reason.startsWith("нет безопасного подхода"));
         boolean nightHome="home".equals(job)&&nightRestWindow();
         if(nightHome){
             if(target!=null&&v.level.getBlockState(target).getBlock() instanceof BedBlock)homeRetries.put(target.asLong(),now()+200);
@@ -886,11 +1253,17 @@ final class Resident {
         }
         if(job!=null)AutonomousVillagesMod.LOG.info("WORK_INTERRUPTED village={} worker={} job={} target={} cause={}",v.state.name,id,job,target,reason);
         lastFailure=reason;
+        if(recovery)Infrastructure.stuck(v,destination);
         if(target!=null&&exclusiveJob(job))v.rejected.put(target.asLong(),now()+600);
         if(treeBase!=null)v.rejected.put(treeBase.asLong(),now()+1200);
         if(job!=null)delays.put(job,now()+(job.equals("storage")?400:100));
         cancel();if(nightHome)delays.put("home",now()+10);cooldown=now()+10;status=reason;
         if(recovery)TerrainRecovery.start(this,destination);
     }
-    static boolean exclusiveJob(String kind){return kind!=null&&!Set.of("home","native_work","storage","table","air","escape","farm_watch","supply","pickup").contains(kind);}
+    static String activity(String kind){
+        if(kind==null)return "none";
+        return switch(kind){case "wood"->"wood";case "harvest","plant","hoe","seeds","dig_irrigation","fill_bucket","irrigate"->"farm";case "build","renovate","grade"->"build";case "stone","ore","sand","mine"->"mine";default->"none";};
+    }
+    static String miningActivity(String kind){var a=activity(kind);return a.equals("none")?"mine":a;}
+    static boolean exclusiveJob(String kind){return kind!=null&&!Set.of("home","native_work","storage","table","air","escape","farm_watch","supply","pickup","deliver","collect_order","delivery_return","guard").contains(kind);}
 }

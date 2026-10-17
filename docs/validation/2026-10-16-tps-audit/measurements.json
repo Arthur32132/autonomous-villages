@@ -1,0 +1,145 @@
+{
+  "date": "2026-10-16",
+  "machineCpu": "Intel Core i5-14600KF",
+  "reportedLogicalProcessors": 20,
+  "scene": "Minecraft Java 26.2; Fabric 0.19.5; original normal client mod set copied into disposable profile; Normal difficulty; seed 8675309; creative observer; six native villagers; daylight/weather running",
+  "scope": "short throughput measurements, not full autonomy or 40-vs-400 behavioural equivalence",
+  "runs": [
+    {
+      "run": "20261016-162410-339624",
+      "success": false,
+      "reason": "resident_lost_during_live_observation",
+      "ticks": 39108,
+      "sourcesUnchanged": true,
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "1a83eefe6e9435eb42bbcea3f6a1129db86114d96285390d68857b0454202214",
+        "navigation-ai-0.2.1.jar": "19f9211b6e80af3947792069f621868283bd440bcf778b6f7f382a9315a1f615"
+      },
+      "samples": [
+        {
+          "phase": "rate",
+          "targetTps": 40,
+          "actualTps": 39.99533857075205,
+          "oneSecondP10Tps": 39.81900030612071,
+          "elapsedSeconds": 20.0273339,
+          "meanTickMs": 2.9840363295880152,
+          "p95TickMs": 4.1761,
+          "colonyTicks": 2122,
+          "residents": 6
+        },
+        {
+          "phase": "rate",
+          "targetTps": 100,
+          "actualTps": 100.01102670300409,
+          "oneSecondP10Tps": 99.83503496054885,
+          "elapsedSeconds": 20.0077938,
+          "meanTickMs": 2.0105373858070963,
+          "p95TickMs": 2.97,
+          "colonyTicks": 4422,
+          "residents": 6
+        },
+        {
+          "phase": "rate",
+          "targetTps": 200,
+          "actualTps": 199.9876417636772,
+          "oneSecondP10Tps": 199.65551437549652,
+          "elapsedSeconds": 20.0012359,
+          "meanTickMs": 2.118284725,
+          "p95TickMs": 3.9445,
+          "colonyTicks": 9021,
+          "residents": 6
+        },
+        {
+          "phase": "rate",
+          "targetTps": 400,
+          "actualTps": 399.8989622621929,
+          "oneSecondP10Tps": 396.6909199641184,
+          "elapsedSeconds": 20.0000519,
+          "meanTickMs": 1.3838472073018255,
+          "p95TickMs": 2.1862,
+          "colonyTicks": 18219,
+          "residents": 6
+        },
+        {
+          "phase": "rate",
+          "targetTps": 800,
+          "actualTps": 569.4209424493068,
+          "oneSecondP10Tps": 381.36605520643036,
+          "elapsedSeconds": 20.0010206,
+          "meanTickMs": 1.503783634647467,
+          "p95TickMs": 3.2303,
+          "colonyTicks": 32008,
+          "residents": 6
+        }
+      ]
+    },
+    {
+      "run": "20261016-163350-509861",
+      "success": true,
+      "reason": "tick_speed_benchmark_completed",
+      "ticks": 20359,
+      "sourcesUnchanged": true,
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "1a83eefe6e9435eb42bbcea3f6a1129db86114d96285390d68857b0454202214",
+        "navigation-ai-0.2.1.jar": "19f9211b6e80af3947792069f621868283bd440bcf778b6f7f382a9315a1f615"
+      },
+      "samples": [
+        {
+          "phase": "rate",
+          "targetTps": 4000,
+          "actualTps": 126.79325586672044,
+          "oneSecondP10Tps": 19.648000863587427,
+          "elapsedSeconds": 10.0005319,
+          "meanTickMs": 2.593797949526814,
+          "p95TickMs": 4.4399,
+          "colonyTicks": 3452,
+          "residents": 6
+        },
+        {
+          "phase": "sprint",
+          "targetTps": "unlimited",
+          "actualTps": 441.33113910236585,
+          "oneSecondP10Tps": 223.55858357672776,
+          "elapsedSeconds": 10.0015603,
+          "meanTickMs": 1.9069840826914364,
+          "p95TickMs": 3.8865,
+          "colonyTicks": 8863,
+          "residents": 6
+        },
+        {
+          "phase": "rate",
+          "targetTps": 400,
+          "actualTps": 400.0603900207841,
+          "oneSecondP10Tps": 384.0475237363814,
+          "elapsedSeconds": 10.0009901,
+          "meanTickMs": 1.8761653336665833,
+          "p95TickMs": 3.6283,
+          "colonyTicks": 14066,
+          "residents": 6
+        },
+        {
+          "phase": "baseline_repeat",
+          "targetTps": 40,
+          "actualTps": 39.99869244274405,
+          "oneSecondP10Tps": 39.947668554194,
+          "elapsedSeconds": 10.0003269,
+          "meanTickMs": 1.84328775,
+          "p95TickMs": 2.7445,
+          "colonyTicks": 14587,
+          "residents": 6
+        },
+        {
+          "phase": "confirmation",
+          "targetTps": 175,
+          "actualTps": 174.99449817297744,
+          "oneSecondP10Tps": 174.76155225991016,
+          "elapsedSeconds": 30.0009432,
+          "meanTickMs": 1.6011642285714287,
+          "p95TickMs": 2.1961,
+          "colonyTicks": 20359,
+          "residents": 6
+        }
+      ]
+    }
+  ]
+}

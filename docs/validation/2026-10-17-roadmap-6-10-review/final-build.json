@@ -1,0 +1,13 @@
+{
+  "jars": {
+    "autonomous-villages-0.2.1.jar": "7eca3e67346793ac755fdb7c0ba14f2a51f741321ee78814beee4f8d08891e05",
+    "autonomous-villages-validation-0.2.1.jar": "f8f5a59cc1b3c54c63fc41e846885c05e831edaadfed743e6e31d015a690532e",
+    "autonomous-villages-client-validation-0.2.1.jar": "ddd889981d775d31254b42a1c38c0691a085d7b73527a4f7738e4f573449848a"
+  },
+  "junit": {
+    "tests": 69,
+    "failures": 0,
+    "errors": 0
+  },
+  "note": "Client observer rebuilt after the failed live run; production JAR remains the one tested at 40/400 TPS."
+}

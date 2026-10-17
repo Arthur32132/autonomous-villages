@@ -134,6 +134,7 @@ final class Construction {
     }
     static boolean place(Village v, BotHandle b, Step step) {
         BlockPos p=step.pos();
+        if(!v.state.policy.allows(step.state().getBlock() instanceof SaplingBlock?"wood":"build",p))return false;
         if(step.state().getBlock() instanceof SaplingBlock&&!v.state.plantedTrees.contains(p.asLong())&&v.state.plantedTrees.size()>=512)return false;
         if(step.item()==Items.CRAFTING_TABLE&&!v.town.protects(p)&&v.state.temporaryWorkbenches.size()>=256)return false;
         if(step.item()==Items.CHEST&&v.state.storage.size()>=128&&!v.state.storage.contains(p.asLong()))return false;
@@ -166,7 +167,7 @@ final class Construction {
                     .setMessage(2,net.minecraft.network.chat.Component.literal("Общие припасы"));
             sign.setText(text,true);sign.setChanged();v.level.sendBlockUpdated(p,step.state(),step.state(),3);
         }
-        if (step.state().getBlock() instanceof SaplingBlock) {v.state.plantedTrees.add(p.asLong());v.state.reforestation.remove(p.asLong());}
+        if (step.state().getBlock() instanceof SaplingBlock) {v.state.plantedTrees.add(p.asLong());v.state.reforestation.remove(p.asLong());ManagedLand.planted(v,p);}
         if(step.item()==Items.CHEST || step.item()==Items.FURNACE)v.runtime.save();
         b.entity().swing(net.minecraft.world.InteractionHand.MAIN_HAND);
         var sound=step.state().getSoundType();v.level.playSound(null,p,sound.getPlaceSound(),net.minecraft.sounds.SoundSource.BLOCKS,.7f,1f);

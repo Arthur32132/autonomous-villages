@@ -35,11 +35,36 @@ final class TownPlanner {
     private final Map<Long,Boolean> shelterCache=new HashMap<>();
     TownPlanner(Village v){this.v=v;}
     void invalidate(){requestedTick=-1;materialsTick=-1;protectedCount=-1;shelterTick=-1;}
+    TownBuilding houseFor(BlockPos bed){
+        return v.state.buildings.stream().filter(house->house.blocks.stream().anyMatch(plan->plan.block().getBlock() instanceof BedBlock
+                &&(plan.position().equals(bed)||plan.position().relative(plan.block().getValue(BedBlock.FACING)).equals(bed)))).findFirst().orElse(null);
+    }
+    boolean knownShelter(BlockPos bed){
+        var house=houseFor(bed);
+        if(house==null||!house.completed||house.kind.equals("warehouse")||!usableBed(bed))return false;
+        if(house.blocks.stream().noneMatch(plan->plan.block().getBlock() instanceof DoorBlock&&plan.block().is(BlockTags.WOODEN_DOORS)&&usableDoor(plan)))return false;
+        return shelterIntact(bed);
+    }
+    private boolean usableBed(BlockPos bed){
+        var state=v.level.getBlockState(bed);
+        if(!(state.getBlock() instanceof BedBlock))return false;
+        BlockPos mate=state.getValue(BedBlock.PART)==BedPart.HEAD?bed.relative(state.getValue(BedBlock.FACING).getOpposite()):bed.relative(state.getValue(BedBlock.FACING));
+        var other=v.level.getBlockState(mate);
+        return other.getBlock()==state.getBlock()&&other.getValue(BedBlock.FACING)==state.getValue(BedBlock.FACING)
+                &&other.getValue(BedBlock.PART)!=state.getValue(BedBlock.PART);
+    }
+    private boolean usableDoor(TownBuilding.Plan plan){
+        var lower=v.level.getBlockState(plan.position());
+        if(!(lower.getBlock() instanceof DoorBlock)||!lower.is(BlockTags.WOODEN_DOORS)||lower.getValue(DoorBlock.HALF)!=DoubleBlockHalf.LOWER)return false;
+        var upper=v.level.getBlockState(plan.position().above());
+        if(!(upper.getBlock() instanceof DoorBlock)||!upper.is(BlockTags.WOODEN_DOORS)||upper.getValue(DoorBlock.HALF)!=DoubleBlockHalf.UPPER)return false;
+        return lower.getBlock()==plan.block().getBlock()&&lower.getValue(DoorBlock.FACING)==plan.block().getValue(DoorBlock.FACING)
+                &&upper.getBlock()==plan.block().getBlock()&&upper.getValue(DoorBlock.FACING)==plan.block().getValue(DoorBlock.FACING);
+    }
     boolean shelterIntact(BlockPos bed){
         long tick=v.level.getGameTime()/20;if(shelterTick!=tick){shelterCache.clear();shelterTick=tick;}
         return shelterCache.computeIfAbsent(bed.asLong(),ignored->{
-            var house=v.state.buildings.stream().filter(b->b.blocks.stream().anyMatch(p->p.block().getBlock() instanceof BedBlock
-                    &&(p.position().equals(bed)||p.position().relative(p.block().getValue(BedBlock.FACING)).equals(bed)))).findFirst().orElse(null);
+            var house=houseFor(bed);
             if(house==null)return true;
             for(var plan:house.blocks){
                 BlockPos p=plan.position();var expected=plan.block();var actual=v.level.getBlockState(p);
@@ -53,8 +78,8 @@ final class TownPlanner {
     boolean protects(BlockPos p){
         if(protectedCount>=0&&protectionTick==v.level.getGameTime())return protectedBlocks.contains(p.asLong());
         protectionTick=v.level.getGameTime();
-        int count=v.state.buildings.stream().mapToInt(b->b.blocks.size()).sum();
-        if(count!=protectedCount){protectedBlocks.clear();protectedDoors.clear();constructionBlocks.clear();for(var b:v.state.buildings)for(var s:b.blocks){protectedBlocks.add(s.pos);if(s.block().getBlock() instanceof DoorBlock){protectedDoors.add(s.position());protectedBlocks.add(s.position().above().asLong());}if(s.block().getBlock() instanceof BedBlock)protectedBlocks.add(s.position().relative(s.block().getValue(BedBlock.FACING)).asLong());if(!b.kind.equals("native_house"))constructionBlocks.add(s.pos);}protectedCount=count;}
+        int count=v.state.buildings.stream().mapToInt(b->b.blocks.size()+b.foundation.size()+b.cuts.size()).sum();
+        if(count!=protectedCount){protectedBlocks.clear();protectedDoors.clear();constructionBlocks.clear();for(var b:v.state.buildings){protectedBlocks.addAll(b.cuts);for(var s:java.util.stream.Stream.concat(b.blocks.stream(),b.foundation.stream()).toList()){protectedBlocks.add(s.pos);if(s.block().getBlock() instanceof DoorBlock){protectedDoors.add(s.position());protectedBlocks.add(s.position().above().asLong());}if(s.block().getBlock() instanceof BedBlock)protectedBlocks.add(s.position().relative(s.block().getValue(BedBlock.FACING)).asLong());if(!b.kind.equals("native_house"))constructionBlocks.add(s.pos);}}protectedCount=count;}
         return protectedBlocks.contains(p.asLong());
     }
     Collection<BlockPos> doors(){protects(v.state.center());return protectedDoors;}
@@ -109,7 +134,7 @@ final class TownPlanner {
         if(!house.blocks.isEmpty()){house.completed=true;v.state.buildings.add(house);}
     }
     private void adopt(BlockPos p){
-        if(v.state.storage.size()<128&&v.level.getBlockEntity(p) instanceof ChestBlockEntity c&&!c.isLocked())v.state.storage.add(p.asLong());
+        if(!v.state.policy.privateChests.contains(p.asLong())&&v.state.storage.size()<128&&v.level.getBlockEntity(p) instanceof ChestBlockEntity c&&!c.isLocked())v.state.storage.add(p.asLong());
         if(v.state.furnaces.size()<16&&v.level.getBlockEntity(p) instanceof FurnaceBlockEntity f&&!f.isLocked())v.state.furnaces.add(p.asLong());
         if(v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE))v.index.tables.add(p);
     }
@@ -127,6 +152,7 @@ final class TownPlanner {
             try{var survey=VillageDiscovery.survey(v.level,v.state.center());capture(survey);v.runtime.save();}catch(IllegalArgumentException ignored){}
         }
         if(now<nextPlanning)return;nextPlanning=now+100;
+        syncOrders(now);
         boolean adjusted=!coalesced&&coalesceHouses();
         for(var building:v.state.buildings){
             if(building.kind.equals("native_house"))adjusted|=building.blocks.removeIf(p->!structural(p.block()));
@@ -147,16 +173,23 @@ final class TownPlanner {
         }
         if(adjusted)v.runtime.save();
         for(TownBuilding b:v.state.buildings){
-            int built=b.built(v);if(built==b.blocks.size()&&!b.completed){b.completed=true;v.event("Завершено здание: "+label(b));v.runtime.save();}
+            int built=b.built(v);if(built==b.blocks.size()&&Infrastructure.prepared(v,b)&&!b.completed){b.completed=true;v.event("Завершено здание: "+label(b));v.runtime.save();}
         }
         if(v.state.buildings.size()>=256)return;
         if(v.state.buildings.stream().noneMatch(b->b.kind.equals("warehouse"))){
             BlockPos site=findSite(7,7);
-            if(site!=null){TownBuilding b=warehouse(site);b.validate(v.state);v.state.buildings.add(b);invalidate();v.event("Размечена стройка отдельного склада");v.runtime.save();}
+            if(site!=null){TownBuilding b=warehouse(site);if(Infrastructure.prepare(v,b,7,7)){b.validate(v.state);v.state.buildings.add(b);invalidate();v.event("Размечена стройка отдельного склада");v.runtime.save();}}
             else stage="ищут площадку склада, проверяют проходы";
-            return;
         }
-        if(v.state.buildings.stream().anyMatch(b->b.kind.equals("warehouse")&&!b.completed))return;
+        // A depot is a parallel project, never a prerequisite for sleeping places.
+        int beds=v.index.beds.size();
+        boolean housingNeeded=beds<v.state.residents.size()+(SettlementEconomy.surplus(v)?2:0);
+        if(housingNeeded&&v.state.completedShelters<128&&v.state.buildings.stream().noneMatch(b->b.kind.equals("house")&&!b.completed)){
+            TownBuilding district=housingDistrict();
+            BlockPos site=findSite(5,5,district==null?v.meetingPoint():BlockPos.of(district.origin));
+            if(site!=null){TownBuilding b=new TownBuilding("house",site);b.housingFor=district==null?null:district.origin;foundation(b,site,5,5);for(var s:Construction.shelter(site))b.add(s.pos(),s.state());if(!Infrastructure.prepare(v,b,5,5))return;b.validate(v.state);v.state.buildings.add(b);invalidate();v.state.completedShelters++;syncOrders(now);v.runtime.save();}
+        }
+        if(housingNeeded)return;
         if(v.needsChest()){
             var depot=v.state.buildings.stream().filter(b->b.kind.equals("warehouse")&&b.completed).findFirst().orElse(null);
             if(depot!=null){
@@ -169,21 +202,90 @@ final class TownPlanner {
                 }
             }
         }
-        if(v.state.buildings.stream().filter(b->!b.completed).count()>2)return;
-        int beds=v.index.beds.size();
-        if(beds<v.state.residents.size()+2&&v.state.completedShelters<128&&v.state.buildings.stream().noneMatch(b->b.kind.equals("house")&&!b.completed)){
-            BlockPos site=findSite(5,5);
-            if(site!=null){TownBuilding b=new TownBuilding("house",site);foundation(b,site,5,5);for(var s:Construction.shelter(site))b.add(s.pos(),s.state());b.validate(v.state);v.state.buildings.add(b);invalidate();v.state.completedShelters++;v.runtime.save();}
-        }
+        if(!SettlementEconomy.surplus(v)||v.state.buildings.stream().filter(b->!b.completed).count()>2)return;
         if(v.count(s->s.is(ItemTags.LOGS)||s.is(ItemTags.PLANKS))>=48&&v.count(Supplies::food)>=Math.max(6,v.workers.size()*3)&&now-v.state.lastUpgrade>1200){
             boolean improved=false;
-            for(var house:v.state.buildings.stream().filter(b->!b.kind.equals("warehouse")&&b.tier<2&&b.completed).sorted(Comparator.comparingInt(b->b.tier)).toList())
+            for(var house:v.state.buildings.stream().filter(b->Set.of("house","native_house").contains(b.kind)&&b.tier<2&&b.completed).sorted(Comparator.comparingInt(b->b.tier)).toList())
                 if(improve(house)){v.state.lastUpgrade=now;v.runtime.save();improved=true;break;}
             if(!improved)for(var house:v.state.buildings.stream().filter(b->b.kind.equals("native_house")&&b.tier<2&&b.completed).toList())
                 if(reinforce(house)){house.tier++;house.completed=false;v.state.lastUpgrade=now;v.event("Каменное укрепление жилого дома");v.runtime.save();break;}
         }
     }
-    static String label(TownBuilding b){return b.kind.equals("warehouse")?"склад":b.tier>0?"дом, улучшение "+b.tier:"жилой дом";}
+    /** Derived from architectural intent, so existing saved depots need no migration. */
+    static int warehousePhase(TownBuilding b,TownBuilding.Plan p){
+        BlockPos base=BlockPos.of(b.origin),q=p.position();
+        int x=q.getX()-base.getX(),y=q.getY()-base.getY(),z=q.getZ()-base.getZ();
+        if(p.block().getBlock() instanceof SignBlock||p.block().is(Blocks.CHEST)&&!(x==2&&z==4))return 3;
+        // Paid approach, short walkway, chest, table and a lit working surface.
+        if(y<0||x==3&&y==0&&z>=-1&&z<=4
+                ||y==0&&((x==2||x==4)&&z==4||(x==1||x==2)&&z==2)
+                ||x==2&&y==1&&z==4||x==4&&y==1&&z==4||x==1&&y==1&&z==2)return 0;
+        return y>=3?2:1;
+    }
+    int warehousePhase(TownBuilding b){
+        return b.blocks.stream().filter(p->!p.matches(v)).mapToInt(p->warehousePhase(b,p)).min().orElse(4);
+    }
+    private int priority(TownBuilding b){
+        if(b.completed)return b.kind.equals("warehouse")?5:0;
+        if(b.kind.equals("road"))return 1;
+        if(b.kind.equals("field")||b.kind.equals("sheep_pen"))return 3;
+        if(b.kind.equals("warehouse"))return warehousePhase(b)==0?1:warehousePhase(b)+3;
+        return b.tier==0?2:7;
+    }
+    private List<TownBuilding> workOrder(){
+        var order=new ArrayList<>(v.state.buildings);
+        order.sort(Comparator.comparingInt(this::priority));return order;
+    }
+    private List<TownBuilding.Plan> workPlans(TownBuilding b){
+        if(!b.completed&&!SettlementEconomy.surplus(v)&&(ProductionBuildings.KINDS.contains(b.kind)||b.tier>0))return List.of();
+        if(!Infrastructure.approachReady(v,b))return List.of();
+        if(!Infrastructure.prepared(v,b))return b.foundation.stream().filter(p->v.state.policy.allows("build",p.position())).toList();
+        if(!b.kind.equals("warehouse"))return b.blocks.stream().filter(p->v.state.policy.allows("build",p.position())).toList();
+        int phase=warehousePhase(b);
+        return b.blocks.stream().filter(p->warehousePhase(b,p)==phase&&v.state.policy.allows("build",p.position())).toList();
+    }
+    static String label(TownBuilding b){if(ProductionBuildings.KINDS.contains(b.kind))return ProductionBuildings.label(b.kind);if(b.kind.equals("field"))return "поле";if(b.kind.equals("road"))return "дорога";return b.kind.equals("sheep_pen")?"овечий загон":b.kind.equals("warehouse")?"склад":b.tier>0?"дом, улучшение "+b.tier:"жилой дом";}
+    /**
+     * The builder orders two beds; the planner reveals the wool, planks and the missing tools.
+     * The orders hold only metadata, and a bed that is no longer missing releases its reserve.
+     */
+    void syncOrders(long now){
+        boolean changed=false;
+        for(var order:List.copyOf(v.state.orders)){
+            var material=order.kind();
+            if(material==null){v.state.orders.remove(order);changed=true;continue;}
+            if((order.transit||!order.carrier.isEmpty())&&v.workers.values().stream().noneMatch(r->r.deliverOrder==order)){Orders.release(order);changed=true;}
+        }
+        for(var material:Orders.Material.values())changed|=Orders.recovered(v.state.orders,material,v.chestCount(material),now);
+        var missing=v.state.buildings.stream()
+                .filter(b->b.blocks.stream().anyMatch(p->p.block().getBlock() instanceof BedBlock&&!p.matches(v))).toList();
+        var works=missing.stream().map(b->b.origin).collect(java.util.stream.Collectors.toSet());
+        changed|=v.state.orders.removeIf(o->o.purpose.startsWith("bed_")&&!works.contains(o.work));
+        if(missing.isEmpty()){
+            if(Orders.clear(v.state.orders,"bed_"))changed=true;
+        }else{
+            var keeper=v.farm.caretaker();
+            boolean hasShears=keeper!=null&&Supplies.find(keeper.bot(),s->s.is(Items.SHEARS)&&Supplies.usable(s))>=0;
+            var builder=v.workers.values().stream().filter(r->v.builder(r.id)&&r.bot()!=null&&r.body().isAlive()).sorted(Comparator.<Resident>comparingInt(r->v.hasRole(r.id,ResidentRoles.Role.BUILDER)?0:1).thenComparing(r->r.id.toString())).findFirst().orElse(null);
+            String recipient=builder==null?"":builder.id.toString();
+            long delivery=v.meetingPoint().asLong();
+            for(TownBuilding work:missing){
+                int beds=(int)work.blocks.stream().filter(p->p.block().getBlock() instanceof BedBlock&&!p.matches(v)).count();
+                var demand=Orders.beds(beds,hasShears,true);
+                changed|=v.state.orders.removeIf(o->o.work==work.origin&&o.purpose.startsWith("bed_")
+                        &&demand.stream().noneMatch(d->d.purpose().equals(o.purpose)));
+                for(var need:demand){
+                    // Assign the final recipient once. Routing shears through the builder
+                    // first released their carrier on every synchronization.
+                    String receiver=need.material()==Orders.Material.SHEARS?(keeper==null?"":keeper.id.toString()):recipient;
+                    changed|=Orders.applyScoped(v.state.orders,work.origin,List.of(need),receiver,delivery,now,need.purpose());
+                }
+            }
+        }
+        changed|=ConstructionSupply.sync(v,now);
+        changed|=Orders.refreshStock(v);
+        if(changed)v.runtime.save();
+    }
     TownBuilding warehouse(BlockPos base){
         var b=new TownBuilding("warehouse",base);
         foundation(b,base,7,7);
@@ -226,7 +328,15 @@ final class TownPlanner {
             if(p.getY()>=surface&&Construction.clear(v.level.getBlockState(p)))b.add(p,Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING,Direction.SOUTH));
         }
     }
-    private BlockPos findSite(int width,int depth){
+    private TownBuilding housingDistrict(){
+        return v.state.buildings.stream().filter(b->Set.of("house","native_house").contains(b.kind)&&b.completed)
+                .max(Comparator.comparingLong(b->v.state.residents.stream().map(v.level::getEntity)
+                    .filter(e->e instanceof Villager body&&body.getBrain().getMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.HOME)
+                        .filter(home->home.dimension().equals(v.level.dimension())&&b.blocks.stream().anyMatch(p->p.position().distSqr(home.pos())<4)).isPresent()).count()
+                    -b.blocks.stream().filter(p->p.block().getBlock() instanceof BedBlock).count())).orElse(null);
+    }
+    BlockPos findSite(int width,int depth){return findSite(width,depth,null);}
+    private BlockPos findSite(int width,int depth,BlockPos focus){
         // Use the entire footprint, not a ring of a fixed radius. Only a few candidates each cycle.
         var bounds=v.state.bounds;if(bounds==null)return null;
         int columns=bounds.maxX-bounds.minX+1;
@@ -240,19 +350,14 @@ final class TownPlanner {
             }
             // A full floor over a depression can seal a two-block pit around a worker. Until a paid
             // earthworks project has graded a slope, use ground with a continuous level approach.
-            if(high!=low)continue;
-            BlockPos base=new BlockPos(x,high,z);
+            if(high-low>1)continue;
+            BlockPos base=new BlockPos(x,(low+high)/2,z);
             if(!v.level.hasChunkAt(base)||!siteWithinBounds(v.state,base,width,depth))continue;
-            boolean good=true;
-            for(int dx=-1;dx<=width&&good;dx++)for(int dz=-1;dz<=depth&&good;dz++){
-                BlockPos p=base.offset(dx,0,dz);
-                int surface=v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,p.getX(),p.getZ());
-                BlockPos ground=new BlockPos(p.getX(),surface-1,p.getZ());
-                if(!VillageIndex.naturalSoil(v.level.getBlockState(ground))||!v.level.getBlockState(ground).isFaceSturdy(v.level,ground,Direction.UP))good=false;
-                for(int dy=0;dy<4&&good;dy++)if(!Construction.clear(v.level.getBlockState(p.above(dy)))||protects(p.above(dy)))good=false;
-            }
+            boolean good=Infrastructure.site(v,base,width,depth)!=null;
             if(good&&v.state.buildings.stream().noneMatch(b->BlockPos.of(b.origin).distSqr(base)<144)){
                 double score=v.index.beds.stream().mapToDouble(home->{double dy=home.getY()-base.getY();return home.distSqr(base)+15*dy*dy;}).average().orElse(base.distSqr(v.state.center()));
+                if(focus!=null)score+=2*focus.distSqr(base);
+                score+=.25*v.state.land.fields.stream().mapToDouble(f->BlockPos.of(f.entry).distSqr(base)).average().orElse(0);
                 if(score<bestScore){best=base;bestScore=score;}
             }
         }
@@ -270,13 +375,13 @@ final class TownPlanner {
     }
     TownBuilding.Plan request(Resident resident,boolean nonPlanks){
         if(!v.builder(resident.id))return null;
-        List<TownBuilding> order=new ArrayList<>(v.state.buildings);
-        order.sort(Comparator.comparingInt(b->b.completed?0:b.kind.equals("warehouse")?1:2));
+        List<TownBuilding> order=workOrder();
         for(TownBuilding b:order){int considered=0;
-            for(TownBuilding.Plan p:b.blocks){
+            for(TownBuilding.Plan p:workPlans(b)){
                 if(p.matches(v))continue;
                 if(nonPlanks&&!b.completed&&p.block().is(BlockTags.PLANKS))continue;
-                stage=(b.completed?"ремонт ":b.tier>0?"улучшение ":"строительство ")+label(b)+" "+b.built(v)+"/"+b.blocks.size();
+                stage=(b.completed?"ремонт ":b.tier>0?"улучшение ":"строительство ")+label(b)+" "+b.built(v)+"/"+b.blocks.size()
+                        +(b.kind.equals("warehouse")?" — "+List.of("общий сундук и рабочее место","рабочее помещение","крыша","расширение и отделка","готов").get(warehousePhase(b)):"");
                 if(!v.ready(p.position(),resident.id))continue;
                 if(Construction.clear(v.level.getBlockState(p.position()))||p.replaceOwned||Construction.sameMaterial(p.step(),v.level.getBlockState(p.position()))){
                     if(Construction.available(resident.bot(),p.step())!=null)return p;
@@ -291,23 +396,23 @@ final class TownPlanner {
     }
     Item wanted(Resident resident){
         if(!v.builder(resident.id))return Items.AIR;
-        for(TownBuilding b:v.state.buildings)for(TownBuilding.Plan p:b.blocks)if(!p.matches(v)&&v.ready(p.position(),resident.id))return p.block().getBlock().asItem();
+        for(TownBuilding b:workOrder())for(TownBuilding.Plan p:workPlans(b))if(!p.matches(v)&&v.ready(p.position(),resident.id))return p.block().getBlock().asItem();
         return Items.AIR;
     }
     List<TownBuilding.Plan> wantedPlans(Resident r){
         if(!v.builder(r.id))return List.of();
         if(requestedTick==v.level.getGameTime())return requested;
         requestedTick=v.level.getGameTime();
-        var order=new ArrayList<>(v.state.buildings);
-        order.sort(Comparator.comparingInt(b->b.completed?0:b.kind.equals("warehouse")?1:2));
+        var order=workOrder();
         var requested=new LinkedHashMap<Item,TownBuilding.Plan>();
         for(var building:order){
-            int missing=0;
-            for(var plan:building.blocks){
+            for(var plan:workPlans(building)){
                 if(plan.matches(v))continue;
                 if(!plan.replaceOwned&&!Construction.clear(v.level.getBlockState(plan.position()))&&!Construction.sameMaterial(plan.step(),v.level.getBlockState(plan.position())))continue;
                 requested.putIfAbsent(plan.block().getBlock().asItem(),plan);
-                if(++missing>=12||requested.size()>=16)break;
+                // Bound distinct recipes, not repeated cells: a large floor must not
+                // hide every door, chest and stair recipe that follows it.
+                if(requested.size()>=16)break;
             }
             if(requested.size()>=16)break;
         }
@@ -319,7 +424,7 @@ final class TownPlanner {
         if(materialsTick==v.level.getGameTime())return;materialsTick=v.level.getGameTime();
         var items=new LinkedHashMap<Item,TownBuilding.Plan>();
         pendingWood=0;
-        for(var b:v.state.buildings)for(var p:b.blocks)if(!p.matches(v)){
+        for(var b:v.state.buildings)for(var p:workPlans(b))if(!p.matches(v)){
             items.putIfAbsent(p.block().getBlock().asItem(),p);if(p.block().is(BlockTags.PLANKS))pendingWood++;
         }
         materials=List.copyOf(items.values());

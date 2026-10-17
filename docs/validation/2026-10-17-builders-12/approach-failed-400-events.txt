@@ -1,0 +1,38 @@
+[11:47:19] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=1 job=build road=2 house=5 pos=(1994.0891217113538, 101.0, 1983.8833515791696)
+[11:47:19] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=1 job=null road=2 house=22 pos=(1996.5044893412153, 102.0, 1982.5325318120167)
+[11:47:20] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=1 job=renovate road=2 house=33 pos=(1989.4461964375234, 100.0, 1981.4456576142277)
+[11:47:21] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1985.5425288314902, 100.0, 1984.5235535158117)
+[11:47:22] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1986.4612715523067, 100.0, 1984.3472352863014)
+[11:47:23] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1986.9807751093656, 100.0, 1984.6452659867325)
+[11:47:25] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1985.8668985853649, 100.0, 1986.0835627972108)
+[11:47:26] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1985.8668985853649, 100.0, 1986.0835627972108)
+[11:47:27] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1985.8668985853649, 100.0, 1986.0835627972108)
+[11:47:28] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1985.8668985853649, 100.0, 1986.0835627972108)
+[11:47:30] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1986.3357833762664, 100.0, 1987.1559038387782)
+[11:47:31] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1986.4543103164158, 100.0, 1987.1025146804857)
+[11:47:32] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1986.892577841857, 100.0, 1987.2629871492984)
+[11:47:33] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=33 pos=(1986.5077099958057, 100.0, 1986.7560114435173)
+[11:47:34] [Server thread/INFO]: WORK_INTERRUPTED village=Test worker=187e4552-e8db-4c05-a36b-9b87a218a15b job=deliver target=BlockPos{x=1986, y=100, z=1986} cause=цель недоступна; выбирает другую работу
+[11:47:35] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=37 pos=(1997.4220879056052, 102.0, 1983.735026381369)
+[11:47:36] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=56 pos=(1997.300000011921, 102.0, 1981.6254979361195)
+[11:47:37] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=65 pos=(1996.862058554874, 102.0, 1982.3761371716396)
+[11:47:38] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=65 pos=(1997.4457822614868, 102.0, 1980.982598580454)
+[11:47:40] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=65 pos=(1997.066755756494, 101.0, 1979.3958938471858)
+[11:47:41] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=65 pos=(1996.779651240013, 101.0, 1978.0452484633286)
+[11:47:42] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=null road=3 house=69 pos=(1997.699999988079, 102.0, 1981.273845428229)
+[11:47:43] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=storage road=3 house=81 pos=(1998.443896681694, 102.0, 1982.300000011921)
+[11:47:45] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=storage road=3 house=81 pos=(1998.443896681694, 102.0, 1982.300000011921)
+[11:47:46] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=storage road=3 house=81 pos=(1998.320451316116, 102.0, 1982.3138341195881)
+[11:47:46] [Server thread/INFO]: WORK_INTERRUPTED village=Test worker=e3b11025-a6c0-45f8-b595-20ecf3a7ad16 job=storage target=BlockPos{x=1983, y=100, z=1983} cause=маршрут: unreachable
+[11:47:46] [Server thread/INFO]: WORK_INTERRUPTED village=Test worker=e3b11025-a6c0-45f8-b595-20ecf3a7ad16 job=escape target=BlockPos{x=1981, y=100, z=1983} cause=маршрут: unreachable
+[11:47:47] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=table road=3 house=81 pos=(1998.320451316116, 102.0, 1982.3138341195881)
+[11:47:47] [Server thread/INFO]: WORK_INTERRUPTED village=Test worker=470a20a6-ef78-469d-857c-6dad718f3c7b job=deliver target=BlockPos{x=1998, y=102, z=1982} cause=нет безопасного подхода
+[11:47:48] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=table road=3 house=81 pos=(1998.1985518901326, 102.0, 1982.3415023349226)
+[11:47:49] [Server thread/INFO]: WORK_INTERRUPTED village=Test worker=e3b11025-a6c0-45f8-b595-20ecf3a7ad16 job=table target=BlockPos{x=1983, y=100, z=1981} cause=маршрут: unreachable
+[11:47:49] [Server thread/INFO]: WORK_INTERRUPTED village=Test worker=e3b11025-a6c0-45f8-b595-20ecf3a7ad16 job=escape target=BlockPos{x=1981, y=100, z=1981} cause=маршрут: unreachable
+[11:47:50] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=table road=3 house=81 pos=(1998.1985518901326, 102.0, 1982.3415023349226)
+[11:47:51] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=table road=3 house=81 pos=(1998.1985518901326, 102.0, 1982.3415023349226)
+[11:47:52] [Server thread/INFO]: WORK_INTERRUPTED village=Test worker=e3b11025-a6c0-45f8-b595-20ecf3a7ad16 job=table target=BlockPos{x=1983, y=100, z=1981} cause=маршрут: unreachable
+[11:47:52] [Server thread/INFO]: VILLAGE_TEST BUILDER_PROGRESS phase=2 job=escape road=3 house=81 pos=(1998.1985518901326, 102.0, 1982.3415023349226)
+[11:47:52] [Server thread/INFO]: WORK_INTERRUPTED village=Test worker=e3b11025-a6c0-45f8-b595-20ecf3a7ad16 job=escape target=BlockPos{x=1981, y=100, z=1981} cause=маршрут: unreachable
+[11:47:53] [Server thread/INFO]: VILLAGE_TEST FAIL stage=73 java.lang.AssertionError: builder timeout phase=2 job=table status=идёт к верстаку pos=(1998.1985518901326, 102.0, 1982.3415023349226) road=3/3 house=81/85 bag=[1 minecraft:stone_pickaxe, 1 minecraft:stone_axe, 1 minecraft:stone_sword, 8 minecraft:stick, 3 minecraft:bread, 16 minecraft:oak_planks, 1 minecraft:oak_log, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air, 0 minecraft:air]

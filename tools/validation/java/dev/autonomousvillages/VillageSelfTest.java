@@ -37,6 +37,24 @@ public final class VillageSelfTest {
     static boolean safetyOnly;
     static boolean longrunOnly;
     static boolean nightOnly;
+    static boolean ordersOnly;
+    static boolean housingOnly;
+    static boolean rolesOnly;
+    static boolean productionOnly;
+    static boolean flockOnly;
+    static boolean planningOnly;
+    static boolean systemsOnly;
+    static boolean buildersOnly;
+    static Resident ordersRecipient,ordersHolder;
+    static TownBuilding ordersHouse;
+    static BlockPos ordersChest;
+    static final List<BlockPos> ordersBeds=new ArrayList<>();
+    static boolean ordersBlockedChecked;
+    static long restartWaitStarted;
+    static BlockPos reviewFixture;
+    static boolean reviewProbe;
+    static int budgetStage=-1,budgetSince;
+    static long stageInfrastructureTicks,stageWallStart;
     static BlockPos nightRoom,nightBed;
     static Optional<GlobalPos> previousHome;
     static boolean nightDoorOpened;
@@ -98,17 +116,43 @@ public final class VillageSelfTest {
         });
         CommandRegistrationCallback.EVENT.register((dispatcher,access,env)->dispatcher.register(Commands.literal("avtest")
             .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)).executes(c->{
-                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;running=true;
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=false;productionOnly=false;flockOnly=false;planningOnly=false;running=true;
                 cmd("time set 1000");cmd("time pause");cmd("tick rate 60");setup();log("START");return 1;
             }).then(Commands.literal("night").executes(c->{
-                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=true;running=true;
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=true;ordersOnly=false;housingOnly=false;rolesOnly=false;productionOnly=false;flockOnly=false;planningOnly=false;running=true;
                 cmd("time set 1000");cmd("time pause");cmd("tick rate 60");setup();log("NIGHT_START");return 1;
             })).then(Commands.literal("longrun").executes(c->{
-                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=true;running=true;
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=true;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=false;productionOnly=false;flockOnly=false;planningOnly=false;running=true;
                 cmd("time set 1000");cmd("time pause");cmd("tick rate 60");setup();log("LONGRUN_START");return 1;
             })).then(Commands.literal("safety").executes(c->{
-                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=true;running=true;
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=true;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=false;productionOnly=false;flockOnly=false;planningOnly=false;running=true;
                 cmd("time set 1000");cmd("time pause");cmd("tick rate 60");setup();log("SAFETY_START");return 1;
+            })).then(Commands.literal("orders").executes(c->{
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=true;housingOnly=false;rolesOnly=false;productionOnly=false;flockOnly=false;planningOnly=false;running=true;
+                cmd("time set 1000");cmd("time pause");cmd("tick rate 60");setup();log("ORDERS_START");return 1;
+            })).then(Commands.literal("housing").executes(c->{
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=true;rolesOnly=false;productionOnly=false;flockOnly=false;planningOnly=false;running=true;
+                cmd("time set 1000");cmd("time pause");setup();log("HOUSING_START");return 1;
+            })).then(Commands.literal("roles").executes(c->{
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=true;productionOnly=false;flockOnly=false;planningOnly=false;running=true;
+                cmd("time set 1000");cmd("time pause");setup();log("ROLES_START");return 1;
+            })).then(Commands.literal("production").executes(c->{
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=false;productionOnly=true;flockOnly=false;planningOnly=false;running=true;
+                cmd("time set 1000");cmd("time pause");setup();log("PRODUCTION_START");return 1;
+            })).then(Commands.literal("flock").executes(c->{
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=false;productionOnly=false;flockOnly=true;planningOnly=false;running=true;
+                cmd("time set 1000");cmd("time pause");setup();log("FLOCK_START");return 1;
+            })).then(Commands.literal("planning").executes(c->{
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=false;productionOnly=false;flockOnly=false;planningOnly=true;running=true;
+                cmd("time set 1000");cmd("time pause");setup();log("PLANNING_START");return 1;
+            })).then(Commands.literal("systems").executes(c->{
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=false;productionOnly=false;flockOnly=false;planningOnly=true;systemsOnly=true;running=true;
+                cmd("time set 1000");cmd("time pause");setup();log("SYSTEMS_START");return 1;
+            })).then(Commands.literal("builders").executes(c->{
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=0;passed=0;ledgeChecked=false;safetyOnly=false;longrunOnly=false;nightOnly=false;ordersOnly=false;housingOnly=false;rolesOnly=false;productionOnly=false;flockOnly=false;planningOnly=true;systemsOnly=false;buildersOnly=true;running=true;
+                cmd("time set 1000");cmd("time pause");setup();log("BUILDERS_START");return 1;
+            })).then(Commands.literal("systems_restart").executes(c->{
+                server=c.getSource().getServer();level=server.overworld();age=0;stage=101;running=true;log("SYSTEMS_RESTART_START");return 1;
             })).then(Commands.literal("restart").executes(c->{
                 server=c.getSource().getServer();level=server.overworld();age=0;stage=100;running=true;log("RESTART_START");return 1;
             }))));
@@ -120,7 +164,56 @@ public final class VillageSelfTest {
     static void pass(String text){passed++;log("PASS "+text);}
     static void advance(){stage++;since=age;}
     static void resetBag(BotHandle b){b.stopAll();for(int i=0;i<36;i++)b.inventory().extract(i,Integer.MAX_VALUE);}
+    static void beginUnarmedRetreat(){
+        resetBag(worker.bot());worker.body().snapTo(Vec3.atBottomCenterOf(origin),0,0);worker.body().setHealth(8);
+        cmd("difficulty normal");
+        enemy=EntityTypes.ZOMBIE.create(level,EntitySpawnReason.COMMAND);enemy.setNoAi(true);enemy.setPersistenceRequired();
+        enemy.snapTo(worker.body().position().add(8,0,0),0,0);level.addFreshEntity(enemy);
+        for(int x=-3;x<=3;x++)for(int z=-3;z<=3;z++)level.setBlock(enemy.blockPosition().offset(x,3,z),Blocks.GLASS.defaultBlockState(),3);
+        stage=55;since=age;
+    }
     static void give(BotHandle b,Item item,int count){require(b.inventory().insert(new ItemStack(item,count)).isEmpty(),"give fits");}
+    /** A finished house with two missing beds; the planks exist only in another worker's backpack. */
+    static void beginOrders(){
+        // Isolate order scheduling from unrelated construction, farming and native wandering.
+        // Work/navigation/inventory transfers remain the production implementations.
+        v.state.active=false;v.state.orders.clear();v.state.buildings.clear();v.state.storage.clear();
+        ordersBeds.clear();ordersBlockedChecked=false;
+        BlockPos base=origin.offset(6,0,0);
+        ordersHouse=new TownBuilding("house",base);ordersHouse.completed=true;
+        for(BlockPos p:List.of(base.offset(1,0,0),base.offset(3,0,0))){
+            var foot=Blocks.BED.white().defaultBlockState().setValue(BedBlock.FACING,Direction.SOUTH).setValue(BedBlock.PART,BedPart.FOOT);
+            ordersHouse.add(p,foot);ordersBeds.add(p);
+        }
+        ordersChest=origin.offset(0,0,4);level.setBlock(ordersChest,Blocks.CHEST.defaultBlockState(),3);
+        v.runtime.storage("Test",ordersChest,server.createCommandSourceStack().withPosition(Vec3.atCenterOf(ordersChest)));
+        ((ChestBlockEntity)level.getBlockEntity(ordersChest)).clearContent();
+        v.state.buildings.add(ordersHouse);v.town.invalidate();
+        var builders=v.workers.values().stream().filter(r->v.builder(r.id)&&r.bot()!=null)
+                .sorted(Comparator.comparing(r->r.id.toString())).toList();
+        require(builders.size()>=2,"two attached workers for recipient and carrier");
+        ordersRecipient=builders.get(0);ordersHolder=builders.get(1);
+        // This scenario measures two builders' 64-plank kits, not a steward's smaller kit.
+        for(var r:List.of(ordersRecipient,ordersHolder))v.state.residentRoles.put(r.id,new ResidentRoles.Assignment(r.id,ResidentRoles.Role.BUILDER,"mason","orders fixture: primary builder kit"));
+        for(Resident r:v.workers.values()){r.cancel();resetBag(r.bot());r.body().setNoAi(true);}
+        ordersHolder.body().setNoAi(false);
+        ordersRecipient.body().setNoAi(false);
+        // Shears now belong to an explicit flock caretaker, independently of both builders.
+        var keeperBody=spawn(origin.offset(-8,0,8));keeperBody.setNoAi(false);
+        var keeperBot=v.runtime.bots.attach(keeperBody);resetBag(keeperBot);keeperBot.activities().run(List.of(new BotActivity.Wait(10000)));
+        var keeper=new Resident(v,keeperBody.getUUID());v.workers.put(keeper.id,keeper);v.state.residents.add(keeper.id);
+        v.state.residentRoles.put(keeper.id,new ResidentRoles.Assignment(keeper.id,ResidentRoles.Role.FARMER,"farmer","orders fixture: shears recipient"));
+        give(ordersHolder.bot(),Items.OAK_PLANKS,70); // 64 personal construction timber + 6 transferable
+        for(int i=0;i<36;i++)give(ordersRecipient.bot(),Items.COBBLESTONE,64);
+        ordersRecipient.body().snapTo(Vec3.atBottomCenterOf(origin),0,0);
+        ordersHolder.body().snapTo(Vec3.atBottomCenterOf(origin.offset(5,0,0)),0,0);
+        require(v.chestCount(Orders.Material.PLANKS)==0&&v.ledger(Orders.Material.PLANKS).free()==0
+                &&v.ledger(Orders.Material.PLANKS).strandedInBackpacks(),"backpack surplus is real but not free chest stock");
+        pass("planks_in_another_backpack_are_not_free_stock");
+        v.town.syncOrders(level.getGameTime());
+        IronSupply.sync(v,level.getGameTime());
+        stage=60;since=age;
+    }
     static void bed(BlockPos p){
         var foot=Blocks.BED.white().defaultBlockState().setValue(BedBlock.FACING,Direction.SOUTH).setValue(BedBlock.PART,BedPart.FOOT);
         level.setBlock(p,foot,18);level.setBlock(p.south(),foot.setValue(BedBlock.PART,BedPart.HEAD),18);
@@ -129,12 +222,21 @@ public final class VillageSelfTest {
         e.setNoAi(true);e.snapTo(Vec3.atBottomCenterOf(p),0,0);level.addFreshEntity(e);return e;}
     static boolean fixtureReady(){
         var tracked=level.getEntitiesOfClass(Villager.class,new AABB(origin).inflate(8),e->e.isAlive());
-        return tracked.stream().anyMatch(e->e.getUUID().equals(first))&&tracked.stream().anyMatch(e->e.getUUID().equals(second));
+        return tracked.stream().anyMatch(e->e.getUUID().equals(first))&&tracked.stream().anyMatch(e->e.getUUID().equals(second))
+            &&(!reviewProbe||level.isPositionEntityTicking(reviewFixture));
+    }
+    static void releaseReviewFixture(){
+        if(reviewProbe)level.getChunkSource().removeTicketWithRadius(PROBE,new net.minecraft.world.level.ChunkPos(reviewFixture.getX()>>4,reviewFixture.getZ()>>4),2);
+        reviewProbe=false;
     }
     static void releaseFixture(){
         ((Villager)level.getEntity(first)).setNoAi(false);((Villager)level.getEntity(second)).setNoAi(false);
     }
     static void setup(){
+        if(origin.getX()==2000&&!safetyOnly&&!nightOnly&&!housingOnly&&!rolesOnly&&!productionOnly&&!flockOnly&&!planningOnly){
+            reviewFixture=origin.offset(96,0,0);reviewProbe=true;
+            level.getChunkSource().addTicketWithRadius(PROBE,new net.minecraft.world.level.ChunkPos(reviewFixture.getX()>>4,reviewFixture.getZ()>>4),2);
+        }
         level.getChunkSource().addTicketWithRadius(PROBE,new net.minecraft.world.level.ChunkPos(origin.getX()>>4,origin.getZ()>>4),4);
         for(int x=-28;x<=28;x++)for(int z=-28;z<=28;z++){
             BlockPos p=origin.offset(x,-1,z);level.setBlock(p,Blocks.GRASS_BLOCK.defaultBlockState(),3);
@@ -239,9 +341,15 @@ public final class VillageSelfTest {
     }
     static void tick() throws java.io.IOException{
         age++;
+        if(stage==101){if(PlanningPersistence.restore()){log("RESTART_DONE passed="+passed);running=false;}return;}
         if(stage==100){
-            if(age==1){v=AutonomousVillagesMod.runtime(server).get("Test");require(!v.state.active&&!v.ticketed,"paused state initially has no tickets");v.ticket(true);}
+            if(age==1){restartWaitStarted=System.nanoTime();v=AutonomousVillagesMod.runtime(server).get("Test");require(!v.state.active&&!v.ticketed,"paused state initially has no tickets");v.ticket(true);}
             if(age<120)return;
+            Village restoredAuto=v.runtime.get("Auto");
+            boolean ready=v.state.residents.stream().allMatch(id->level.getEntity(id)instanceof Villager resident&&resident.isAlive()&&v.runtime.bots.find(id).isPresent())
+                &&restoredAuto.state.residents.stream().allMatch(id->level.getEntity(id)instanceof Villager resident&&resident.isAlive()&&v.runtime.bots.find(id).isPresent())
+                &&!restoredAuto.chests().isEmpty();
+            if(!ready){require(System.nanoTime()-restartWaitStarted<30_000_000_000L,"restart bodies/controllers/storage did not become ready within30real seconds");return;}
             v=AutonomousVillagesMod.runtime(server).get("Test");
             require(!v.state.active,"paused state survives restart");
             var expected=VillageRuntime.GSON.fromJson(java.nio.file.Files.readString(server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT).resolve("validation-expected-members.json")),UUID[].class);
@@ -270,7 +378,21 @@ public final class VillageSelfTest {
             pass("active_village_resumes_after_restart");v.runtime.change("Auto","release");require(v.runtime.villages.isEmpty(),"released all villages");
             log("RESTART_DONE passed="+passed);running=false;return;
         }
-        if(age-since>(stage==9?12000:6000))throw new AssertionError("timeout stage="+stage+" worker="+(worker==null?"none":worker.status+" job="+worker.job+" target="+worker.target+" pos="+worker.body().position()));
+        if(stage!=budgetStage||since!=budgetSince){budgetStage=stage;budgetSince=(int)since;stageInfrastructureTicks=0;stageWallStart=System.nanoTime();}
+        Resident timedWorker=ordersOnly&&stage>=60?ordersHolder:(stage==44||stage==45)?timberWorker:worker;
+        boolean infrastructurePending=timedWorker!=null&&timedWorker.bot()!=null
+            &&(timedWorker.bot().navigator().status()==NavigationStatus.COMPUTING
+                ||timedWorker.excavation!=null&&timedWorker.excavation.waitingForInfrastructure());
+        if(stage==9&&v!=null)infrastructurePending=v.workers.values().stream().anyMatch(r->r.bot()!=null&&r.bot().navigator().status()==NavigationStatus.COMPUTING);
+        if(stage==54&&v!=null)infrastructurePending=v.workers.keySet().stream().anyMatch(v.expeditions::waitingForInfrastructure);
+        if(infrastructurePending)stageInfrastructureTicks++;
+        long actionBudget=stage==73?16000:stage==72&&systemsOnly?40000:stage==71?20000:stage==9?12000:6000;
+        double wallLimit=Math.min(900,30+2*actionBudget/server.tickRateManager().tickrate());
+        if(age-since-stageInfrastructureTicks>actionBudget||System.nanoTime()-stageWallStart>wallLimit*1_000_000_000L)
+            throw new AssertionError("timeout stage="+stage+" activeTicks="+(age-since-stageInfrastructureTicks)+" infrastructureTicks="+stageInfrastructureTicks+" worker="+(worker==null?"none":worker.status+" job="+worker.job+" target="+worker.target+" pos="+worker.body().position()));
+        if(stage==73){if(BuilderRegression.tick()){log("DONE passed="+passed+" scope=builders");running=false;}return;}
+        if(stage==72){if(PlanningRegression.tick()){PlanningPersistence.capture();log("DONE passed="+passed+" scope=planning");running=false;}return;}
+        if(stage==71){if(ProductionRegression.tick()){log("DONE passed="+passed+" scope=production");running=false;}return;}
         if(stage==0){
             if(age<60||!fixtureReady())return;
             releaseFixture();
@@ -291,8 +413,14 @@ public final class VillageSelfTest {
             worker=v.workers.get(first);require(worker!=null,"native attached");worker.cancel();
             for(Resident other:v.workers.values())if(other!=worker){other.cancel();other.body().setNoAi(true);other.body().snapTo(Vec3.atBottomCenterOf(origin.offset(-20,0,-10)),0,0);}
             worker.body().snapTo(Vec3.atBottomCenterOf(origin),0,0);
+            if(planningOnly){PlanningRegression.begin(v,origin);stage=72;since=age;return;}
+            if(flockOnly){ProductionRegression.beginFlock(v,origin);stage=71;since=age;return;}
+            if(productionOnly){ProductionRegression.begin(v,origin);stage=71;since=age;return;}
+            if(rolesOnly){RolesRegression.run(v,origin);log("DONE passed="+passed+" scope=roles");running=false;return;}
+            if(housingOnly){HousingRegression.run(v,origin);log("DONE passed="+passed+" scope=housing");running=false;return;}
             if(nightOnly){beginNightEntry();return;}
             if(longrunOnly){LongRunRegression.run(v,worker,origin);beginReturnFallback();return;}
+            if(ordersOnly){beginOrders();return;}
             if(!ledgeChecked){
                 for(int x=18;x<=25;x++)for(int z=18;z<=25;z++)for(int y=-30;y<0;y++)level.setBlock(origin.offset(x,y,z),Blocks.AIR.defaultBlockState(),3);
                 worker.body().snapTo(Vec3.atBottomCenterOf(origin.offset(17,0,17)),0,0);worker.body().setDeltaMovement(Vec3.ZERO);
@@ -335,6 +463,59 @@ public final class VillageSelfTest {
             crop=origin.offset(7,0,0);level.setBlock(crop.below(),Blocks.FARMLAND.defaultBlockState().setValue(FarmlandBlock.MOISTURE,7),3);
             level.setBlock(crop,Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE,7),3);
             v.index.crops.add(crop);v.index.soil.add(crop);worker.assign("harvest",crop);advance();return;
+        }
+        if(stage==60){
+            require(v.state.orders.stream().noneMatch(o->o.purpose.startsWith("b_")&&(o.kind()==Orders.Material.PLANKS||o.kind()==Orders.Material.LOGS)),"bed-only repair has no competing bulk timber order");
+            require(v.state.orders.stream().anyMatch(o->o.purpose.equals("bed_planks")&&o.quantity==6),"six planks requested");
+            require(v.state.orders.stream().anyMatch(o->o.purpose.equals("bed_wool")&&o.quantity==6),"six wool requested");
+            require(v.state.orders.stream().anyMatch(o->o.kind()==Orders.Material.SHEARS),"shears requested");
+            require(v.state.orders.stream().anyMatch(o->o.kind()==Orders.Material.IRON&&o.quantity==2),"two iron requested");
+            var ledger=v.ledger(Orders.Material.PLANKS);
+            require(ledger.reserved()==6&&ledger.kit()==64&&ledger.total()==70,"reservation uses only real surplus");
+            pass("two_beds_expand_to_materials_and_tools_without_reserving_the_personal_kit");
+            stage=61;since=age;return;
+        }
+        if(stage==61){
+            SupplyRuns.tick(v);DeliveryRuns.tick(v);
+            if("deliver".equals(ordersHolder.job))ordersHolder.work(ordersHolder.bot());
+            var planks=v.state.orders.stream().filter(o->o.purpose.equals("bed_planks")).findFirst().orElseThrow();
+            if(!ordersBlockedChecked){
+                if(planks.retryAfter==0)return;
+                require(planks.delivered==0&&!planks.transit&&ordersHolder.count(Orders.Material.PLANKS)==70,"full recipient loses no cargo and releases transit");
+                require(ordersHolder.status.contains("Доставка неполная"),"blocked delivery has a visible reason");
+                pass("full_backpack_keeps_real_cargo_and_reports_blocked_delivery");
+                resetBag(ordersRecipient.bot());ordersBlockedChecked=true;return;
+            }
+            if(planks.delivered<6)return;
+            require(ordersRecipient.count(Orders.Material.PLANKS)==6&&ordersHolder.count(Orders.Material.PLANKS)==64,"exact real transfer conserves all 70 planks and personal kit");
+            require(!planks.transit,"completed delivery releases transit");
+            pass("physical_delivery_conserves_items_and_preserves_personal_kit");
+            stage=62;since=age;return;
+        }
+        if(stage==62){
+            ordersRecipient.body().kill(level);stage=63;since=age;return;
+        }
+        if(stage==63){
+            if(age-since<10)return;
+            require(v.state.orders.stream().anyMatch(o->o.returnCargo()&&o.kind()==Orders.Material.PLANKS&&o.quantity==6),"six actual delivered planks require return after death");
+            require(v.state.orders.stream().noneMatch(o->o.returnCargo()&&o.kind()==Orders.Material.WOOL),"unfulfilled wool is not invented as lost cargo");
+            pass("death_tracks_real_delivered_cargo_instead_of_unfulfilled_requests");
+            var drops=level.getEntitiesOfClass(ItemEntity.class,ordersRecipient.body().getBoundingBox().inflate(4),e->e.isAlive()&&e.getItem().is(Items.OAK_PLANKS));
+            require(drops.stream().mapToInt(e->e.getItem().getCount()).sum()==6,"six real dropped planks exist");
+            // Move the real drop to shared storage in two partial deposits, as a player/hopper could.
+            var drop=drops.getFirst();var chest=(ChestBlockEntity)level.getBlockEntity(ordersChest);
+            chest.setItem(0,drop.getItem().split(2));chest.setChanged();
+            v.town.syncOrders(level.getGameTime());
+            require(v.state.orders.stream().anyMatch(o->o.returnCargo()&&o.delivered==2&&o.outstanding()==4),"partial return leaves four outstanding");
+            chest.getItem(0).grow(drop.getItem().getCount());drop.discard();chest.setChanged();
+            stage=64;since=age;return;
+        }
+        if(stage==64){
+            v.town.syncOrders(level.getGameTime());
+            require(v.state.orders.stream().noneMatch(o->o.returnCargo()),"return closes after the remaining actual items reach shared storage");
+            require(v.chestCount(Orders.Material.PLANKS)+ordersHolder.count(Orders.Material.PLANKS)==70,"all planks remain real after death and return");
+            pass("partial_then_complete_real_drop_return_conserves_all_items");
+            log("DONE passed="+passed+" orders_only=true");running=false;return;
         }
         if(stage==2){
             manual();
@@ -571,11 +752,15 @@ public final class VillageSelfTest {
             v.state.buildings.remove(securityPlan);v.town.invalidate();
             for(BlockPos p:BlockPos.betweenClosed(nightRoom,nightRoom.offset(4,3,8)))level.setBlock(p,Blocks.AIR.defaultBlockState(),3);
             cmd("time set 1000");
-            if(nightOnly){log("DONE passed="+passed+" night_only=true");running=false;return;}
+            if(nightOnly){ShelterRegression.begin(v,worker,origin);stage=90;since=age;return;}
             resetBag(worker.bot());worker.body().setNoAi(true);worker.body().snapTo(Vec3.atBottomCenterOf(origin.offset(14,0,16)),0,0);
             courier=v.workers.get(second);require(courier!=null,"native courier exists");courier.cancel();resetBag(courier.bot());give(courier.bot(),Items.CRAFTING_TABLE,1);
             courier.body().setNoAi(false);courier.body().snapTo(Vec3.atBottomCenterOf(origin.offset(8,0,16)),0,0);
             courier.assign("supply",worker.body().blockPosition());courier.supplyRecipient=worker.id;stage=34;since=age;return;
+        }
+        if(stage==90){
+            if(ShelterRegression.tick(v,worker,origin))beginUnarmedRetreat();
+            return;
         }
         if(stage==34){
             courier.tick();if(courier.job!=null)return;
@@ -751,18 +936,21 @@ public final class VillageSelfTest {
             worker.cancel();resetBag(worker.bot());worker.body().getInventory().clearContent();give(worker.bot(),Items.BREAD,3);worker.cooldown=0;worker.tick();
             require(worker.body().getInventory().countItem(Items.BREAD)==3&&worker.bot().inventory().count(Items.BREAD)==0,"native food transfer: native="+worker.body().getInventory().countItem(Items.BREAD)+" bag="+worker.bot().inventory().count(Items.BREAD)+" job="+worker.job+" status="+worker.status);
             require(worker.body().canBreed(),"native food enables breeding");pass("native_food_and_breeding_prerequisites");
-            resetBag(worker.bot());worker.body().snapTo(Vec3.atBottomCenterOf(origin),0,0);worker.body().setHealth(8);
-            cmd("difficulty normal");
-            enemy=EntityTypes.ZOMBIE.create(level,EntitySpawnReason.COMMAND);enemy.setNoAi(true);enemy.setPersistenceRequired();
-            enemy.snapTo(worker.body().position().add(8,0,0),0,0);level.addFreshEntity(enemy);
-            // Roof keeps the opponent out of sunlight; the villager supplies every point of combat damage.
-            for(int x=-3;x<=3;x++)for(int z=-3;z<=3;z++)level.setBlock(enemy.blockPosition().offset(x,3,z),Blocks.GLASS.defaultBlockState(),3);
-            stage=55;since=age;return;
+            beginUnarmedRetreat();return;
         }
         if(stage==55){
+            if(nightOnly&&(age-since)%20==0)log("RETREAT_PROGRESS elapsed="+(age-since)+" infrastructureTicks="+stageInfrastructureTicks
+                    +" pos="+worker.body().position()+" job="+worker.job+" target="+worker.target+" shelter="+worker.shelter
+                    +" nav="+(worker.navigation==null?"none":worker.navigation.status())+" status="+worker.status);
             worker.tick();if(age-since<120)return;
             require(worker.body().isAlive()&&worker.body().getX()<origin.getX()-2,"injured unarmed resident actually retreats across repeated threat scans: "+worker.body().position());
             pass("injured_resident_physically_retreats_without_restarting_every_threat_scan");
+            if(nightOnly){
+                if(enemy!=null){enemy.discard();enemy=null;}
+                worker.cancel();
+                cmd("difficulty peaceful");
+                log("DONE passed="+passed+" night_only=true");running=false;return;
+            }
             worker.cancel();worker.body().setHealth(20);give(worker.bot(),Items.STONE_SWORD,1);
             enemy.snapTo(worker.body().position().add(2,0,0),0,0);enemy.setNoAi(false);stage=5;since=age;return;
         }

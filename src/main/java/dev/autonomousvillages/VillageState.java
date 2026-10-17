@@ -24,6 +24,7 @@ public final class VillageState {
     public Set<Long> capturedPieces=new LinkedHashSet<>();
     public Map<UUID, ResidentName> residentNames = new LinkedHashMap<>();
     public Map<UUID, Long> residentPositions = new LinkedHashMap<>();
+    public Map<UUID,ResidentRoles.Assignment> residentRoles=new LinkedHashMap<>();
     public long lastExpansion, lastUpgrade;
     public Set<Long> accessBlocks=new LinkedHashSet<>();
     public Set<Long> temporaryWorkbenches=new LinkedHashSet<>();
@@ -37,6 +38,14 @@ public final class VillageState {
     public Map<UUID,Long> deposits=new LinkedHashMap<>();
     public Set<Long> worksites=new LinkedHashSet<>();
     public Set<Long> sheepPastures=new LinkedHashSet<>();
+    public SheepFarm.State sheepFarm=new SheepFarm.State();
+    public VillagePolicy policy=new VillagePolicy();
+    public ManagedLand land=new ManagedLand();
+    public Map<Long,Integer> roadFailures=new LinkedHashMap<>();
+    public Map<String,Long> workshopOutput=new LinkedHashMap<>();
+    public Set<ResidentRoles.Role> vacantRoles=new LinkedHashSet<>();
+    /** Order and reserve metadata only; the items themselves stay in chests and backpacks. */
+    public List<Orders.Order> orders=new ArrayList<>();
     public Map<Long,List<Long>> treeWork=new LinkedHashMap<>();
     public Set<Long> reforestation=new LinkedHashSet<>();
     static final int MAX_TICKET_CHUNKS=1024;
@@ -44,7 +53,14 @@ public final class VillageState {
     static <T> void trimOldest(Set<T> values,int limit){while(values.size()>limit)values.remove(values.iterator().next());}
     /** Historical intent may be forgotten; never discard an inventory or an active worksite. */
     void compactMetadata(){
+        if(workshopOutput==null)workshopOutput=new LinkedHashMap<>();
+        if(policy==null)policy=new VillagePolicy();if(land==null)land=new ManagedLand();
+        if(roadFailures==null)roadFailures=new LinkedHashMap<>();if(vacantRoles==null)vacantRoles=new LinkedHashSet<>();
+        if(sheepFarm==null)sheepFarm=new SheepFarm.State();
         trimOldest(plantedCrops,512);trimOldest(reforestation,2048);trimOldest(capturedPieces,4096);
+        if(orders==null)orders=new ArrayList<>();
+        if(residentRoles==null)residentRoles=new LinkedHashMap<>();
+        residentRoles.keySet().retainAll(residents);
         residentNames.keySet().retainAll(residents);
         var members=new HashSet<>(residents);if(expedition!=null)members.addAll(expedition.team);
         deposits.keySet().retainAll(members);mineralDeposits.keySet().retainAll(members);
@@ -123,6 +139,11 @@ public final class VillageState {
         long dx = (long)pos.getX() - x, dz = (long)pos.getZ() - z;
         return dx * dx + dz * dz <= (long)radius * radius && Math.abs(pos.getY() - y) <= 48;
     }
+    /** Order references must stay inside the world; a workspace may legitimately sit outside the claim. */
+    private static boolean worldPosition(long packed){
+        BlockPos p=BlockPos.of(packed);
+        return Math.abs((long)p.getX())<29_999_000L&&Math.abs((long)p.getZ())<29_999_000L&&p.getY()>=-64&&p.getY()<320;
+    }
     public boolean overlaps(VillageState other) {
         if(bounds!=null&&other.bounds!=null)return bounds.minX<=other.bounds.maxX+8L&&bounds.maxX+8L>=other.bounds.minX
                 &&bounds.minZ<=other.bounds.maxZ+8L&&bounds.maxZ+8L>=other.bounds.minZ;
@@ -130,6 +151,19 @@ public final class VillageState {
         return dx * dx + dz * dz <= r * r;
     }
     public void validate() {
+        if(policy==null||land==null||roadFailures==null||roadFailures.size()>128||vacantRoles==null||vacantRoles.contains(null))throw new IllegalArgumentException("Повреждённое планирование хозяйства");
+        policy.validate();land.validate(this);
+        if(workshopOutput==null||workshopOutput.size()>4||workshopOutput.entrySet().stream().anyMatch(e->!ProductionBuildings.KINDS.contains(e.getKey())||e.getValue()==null||e.getValue()<0))throw new IllegalArgumentException("Повреждённый выпуск мастерских");
+        if(policy.privateChests.stream().anyMatch(p->!contains(BlockPos.of(p))))throw new IllegalArgumentException("Личный сундук вне деревни");
+        if(roadFailures.entrySet().stream().anyMatch(e->e.getKey()==null||!contains(BlockPos.of(e.getKey()))||e.getValue()==null||e.getValue()<0||e.getValue()>1000000))throw new IllegalArgumentException("Повреждённые дорожные заявки");
+        if(sheepFarm==null)throw new IllegalArgumentException("Повреждённое хозяйство");
+        sheepFarm.validate(this);
+        if(residentRoles==null||residentRoles.size()>1024)throw new IllegalArgumentException("Повреждённые назначения жителей");
+        for(var e:residentRoles.entrySet()){
+            var a=e.getValue();
+            if(e.getKey()==null||!residents.contains(e.getKey())||a==null||a.role==null||a.profession==null||a.profession.length()>64
+                    ||a.reason==null||a.reason.length()>160||a.schedule<0||a.schedule>=24)throw new IllegalArgumentException("Повреждённая роль жителя");
+        }
         if(woolScouts<0||sheepPastures==null||sheepPastures.size()>8||sheepPastures.stream().anyMatch(p->p==null))throw new IllegalArgumentException("Повреждённые пастбища");
         if(residentPositions==null||residentPositions.size()>1024)throw new IllegalArgumentException("Повреждённые позиции жителей");
         for(var entry:residentPositions.entrySet()){
@@ -153,7 +187,9 @@ public final class VillageState {
         for(TownBuilding building:buildings)building.validate(this);
         if(expedition!=null)expedition.validate();
         if(mines==null||mines.size()>256||deposits==null||mineralDeposits==null||verifiedMiningDeliveries<0||completedExpeditions<0||completedMiningExpeditions<0||expeditionDeliveries<0||exploredSites<0)throw new IllegalArgumentException("Повреждённые рабочие участки");
-        for(var mine:mines)if(mine==null||mine.direction<0||mine.direction>3||mine.length<0||mine.length>64)throw new IllegalArgumentException("Повреждённая шахта");
+        for(var mine:mines)if(mine==null||mine.direction<0||mine.direction>3||mine.length<0||mine.length>64
+                ||mine.drySegments<0||mine.drySegments>64||mine.hazard==null||mine.hazard.length()>160||mine.iron==null||mine.coal==null||mine.iron.size()>128||mine.coal.size()>128
+                ||mine.iron.contains(null)||mine.coal.contains(null)||mine.lastSurvey<0)throw new IllegalArgumentException("Повреждённая шахта");
         for(var counters:List.of(deposits,mineralDeposits))if(counters.entrySet().stream().anyMatch(e->e.getKey()==null||e.getValue()==null||e.getValue()<0))throw new IllegalArgumentException("Повреждённый учёт поставок");
         for (Long pos : storage) if (pos == null || !contains(BlockPos.of(pos))) throw new IllegalArgumentException("Склад вне деревни");
         for (Long pos : furnaces) if (pos == null || !contains(BlockPos.of(pos))) throw new IllegalArgumentException("Печь вне деревни");
@@ -161,6 +197,15 @@ public final class VillageState {
         for(var tree:treeWork.values())if(tree==null||tree.size()>256||tree.stream().anyMatch(p->p==null||!recordedWork(BlockPos.of(p))))throw new IllegalArgumentException("Повреждённый план лесозаготовки");
         for(Set<Long> positions:List.of(plantedTrees,plantedCrops,fellingTrees))for(Long pos:positions)
             if(pos==null||!recordedWork(BlockPos.of(pos)))throw new IllegalArgumentException("Рабочая область вне деревни");
+        if(orders==null||orders.size()>Orders.MAX_ORDERS)throw new IllegalArgumentException("Повреждённые заказы");
+        for(Orders.Order order:orders){
+            if(order==null||order.kind()==null||order.purpose==null||order.purpose.isEmpty()||order.purpose.length()>32
+                    ||order.quantity<0||order.returnCargo()&&order.quantity<1||order.quantity>65536||order.delivered<0||order.delivered>order.quantity
+                    ||order.carrier==null||order.inTransit<0||order.inTransit>65536||order.observedStock<0
+                    ||order.recipient==null||!worldPosition(order.delivery)||!worldPosition(order.work))throw new IllegalArgumentException("Повреждённый заказ");
+            if(!order.recipient.isEmpty())UUID.fromString(order.recipient);
+            if(!order.carrier.isEmpty())UUID.fromString(order.carrier);
+        }
         if (shelter != null && !contains(BlockPos.of(shelter))) throw new IllegalArgumentException("Стройка вне деревни");
         if (mineEntrance != null && !contains(BlockPos.of(mineEntrance))) throw new IllegalArgumentException("Шахта вне деревни");
     }

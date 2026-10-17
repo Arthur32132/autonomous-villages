@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos;
 /** No cargo is serialized here: carried items stay in the actual residents' backpacks. */
 public final class ExpeditionState {
     public String purpose="mine",phase="scout";
+    public String resource="iron";
     public List<UUID> team=new ArrayList<>();
     public long target,started,phaseSince,deliveryStart;
     public int direction,length,completedSegments,brokenBlocks,attempts,harvested;
@@ -33,10 +34,16 @@ public final class ExpeditionState {
     public static final class Mine {
         public long entrance;
         public int direction,length;
+        public int drySegments;
         public boolean blocked;
+        public boolean exhausted;
+        public String hazard="";
+        public Set<Long> iron=new LinkedHashSet<>(),coal=new LinkedHashSet<>();
+        public long lastSurvey;
         public Mine() { }
     }
     void validate(){
+        if(resource==null||!Set.of("iron","coal","stone").contains(resource))throw new IllegalArgumentException("Повреждённая цель добычи");
         if(purpose==null||phase==null||!Set.of("mine","wood","forage","wool").contains(purpose)||!Set.of("scout","prepare","rally","travel","work","return","unload","shelter").contains(phase)
                 ||team==null||team.size()>4||team.stream().anyMatch(Objects::isNull)||length<0||length>64||completedSegments<0||completedSegments>64
                 ||oreTargets==null||oreTargets.size()>128||oreTargets.stream().anyMatch(Objects::isNull)||workedSegments<0||workedSegments>length||oreCollected<0||oreCollected>24||oreSince<0||woolCollected<0||woolCargoStart<0

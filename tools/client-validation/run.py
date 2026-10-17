@@ -8,6 +8,11 @@ ROOT=Path(__file__).resolve().parents[2]
 parser=argparse.ArgumentParser()
 parser.add_argument('--profile',type=Path,default=Path(os.environ['APPDATA'])/'ModrinthApp/profiles/Fabulously Optimized (3)')
 parser.add_argument('--colony',action='store_true')
+parser.add_argument('--benchmark-tps',action='store_true',help='Measure tick throughput in the normal colony scene; not autonomy acceptance')
+parser.add_argument('--benchmark-rates',default='40,100,200,400,800,1600,4000,10000,0,40',help='Comma-separated TPS targets; 0 means sprint')
+parser.add_argument('--benchmark-seconds',type=int,default=20,help='Wall-clock sample seconds per rate, from 5 to 30')
+parser.add_argument('--tick-rate',type=int,default=400,help='Target simulation TPS for the ordinary colony run; use 40 for comparison')
+parser.add_argument('--residents',type=int,default=0,help='Artificial adult minimum in disposable colony; no items supplied')
 parser.add_argument('--growth',action='store_true',help='Also require a completed new house with real beds')
 parser.add_argument('--daylight',action='store_true',help='Isolate construction/production in daylight; native night/sleep is tested separately')
 parser.add_argument('--live-threats',action='store_true',help='Normal difficulty and a flying creative observer so natural monster spawning remains active')
@@ -15,8 +20,18 @@ parser.add_argument('--world',type=Path)
 parser.add_argument('--max-ticks',type=int,default=48000,help='Bound colony observation; writes separate 48000/96000-tick checkpoints for longer runs')
 parser.add_argument('--keep-lab',action='store_true',help='Retain one <=1 GiB diagnostic lab until the next run; otherwise delete the copied profile on exit')
 args=parser.parse_args()
+try:
+    benchmark_rates=[int(rate) for rate in args.benchmark_rates.split(',')]
+    if not 1<=len(benchmark_rates)<=12 or any(rate<0 or rate>10000 for rate in benchmark_rates):raise ValueError()
+except ValueError:parser.error('--benchmark-rates requires 1 to 12 integers from 0 to 10000')
+if not 5<=args.benchmark_seconds<=30:parser.error('--benchmark-seconds must be between 5 and 30')
+if not 0<=args.residents<=32:parser.error('--residents must be between 0 and 32')
+if args.residents and not args.colony:parser.error('--residents requires --colony')
+if not 1<=args.tick_rate<=10000:parser.error('--tick-rate must be between 1 and 10000')
+if args.benchmark_tps and not args.colony:parser.error('--benchmark-tps requires --colony')
 if not 4800<=args.max_ticks<=144000:parser.error('--max-ticks must be between 4800 and 144000')
 sys.path.insert(0,str(ROOT/'tools'))
+from validation_timing import colony_timeout_seconds
 from test_session import acquire_test_session
 validation_session=acquire_test_session(ROOT,'graphical client')
 from test_artifacts import ValidationRun, reject_disposable_source, compact_observation
@@ -67,13 +82,13 @@ classpath.append(str(meta/f'versions/{version}/{version}.jar'))
 java=meta/'java_versions/zulu25.32.21-ca-jre25.0.2-win_x64/bin/java.exe'
 natives=meta/'natives'/version
 command=[str(java),'-Xmx4G','--sun-misc-unsafe-memory-access=allow','--enable-native-access=ALL-UNNAMED',
-    f'-Davillage.test.maxTicks={args.max_ticks}',
-    f'-Davillage.test.colony={str(args.colony).lower()}',f'-Davillage.test.growth={str(args.growth).lower()}',f'-Davillage.test.liveThreats={str(args.live_threats).lower()}',f'-Davillage.test.daylight={str(args.daylight).lower()}',f'-Davillage.test.copiedWorld={str(args.world is not None).lower()}',
+    f'-Davillage.test.tickRate={args.tick_rate}',f'-Davillage.test.wallTimeout={660 if args.benchmark_tps else colony_timeout_seconds(args.max_ticks,args.tick_rate)-30}',f'-Davillage.test.maxTicks={args.max_ticks}',f'-Davillage.test.benchmarkRates={args.benchmark_rates}',f'-Davillage.test.benchmarkSeconds={args.benchmark_seconds}',f'-Davillage.test.benchmarkTps={str(args.benchmark_tps).lower()}',
+    f'-Davillage.test.residents={args.residents}',f'-Davillage.test.colony={str(args.colony).lower()}',f'-Davillage.test.growth={str(args.growth).lower()}',f'-Davillage.test.liveThreats={str(args.live_threats).lower()}',f'-Davillage.test.daylight={str(args.daylight).lower()}',f'-Davillage.test.copiedWorld={str(args.world is not None).lower()}',
     f'-Djava.library.path={natives}/java',f'-Djna.tmpdir={natives}/jna',f'-Dorg.lwjgl.system.SharedLibraryExtractPath={natives}/lwjgl',
     '-cp',os.pathsep.join(classpath),data['mainClass'],'--username','VillageProbe','--uuid','00000000000000000000000000000001',
     '--accessToken','0','--version','26.2','--versionType','release','--gameDir',str(lab),'--assetsDir',str(meta/'assets'),
     '--assetIndex',data['assetIndex']['id'],'--width','960','--height','540']
-report={'success':False,'originalProfile':str(args.profile),'lab':str(lab),'maxObservationTicks':args.max_ticks,
+report={'success':False,'scope':'tick_speed_benchmark' if args.benchmark_tps else 'colony' if args.colony else 'client_smoke','originalProfile':str(args.profile),'lab':str(lab),'maxObservationTicks':args.max_ticks,'requestedTps':args.tick_rate,
         'jars':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (lab/'mods').glob('*.jar')}}
 frozen_sources={}
 for prefix,project in [('villages',ROOT),('navigation',ROOT.parent/'MinecraftmodNavigationAi')]:
@@ -96,11 +111,11 @@ try:
         process=subprocess.Popen(command,cwd=lab,stdout=log,stderr=subprocess.STDOUT,creationflags=subprocess.CREATE_NO_WINDOW)
         artifacts.register_process(process)
         print(f'CLIENT_PID {process.pid}\nLAB {lab}',flush=True)
-        deadline=time.monotonic()+(min(5100,180+args.max_ticks/20) if args.colony else 360)
+        deadline=time.monotonic()+(720 if args.benchmark_tps else colony_timeout_seconds(args.max_ticks,args.tick_rate) if args.colony else 360)
         while process.poll() is None and time.monotonic()<deadline:
             if artifacts.budget_error:raise RuntimeError(artifacts.budget_error)
             if timeline is not None and time.monotonic()>=next_snapshot and timeline.tell()<32*1024**2:
-                next_snapshot=time.monotonic()+5
+                next_snapshot=time.monotonic()+.5
                 live=lab/'colony-live.json'
                 if live.is_file():
                     try:

@@ -1,0 +1,292 @@
+{
+  "success": false,
+  "scope": "colony",
+  "fullAutonomyAccepted": false,
+  "reason": "production_observation_timeout",
+  "ticks": 48001,
+  "screenshots": 41,
+  "evidence": {
+    "difficulty": "peaceful",
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 400,
+    "requestedTps": 400,
+    "fixedDaylight": false,
+    "naturalThreats": false,
+    "measuredTps": 399.96180364775165,
+    "averageTps": 386.5208541768541,
+    "meanTickMs": 1.188519,
+    "artificialAdultsAdded": 11,
+    "requestedAdultMinimum": 12,
+    "initialRoles": {
+      "2948161d-5d23-4ebc-be6f-f20832b1560c": {
+        "role": "STEWARD",
+        "profession": "none",
+        "reason": "нужен специалист: завхоз",
+        "schedule": 5
+      },
+      "97924587-5c52-4981-9cc4-72c0a9189044": {
+        "role": "BUILDER",
+        "profession": "mason",
+        "reason": "родная профессия: mason",
+        "schedule": 10
+      },
+      "b3bff706-0d11-4369-8c0a-3265ba470f49": {
+        "role": "FARMER",
+        "profession": "mason",
+        "reason": "нужен специалист: фермер",
+        "schedule": 11
+      },
+      "10812de6-ea56-42e3-8bb9-6594be70ef74": {
+        "role": "LOGGER",
+        "profession": "none",
+        "reason": "нужен специалист: лесоруб",
+        "schedule": 13
+      },
+      "31018a08-d2d0-4f52-b736-f4a79d3df826": {
+        "role": "MINER",
+        "profession": "none",
+        "reason": "нужен специалист: шахтёр",
+        "schedule": 19
+      },
+      "40ff8464-911c-41d6-9c33-fedeffd27e24": {
+        "role": "GUARD",
+        "profession": "none",
+        "reason": "нужен специалист: сторож",
+        "schedule": 8
+      },
+      "47604f9f-5540-4496-a896-4bfca137c04f": {
+        "role": "PORTER",
+        "profession": "none",
+        "reason": "нужен специалист: носильщик",
+        "schedule": 2
+      },
+      "493f0f46-4390-498d-b6fa-459d60686edf": {
+        "role": "STEWARD",
+        "profession": "none",
+        "reason": "нужен специалист: завхоз",
+        "schedule": 1
+      },
+      "6730ef53-1452-423e-a26e-ff3ca6f70b89": {
+        "role": "BUILDER",
+        "profession": "none",
+        "reason": "нужен специалист: строитель",
+        "schedule": 0
+      },
+      "848068b2-a164-4d14-8b28-eed27b198503": {
+        "role": "FARMER",
+        "profession": "none",
+        "reason": "нужен специалист: фермер",
+        "schedule": 7
+      },
+      "a898caa0-f1b7-40aa-9adc-1450cc4e5227": {
+        "role": "LOGGER",
+        "profession": "none",
+        "reason": "нужен специалист: лесоруб",
+        "schedule": 5
+      },
+      "b8df6e74-3cc6-43d8-a2d2-b27f36893604": {
+        "role": "MINER",
+        "profession": "none",
+        "reason": "нужен специалист: шахтёр",
+        "schedule": 7
+      },
+      "c80dbc71-c1c5-42a9-ad53-b35e61bf75be": {
+        "role": "GUARD",
+        "profession": "none",
+        "reason": "нужен специалист: сторож",
+        "schedule": 8
+      },
+      "e72e0081-8ea1-40cd-9253-7bd235cfc81e": {
+        "role": "PORTER",
+        "profession": "none",
+        "reason": "нужен специалист: носильщик",
+        "schedule": 16
+      },
+      "f3f370c1-ad62-4432-921e-0c67c5376f34": {
+        "role": "STEWARD",
+        "profession": "none",
+        "reason": "нужен специалист: завхоз",
+        "schedule": 8
+      },
+      "fed361b4-fa73-4483-8f63-fee734b89980": {
+        "role": "BUILDER",
+        "profession": "none",
+        "reason": "нужен специалист: строитель",
+        "schedule": 0
+      },
+      "ff983d1f-1cb9-4625-91b9-a3ef60af5555": {
+        "role": "FARMER",
+        "profession": "none",
+        "reason": "нужен специалист: фермер",
+        "schedule": 0
+      }
+    },
+    "initialResidents": 17,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "residentJobTicks": {
+      "2948161d-5d23-4ebc-be6f-f20832b1560c": {
+        "idle": 11062,
+        "storage": 9995,
+        "home": 18330,
+        "harvest": 8315
+      },
+      "97924587-5c52-4981-9cc4-72c0a9189044": {
+        "idle": 14171,
+        "home": 20057,
+        "storage": 3902,
+        "harvest": 9472
+      },
+      "b3bff706-0d11-4369-8c0a-3265ba470f49": {
+        "idle": 521,
+        "home": 43002,
+        "seeds": 4079
+      },
+      "e72e0081-8ea1-40cd-9253-7bd235cfc81e": {
+        "home": 31972,
+        "idle": 2557,
+        "storage": 11029,
+        "native_work": 2044
+      },
+      "6730ef53-1452-423e-a26e-ff3ca6f70b89": {
+        "home": 47584,
+        "idle": 18
+      },
+      "c80dbc71-c1c5-42a9-ad53-b35e61bf75be": {
+        "idle": 82,
+        "home": 47520
+      },
+      "ff983d1f-1cb9-4625-91b9-a3ef60af5555": {
+        "idle": 2057,
+        "home": 31183,
+        "storage": 7238,
+        "harvest": 5154,
+        "seeds": 1970
+      },
+      "f3f370c1-ad62-4432-921e-0c67c5376f34": {
+        "home": 30484,
+        "idle": 9018,
+        "wood": 8100
+      },
+      "10812de6-ea56-42e3-8bb9-6594be70ef74": {
+        "idle": 10842,
+        "storage": 9973,
+        "home": 17812,
+        "harvest": 5824,
+        "seeds": 3151
+      },
+      "b8df6e74-3cc6-43d8-a2d2-b27f36893604": {
+        "idle": 12326,
+        "home": 25320,
+        "storage": 5178,
+        "wood": 4279,
+        "harvest": 499
+      },
+      "a898caa0-f1b7-40aa-9adc-1450cc4e5227": {
+        "idle": 535,
+        "home": 41650,
+        "wood": 5417
+      },
+      "31018a08-d2d0-4f52-b736-f4a79d3df826": {
+        "idle": 16564,
+        "home": 23211,
+        "harvest": 4363,
+        "storage": 3464
+      },
+      "47604f9f-5540-4496-a896-4bfca137c04f": {
+        "home": 28985,
+        "idle": 1064,
+        "storage": 9760,
+        "native_work": 2333,
+        "pickup": 5460
+      },
+      "848068b2-a164-4d14-8b28-eed27b198503": {
+        "idle": 11195,
+        "home": 17536,
+        "storage": 199,
+        "wood": 9186,
+        "harvest": 9486
+      },
+      "40ff8464-911c-41d6-9c33-fedeffd27e24": {
+        "home": 16530,
+        "idle": 13102,
+        "guard": 17970
+      },
+      "493f0f46-4390-498d-b6fa-459d60686edf": {
+        "idle": 1267,
+        "home": 39345,
+        "wood": 6461,
+        "build": 1,
+        "storage": 528
+      },
+      "fed361b4-fa73-4483-8f63-fee734b89980": {
+        "idle": 12339,
+        "home": 29511,
+        "wood": 4256,
+        "harvest": 1496
+      }
+    },
+    "newMiningExpeditionsReturnedAndUnloaded": 0,
+    "newExpeditionItemsUnloaded": 0,
+    "navigationMetrics": {
+      "serverTicks": 48000,
+      "lastTickNanos": 63100,
+      "totalTickNanos": 13942403200,
+      "maxTickNanos": 19883900,
+      "snapshots": 388,
+      "snapshotNanos": 9830988700,
+      "pathSearchesSubmitted": 367,
+      "pathSearchesCompleted": 312,
+      "pathSearchesCancelled": 50,
+      "pathSearchesRejected": 0,
+      "backpressureDeferrals": 0,
+      "nodeBudgetDeferrals": 0,
+      "pathSearchNanos": 461698537300,
+      "pathNodesVisited": 3204320,
+      "replans": 588,
+      "queuedSearches": 10,
+      "activeSearches": 4
+    },
+    "observedNightTicks": 20000,
+    "observedSleepTicks": 20012,
+    "naturalThreatsSeen": 0,
+    "clockTime": 48000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "iron": 0,
+      "rawIron": 0,
+      "cobblestone": 0,
+      "coal": 0
+    },
+    "sharedChestContents": [
+      {
+        "items": [
+          "1 minecraft:wheat_seeds",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ],
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}"
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 17
+  }
+}

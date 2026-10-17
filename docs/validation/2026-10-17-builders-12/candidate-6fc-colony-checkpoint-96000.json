@@ -1,0 +1,269 @@
+{
+  "ticks": 96000,
+  "complete": false,
+  "status": "Observed | работает | центр -321, 73, -319 | территория -401,-392 — -242,-246 | жителей загружено 12, работников 12, кроватей 5 | сундуков 1, еды 35 | строительство поле 0/3 | заказы: PLANKS 0/6 bed_planks, WOOL 0/6 bed_wool, SHEARS 0/1 bed_shears, IRON 0/2 iron_shears, LOGS 0/8 b_bJ3TUPGsSva0KzeA4YoCmA_logs, PLANKS 0/32 b_bJ3TUPGsSva0KzeA4YoCmA_planks, COBBLESTONE 0/16 b_bJ3TUPGsSva0KzeA4YoCmA_stone, LOGS 0/8 b_zxJA_sZCSBSSU2zpP5JxzQ_logs, PLANKS 0/32 b_zxJA_sZCSBSSU2zpP5JxzQ_planks, COBBLESTONE 0/16 b_zxJA_sZCSBSSU2zpP5JxzQ_stone | запас еды нужен 84 | рост ждёт ресурсов/жилья | хозяйство работает\nвозвращается домой, ночует в безопасном доме, спит",
+  "evidence": {
+    "difficulty": "peaceful",
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 400,
+    "requestedTps": 400,
+    "fixedDaylight": false,
+    "naturalThreats": false,
+    "measuredTps": 399.9140184860255,
+    "averageTps": 393.6579264004312,
+    "meanTickMs": 1.139419,
+    "initialResidents": 12,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "residentJobTicks": {
+      "6c9dd350-f1ac-4af6-b42b-3780e18a0298": {
+        "idle": 4865,
+        "home": 54000,
+        "storage": 11277,
+        "wood": 9122,
+        "build": 10585,
+        "escape": 461,
+        "grade": 4790,
+        "native_work": 600
+      },
+      "27bfee76-dedb-4526-be94-17d4ee737a8f": {
+        "idle": 41568,
+        "grade": 20839,
+        "home": 16274,
+        "storage": 4443,
+        "harvest": 3699,
+        "wood": 8877
+      },
+      "d30ef7a0-967f-490d-87e2-44f95b8643e1": {
+        "idle": 28232,
+        "home": 27648,
+        "storage": 3025,
+        "seeds": 8697,
+        "wood": 421,
+        "harvest": 20815,
+        "build": 6262,
+        "native_work": 600
+      },
+      "f0655a24-93e5-45d7-8820-db208934a57f": {
+        "idle": 38161,
+        "home": 20456,
+        "wood": 12880,
+        "harvest": 10417,
+        "storage": 9981,
+        "seeds": 350,
+        "build": 2728,
+        "bench": 727
+      },
+      "fb836bd4-5d28-4938-83cf-6fa43d510d3a": {
+        "home": 53369,
+        "idle": 15385,
+        "guard": 25647,
+        "native_work": 1200
+      },
+      "70c66997-6ccb-4ebf-bd50-ac22fcc2a00c": {
+        "idle": 33006,
+        "home": 24704,
+        "storage": 21406,
+        "wood": 6896,
+        "harvest": 9589
+      },
+      "cf1240fe-c642-4814-9253-6ce93f9271cd": {
+        "idle": 27986,
+        "home": 29948,
+        "storage": 8367,
+        "wood": 19449,
+        "build": 9849
+      },
+      "24e8c7c0-2d56-4293-b99c-0866a69b0755": {
+        "idle": 40511,
+        "home": 26651,
+        "storage": 12570,
+        "pickup": 10267,
+        "collect_order": 5600
+      },
+      "2fe9b070-f867-4663-a7ef-3854f8081be4": {
+        "idle": 30971,
+        "home": 26724,
+        "grade": 24863,
+        "storage": 9713,
+        "wood": 3309,
+        "harvest": 19
+      },
+      "82eb408e-c512-41f1-95f5-aef38aeadd3b": {
+        "idle": 40900,
+        "home": 16855,
+        "storage": 18624,
+        "wood": 5215,
+        "harvest": 13792,
+        "seeds": 213
+      },
+      "482b5600-0b19-44d3-9b1a-dd2c0c4f658d": {
+        "idle": 23992,
+        "home": 34093,
+        "storage": 20149,
+        "seeds": 527,
+        "wood": 6975,
+        "table": 182,
+        "bench": 383,
+        "harvest": 8594,
+        "escape": 704
+      },
+      "460ad134-10d5-4633-83a5-c04aebdd580a": {
+        "idle": 40440,
+        "home": 18941,
+        "storage": 13086,
+        "seeds": 599,
+        "wood": 4493,
+        "harvest": 15693,
+        "table": 645,
+        "native_work": 847,
+        "plant": 855
+      }
+    },
+    "newMiningExpeditionsReturnedAndUnloaded": 0,
+    "newExpeditionItemsUnloaded": 0,
+    "navigationMetrics": {
+      "serverTicks": 96000,
+      "lastTickNanos": 45200,
+      "totalTickNanos": 27221837400,
+      "maxTickNanos": 20219900,
+      "snapshots": 1587,
+      "snapshotNanos": 19855277400,
+      "pathSearchesSubmitted": 1367,
+      "pathSearchesCompleted": 1308,
+      "pathSearchesCancelled": 122,
+      "pathSearchesRejected": 0,
+      "backpressureDeferrals": 0,
+      "nodeBudgetDeferrals": 0,
+      "pathSearchNanos": 907187900200,
+      "pathNodesVisited": 6665352,
+      "replans": 1806,
+      "queuedSearches": 1,
+      "activeSearches": 4
+    },
+    "observedNightTicks": 40000,
+    "observedSleepTicks": 34088,
+    "naturalThreatsSeen": 0,
+    "clockTime": 96000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "coal": 0,
+      "cobblestone": 0,
+      "rawIron": 0,
+      "iron": 0
+    },
+    "sharedChestContents": [
+      {
+        "pos": "BlockPos{x\u003d-303, y\u003d77, z\u003d-342}",
+        "items": [
+          "1 minecraft:brown_egg",
+          "19 minecraft:dirt",
+          "14 minecraft:wheat_seeds",
+          "1 minecraft:egg",
+          "1 minecraft:bundle",
+          "3 minecraft:apple",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ]
+      }
+    ],
+    "artificialAdultsAdded": 6,
+    "requestedAdultMinimum": 12,
+    "initialRoles": {
+      "27bfee76-dedb-4526-be94-17d4ee737a8f": {
+        "role": "STEWARD",
+        "profession": "none",
+        "reason": "нужен специалист: завхоз",
+        "schedule": 19
+      },
+      "6c9dd350-f1ac-4af6-b42b-3780e18a0298": {
+        "role": "BUILDER",
+        "profession": "none",
+        "reason": "нужен специалист: строитель",
+        "schedule": 6
+      },
+      "d30ef7a0-967f-490d-87e2-44f95b8643e1": {
+        "role": "FARMER",
+        "profession": "none",
+        "reason": "нужен специалист: фермер",
+        "schedule": 5
+      },
+      "f0655a24-93e5-45d7-8820-db208934a57f": {
+        "role": "LOGGER",
+        "profession": "none",
+        "reason": "нужен специалист: лесоруб",
+        "schedule": 20
+      },
+      "70c66997-6ccb-4ebf-bd50-ac22fcc2a00c": {
+        "role": "MINER",
+        "profession": "none",
+        "reason": "нужен специалист: шахтёр",
+        "schedule": 22
+      },
+      "fb836bd4-5d28-4938-83cf-6fa43d510d3a": {
+        "role": "GUARD",
+        "profession": "none",
+        "reason": "нужен специалист: сторож",
+        "schedule": 18
+      },
+      "24e8c7c0-2d56-4293-b99c-0866a69b0755": {
+        "role": "PORTER",
+        "profession": "mason",
+        "reason": "нужен специалист: носильщик",
+        "schedule": 0
+      },
+      "cf1240fe-c642-4814-9253-6ce93f9271cd": {
+        "role": "BUILDER",
+        "profession": "mason",
+        "reason": "родная профессия: mason",
+        "schedule": 22
+      },
+      "2fe9b070-f867-4663-a7ef-3854f8081be4": {
+        "role": "STEWARD",
+        "profession": "none",
+        "reason": "нужен специалист: завхоз",
+        "schedule": 19
+      },
+      "460ad134-10d5-4633-83a5-c04aebdd580a": {
+        "role": "FARMER",
+        "profession": "none",
+        "reason": "нужен специалист: фермер",
+        "schedule": 15
+      },
+      "482b5600-0b19-44d3-9b1a-dd2c0c4f658d": {
+        "role": "LOGGER",
+        "profession": "none",
+        "reason": "нужен специалист: лесоруб",
+        "schedule": 10
+      },
+      "82eb408e-c512-41f1-95f5-aef38aeadd3b": {
+        "role": "MINER",
+        "profession": "none",
+        "reason": "нужен специалист: шахтёр",
+        "schedule": 15
+      }
+    },
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 12
+  },
+  "warehouse": false,
+  "repair": false,
+  "upgrade": false,
+  "growth": false
+}

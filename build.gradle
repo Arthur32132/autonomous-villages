@@ -48,23 +48,29 @@ tasks.register('sourceTree', Zip) {
     preserveFileTimestamps = false
     from(projectDir) {
         into 'AutonomousVillages'
-        include 'src/**','tools/**','gradle/**','gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','LICENSE','README.md','MODDING_PLAN.md','VALIDATION.md','docs/release/**'
+        include 'src/**','tools/**','gradle/**','gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','LICENSE','README.md','MODDING_PLAN.md','VALIDATION.md','AGENTS.md','MODLOG.md','CHANGELOG.md','docs/release/**','docs/ROADMAP.md','docs/STATIC_AUDIT_2026-10-17.md'
         exclude '**/__pycache__/**','**/lab/**'
     }
     from(project(':navigationAi').projectDir) {
         into 'MinecraftmodNavigationAi'
-        include 'src/**','tools/regression/**','gradle/**','gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','LICENSE'
+        include 'src/**','tools/regression/**','gradle/**','gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','LICENSE','README.md','docs/*.md'
         exclude '**/__pycache__/**','tools/regression/results/**'
     }
 }
 tasks.register('assembleDistribution', Sync) {
-    dependsOn tasks.build, project(':navigationAi').tasks.named('build'), tasks.sourceTree
+    dependsOn 'jar', 'sourcesJar', ':navigationAi:jar', ':navigationAi:sourcesJar', 'sourceTree'
     into layout.buildDirectory.dir('distribution')
-    from(tasks.jar)
-    from(project(':navigationAi').tasks.named('jar'))
-    from('README.md', 'LICENSE', 'MODDING_PLAN.md', 'VALIDATION.md')
+    from(tasks.named('jar', Jar).flatMap { it.archiveFile })
+    from(project(':navigationAi').tasks.named('jar', Jar).flatMap { it.archiveFile })
+    from('README.md', 'LICENSE', 'MODDING_PLAN.md', 'VALIDATION.md', 'CHANGELOG.md')
+    from(['docs/STATIC_AUDIT_2026-10-17.md','docs/ROADMAP.md']) { into 'docs' }
+    from(project(':navigationAi').file('docs/RELEASE_0.2.2.md')) { into 'docs/navigation-ai' }
     from('docs/release') { into 'docs/release' }
-    from(tasks.sourceTree) { into 'sources' }
+    from(tasks.named('sourceTree', Zip).flatMap { it.archiveFile }) { into 'sources' }
+    doFirst {
+        def intended = project.layout.buildDirectory.dir('distribution').get().asFile.canonicalFile
+        if (destinationDir.canonicalFile != intended) throw new GradleException('Distribution must stay in build/distribution')
+    }
     doLast {
         def sha = { File f -> java.security.MessageDigest.getInstance('SHA-256').digest(f.bytes).encodeHex().toString() }
         def folder = layout.buildDirectory.dir('distribution').get().asFile

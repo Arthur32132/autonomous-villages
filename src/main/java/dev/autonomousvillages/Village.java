@@ -17,6 +17,7 @@ final class Village {
     final VillageState state;
     final VillageIndex index = new VillageIndex();
     final TownPlanner town;
+    final SheepFarm farm;
     final VillagePresentation presentation;
     final ExpeditionManager expeditions;
     final Reservations reservations = new Reservations();
@@ -31,7 +32,7 @@ final class Village {
     private long nextSurvey;
     private long nextAlarm;
     private final ArrayDeque<String> history=new ArrayDeque<>();
-    Village(VillageRuntime runtime, VillageState state) { this.runtime = runtime; this.state = state; this.level = runtime.server.overworld();this.town=new TownPlanner(this);this.presentation=new VillagePresentation(this);this.expeditions=new ExpeditionManager(this);
+    Village(VillageRuntime runtime, VillageState state) { this.runtime = runtime; this.state = state; this.level = runtime.server.overworld();this.town=new TownPlanner(this);this.farm=new SheepFarm(this);this.presentation=new VillagePresentation(this);this.expeditions=new ExpeditionManager(this);
         if(state.nextExpedition==0)state.nextExpedition=level.getGameTime()+1200;
     }
     void ticket(boolean enabled) {
@@ -74,15 +75,23 @@ final class Village {
         }
         if (time % 100 == 0 || workers.isEmpty()) sync();
         town.tick();
+        farm.tick();
+        ManagedLand.tick(this);
+        ProductionBuildings.tick(this);
+        PopulationPlanning.tick(this);
+        if(time%100==0)IronSupply.sync(this,time);
         expeditions.tick();
         SupplyRuns.tick(this);
-        List<Resident> order = List.copyOf(workers.values()); long deadline = System.nanoTime() + 2_000_000L;
+        DeliveryRuns.tick(this);
+        List<Resident> order = List.copyOf(workers.values());
         for (int n = 0; n < order.size(); n++) {
             Resident r = order.get(Math.floorMod(n + rotation, order.size()));
             if (r.job==null && r.combat==null && time % 10 != Math.floorMod(r.id.hashCode(), 10)) continue;
-            if (System.nanoTime() > deadline && n > 0) break;
-            try { r.tick(); }
+            boolean mayPlan=runtime.residentDecisionRemainingNanos>0;
+            long start=System.nanoTime();boolean idle=r.job==null;
+            try { r.tick(mayPlan); }
             catch (RuntimeException error) { r.fail("повторит действие позже"); if (time % 200 < 10) AutonomousVillagesMod.LOG.warn("Resident {}", r.id, error); }
+            finally{if(idle&&mayPlan)runtime.residentDecisionRemainingNanos-=System.nanoTime()-start;}
         }
         rotation++;
         presentation.tick();
@@ -118,18 +127,56 @@ final class Village {
                 if (v.isNoAi()) continue; // do not override map-maker NoAI residents
                 BotHandle handle = runtime.bots.find(id).orElseGet(() -> runtime.bots.attach(v));
                 if (handle.kind() == BotKind.VILLAGER) workers.computeIfAbsent(id, ignored -> new Resident(this, id));
-            } else if (e != null && !e.isAlive()) { state.residents.remove(id); Resident r = workers.remove(id); if (r != null) reservations.release(id); }
+            } else if (e != null && !e.isAlive()) { state.residents.remove(id); Resident r = workers.remove(id); if (r != null) reservations.release(id); residentLost(id); }
         }
         workers.entrySet().removeIf(entry -> {
             var bot = runtime.bots.find(entry.getKey()).orElse(null);
-            if (bot != null && bot.state() == BotState.DEAD) { state.residents.remove(entry.getKey()); reservations.release(entry.getKey()); return true; }
+            if (bot != null && bot.state() == BotState.DEAD) { state.residents.remove(entry.getKey()); reservations.release(entry.getKey()); residentLost(entry.getKey()); return true; }
             return false;
         });
+        syncRoles();
+        if(!state.vacantRoles.isEmpty())PopulationPlanning.recoverVacancies(this);
+    }
+    void syncRoles(){
+        var adults=new LinkedHashMap<UUID,String>();
+        for(UUID id:state.residents)if(level.getEntity(id) instanceof Villager body&&body.isAlive()&&!body.isBaby()&&!body.isNoAi())
+            adults.put(id,body.getVillagerData().profession().unwrapKey().map(k->k.identifier().getPath()).orElse("none"));
+        state.residentRoles.keySet().retainAll(state.residents);
+        if(ResidentRoles.assign(state.residentRoles,adults)){
+            for(UUID id:adults.keySet())if(state.residentRoles.containsKey(id)&&!announcedRoles.contains(id)){
+                var a=state.residentRoles.get(id);event(a.role.label+": "+a.reason);announcedRoles.add(id);
+            }
+            runtime.save();
+        }
+    }
+    private final Set<UUID> announcedRoles=new HashSet<>();
+    // Captured before vanilla drops/clears the real backpack, consumed only after confirmed death.
+    final Map<UUID,Map<Orders.Material,Integer>> dyingCargo=new HashMap<>();
+    void rememberDyingCargo(UUID id){
+        var b=runtime.bots.find(id).orElse(null);if(b==null)return;
+        var cargo=new EnumMap<Orders.Material,Integer>(Orders.Material.class);
+        for(var material:Orders.Material.values())cargo.put(material,Supplies.count(b.inventory().snapshot().slots(),material.accepts));
+        dyingCargo.put(id,cargo);
+    }
+    void residentLost(UUID id){
+        var lost=primaryRole(id);if(lost!=null)state.vacantRoles.add(lost);
+        state.residentRoles.remove(id);announcedRoles.remove(id);
+        var stock=new EnumMap<Orders.Material,Integer>(Orders.Material.class);
+        long now=level.getGameTime();
+        for(var material:Orders.Material.values()){
+            stock.put(material,chestCount(material));Orders.recovered(state.orders,material,stock.get(material),now);
+        }
+        for(var order:state.orders)if(id.toString().equals(order.recipient)&&!order.returnCargo()){order.recipient="";order.delivered=0;Orders.release(order);}
+        var cargo=dyingCargo.remove(id);
+        if(Orders.workerLost(state.orders,id,meetingPoint().asLong(),now,cargo==null?Map.of():cargo,stock)){
+            event("Заказы погибшего ожидают преемника; реальный груз отмечен к возврату");runtime.save();
+        }
     }
     boolean expand(VillageState.Bounds addition){
         if(state.bounds==null)return false;
         var old=state.bounds;
         var combined=new VillageState.Bounds(Math.min(old.minX,addition.minX),Math.min(old.minZ,addition.minZ),Math.max(old.maxX,addition.maxX),Math.max(old.maxZ,addition.maxZ));
+        if(!state.policy.expansionAllowed(old,combined))return false;
         if(VillageState.footprintChunks(combined)>VillageState.MAX_TICKET_CHUNKS)return false;
         if((long)combined.maxX-combined.minX>4096||(long)combined.maxZ-combined.minZ>4096)return false;
         state.bounds=combined;
@@ -143,6 +190,7 @@ final class Village {
         for (long packed : List.copyOf(state.storage)) {
             BlockPos p = BlockPos.of(packed);
             if (!level.hasChunkAt(p)) continue;
+            if(state.policy.isPrivate(this,p))continue;
             if (level.getBlockEntity(p) instanceof ChestBlockEntity c && !c.isLocked()) result.add(c);
             else if(!(level.getBlockEntity(p) instanceof ChestBlockEntity))state.storage.remove(packed);
         }
@@ -154,26 +202,71 @@ final class Village {
     }
     int count(Predicate<ItemStack> test) {
         int n = 0;
-        for (var chest : chests()) n += Supplies.count(Supplies.copy(chest), test);
+        for (var chest : chests()) if(!ManagedLand.seedChest(this,chest.getBlockPos().asLong()))n += Supplies.count(Supplies.copy(chest), test);
         for (Resident r : workers.values()) { BotHandle b = r.bot(); if (b != null && b.state() == BotState.ACTIVE) n += Supplies.count(b.inventory().snapshot().slots(), test); }
         return n;
+    }
+    int chestCount(Orders.Material material){
+        int n=0;for(var chest:chests())if(!ManagedLand.seedChest(this,chest.getBlockPos().asLong()))n+=Supplies.count(Supplies.copy(chest),material.accepts);return n;
+    }
+    /** Free stock, personal kits, material reserved for open orders and cargo already in transit. */
+    Orders.Ledger ledger(Orders.Material material){
+        Orders.refreshStock(this);
+        List<Resident> active=workers.values().stream().filter(r->{BotHandle b=r.bot();return b!=null&&b.state()==BotState.ACTIVE;}).toList();
+        int[] bags=new int[active.size()],kits=new int[active.size()];
+        for(int i=0;i<active.size();i++){bags[i]=active.get(i).count(material);kits[i]=active.get(i).kit(material);}
+        return Orders.split(state.orders,material,chestCount(material),bags,kits);
+    }
+    /** Earlier open orders keep their chest allocation; unrelated fetches see only free stock. */
+    int claimableFromChests(Orders.Order wanted){
+        Orders.refreshStock(this);
+        int stock=chestCount(wanted.kind());
+        for(var order:state.orders){
+            if(order==wanted)return Math.min(stock,order.outstanding());
+            if(order.open()&&!order.returnCargo()&&order.kind()==wanted.kind())stock=Math.max(0,stock-order.outstanding());
+        }
+        return 0;
+    }
+    /** Residents whose backpack physically carries this material and can hand it over. */
+    List<Resident> holders(Orders.Material material){
+        List<Resident> result=new ArrayList<>();
+        for(Resident r:workers.values()){BotHandle b=r.bot();if(b==null||b.state()!=BotState.ACTIVE)continue;
+            if(r.count(material)>0)result.add(r);}
+        return result;
     }
     boolean ready(BlockPos p, UUID worker) {
         return canWork(p) && rejected.getOrDefault(p.asLong(), 0L) <= level.getGameTime()
                 && reservations.available(p.asLong(), worker, level.getGameTime());
     }
     boolean canWork(BlockPos p){return state.recordedWork(p)||expeditions.permits(p);}
-    boolean steward(UUID id) { return workers.keySet().stream().min(Comparator.comparing(UUID::toString)).map(id::equals).orElse(false); }
-    int roleIndex(UUID id){var ids=workers.keySet().stream().sorted(Comparator.comparing(UUID::toString)).toList();return Math.max(0,ids.indexOf(id));}
-    boolean builder(UUID id){return workers.size()<3||roleIndex(id)%6<=1;}
-    String role(UUID id){if(workers.size()<3)return "мастер";return switch(roleIndex(id)%6){case 0->"завхоз";case 1->"строитель";case 2->"фермер";case 3,5->"лесоруб";default->"шахтёр";};}
+    ResidentRoles.Role primaryRole(UUID id){var a=state.residentRoles.get(id);return a==null?null:a.role;}
+    boolean hasRole(UUID id,ResidentRoles.Role role){return primaryRole(id)==role;}
+    boolean smallCrew(){return state.residentRoles.size()<3;}
+    boolean steward(UUID id){return hasRole(id,ResidentRoles.Role.STEWARD)||smallCrew()&&builder(id);}
+    /** Stable native/social schedule slot; this number no longer encodes a specialization. */
+    int roleIndex(UUID id){var a=state.residentRoles.get(id);return a==null?Math.floorMod(id.hashCode(),24):a.schedule;}
+    boolean builder(UUID id){return hasRole(id,ResidentRoles.Role.BUILDER)||hasRole(id,ResidentRoles.Role.STEWARD)||smallCrew()&&primaryRole(id)!=null;}
+    boolean farmer(UUID id){return hasRole(id,ResidentRoles.Role.FARMER)||smallCrew()&&primaryRole(id)!=null;}
+    boolean miner(UUID id){return hasRole(id,ResidentRoles.Role.MINER)||smallCrew()&&primaryRole(id)!=null;}
+    boolean guard(UUID id){return hasRole(id,ResidentRoles.Role.GUARD);}
+    boolean porter(UUID id){return hasRole(id,ResidentRoles.Role.PORTER);}
+    boolean logger(UUID id){return hasRole(id,ResidentRoles.Role.LOGGER);}
+    String role(UUID id){var a=primaryRole(id);return a==null?"без назначения":a.label;}
+    boolean expeditionCoverage(Set<UUID> away){
+        var available=new LinkedHashMap<UUID,ResidentRoles.Role>();
+        for(var r:workers.values())if(r.bot()!=null&&r.bot().state()==BotState.ACTIVE&&r.body().isAlive()&&!r.body().isBaby()
+                &&!r.body().isNoAi()&&r.body().getHealth()>=12&&state.contains(r.body().blockPosition())&&primaryRole(r.id)!=null)
+            available.put(r.id,primaryRole(r.id));
+        return ResidentRoles.homeCoverage(available,away);
+    }
     long activeJobs(String... kinds){var names=Set.of(kinds);return workers.values().stream().filter(r->r.job!=null&&names.contains(r.job)).count();}
     void raiseAlarm(Resident caller,net.minecraft.world.entity.monster.Monster enemy){
         long now=level.getGameTime();if(now<nextAlarm)return;nextAlarm=now+40;
         workers.values().stream().filter(r->r!=caller&&r.bot()!=null&&r.body().isAlive()&&!r.body().isSleeping()&&r.body().getHealth()>=16
+                &&guard(r.id)&&!r.body().isTrading()
                 &&r.body().distanceToSqr(enemy)<24*24&&r.body().hasLineOfSight(enemy)
                 &&(r.combat==null||r.combat.completion().isDone())&&VillageWorkshop.hasDefensiveSword(r.bot()))
-                .sorted(Comparator.comparingDouble(r->r.body().distanceToSqr(enemy))).limit(2).toList().forEach(r->r.defend(enemy));
+                .sorted(Comparator.comparingDouble(r->r.body().distanceToSqr(enemy))).limit(2).toList().forEach(r->{r.defend(enemy);ProductionBuildings.alarm(this);});
     }
     void event(String message){history.addLast(message);while(history.size()>12)history.removeFirst();AutonomousVillagesMod.LOG.info("SETTLEMENT {}: {}",state.name,message);}
     boolean safeFeet(BlockPos p) {
@@ -242,6 +335,10 @@ final class Village {
         return state.name + " | " + (state.active ? "работает" : "пауза") + " | центр " + state.center().toShortString()
                 +(state.bounds==null?" | осмотр границ":" | территория "+state.bounds.minX+","+state.bounds.minZ+" — "+state.bounds.maxX+","+state.bounds.maxZ)
                 + " | жителей загружено " + living + ", работников " + workers.size() + ", кроватей " + index.beds.size()
-                + " | сундуков " + chests().size() + ", еды " + count(Supplies::food) + " | " + town.stage + " | " + problem + (jobs.isEmpty() ? "" : "\n" + jobs);
+                + " | сундуков " + chests().size() + ", еды " + count(Supplies::food) + " | " + town.stage
+                + (state.orders.isEmpty() ? "" : " | заказы: " + String.join(", ", state.orders.stream()
+                        .map(o -> o.material + " " + o.delivered + "/" + o.quantity + (o.transit ? " в пути" : "") + " " + o.purpose).toList()))
+                + " | запас еды нужен "+SettlementEconomy.budget(this).food()+" | "+(SettlementEconomy.canGrow(this)?"рост обеспечен":"рост ждёт ресурсов/жилья")
+                + " | " + problem + (jobs.isEmpty() ? "" : "\n" + jobs);
     }
 }

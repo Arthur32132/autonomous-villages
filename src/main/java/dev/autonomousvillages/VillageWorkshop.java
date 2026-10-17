@@ -45,13 +45,19 @@ final class VillageWorkshop {
         if(repairing&&!(recipe.value() instanceof RepairItemRecipe))return false;
         ItemStack output = recipe.value().assemble(input);
         if (output.isEmpty() || !accept.test(output) || !output.isItemEnabled(v.level.enabledFeatures())) return false;
+        var maker=v.workers.get(b.id());
+        if(maker!=null&&output.is(Items.BREAD)){
+            int spent=Supplies.count(grid,s->s.is(Items.WHEAT));
+            if(Supplies.count(next,s->s.is(Items.WHEAT))<v.farm.wheatReserve(maker)||v.count(s->s.is(Items.WHEAT))-spent<SettlementEconomy.budget(v).breedingWheat())return false;
+        }
+        if(maker!=null&&grid.stream().anyMatch(s->s.is(Items.IRON_INGOT))&&!IronSupply.accepts(v,maker,output))return false;
         if ((width > 2 || height > 2) && v.index.tables.stream().noneMatch(p -> nearTable(b,v,p))) {
             var resident=v.workers.get(b.id());if(resident!=null)resident.needsWorkbench=true;
             return false;
         }
         for (ItemStack rest : recipe.value().getRemainingItems(input)) if (!rest.isEmpty() && !Supplies.insert(next,rest)) return false;
         boolean made=Supplies.insert(next, output) && Supplies.replace(b, before, next);
-        if(made){b.entity().swing(net.minecraft.world.InteractionHand.MAIN_HAND);var resident=v.workers.get(b.id());if(resident!=null)resident.needsWorkbench=false;}return made;
+        if(made){ProductionBuildings.record(v,b.entity().blockPosition(),output);b.entity().swing(net.minecraft.world.InteractionHand.MAIN_HAND);var resident=v.workers.get(b.id());if(resident!=null)resident.needsWorkbench=false;}return made;
     }
     static boolean nearTable(BotHandle b,Village v,net.minecraft.core.BlockPos p){
         if(!v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)||b.entity().position().distanceToSqr(Vec3.atCenterOf(p))>16)return false;
@@ -67,17 +73,19 @@ final class VillageWorkshop {
         for(var worn:slots)if((Supplies.tool(worn)||worn.has(net.minecraft.core.component.DataComponents.EQUIPPABLE))&&worn.isDamageableItem()&&!worn.isEnchanted()&&!Supplies.usable(worn)
                 &&slots.stream().filter(s->s.is(worn.getItem())&&s.isDamaged()&&!s.isEnchanted()).count()>=2
                 &&craft(b,v,new String[]{"MM"},s->s.is(worn.getItem())&&s.isDamaged()&&!s.isEnchanted(),s->s.is(worn.getItem()),true))return true;
-        boolean established=v.state.buildings.stream().anyMatch(h->h.kind.equals("warehouse")&&h.completed);
-        int role=v.roleIndex(b.id())%6;
-        boolean miner=role==4||v.workers.size()<3,farmer=role==2||v.workers.size()<3,guard=role==5||v.workers.size()<3;
+        boolean established=v.state.buildings.stream().anyMatch(h->h.kind.equals("warehouse")&&v.town.warehousePhase(h)>=1);
+        boolean miner=v.miner(b.id()),farmer=v.farmer(b.id()),guard=v.guard(b.id());
         if (craft(b,v,Items.BREAD,new String[]{"MMM"},s -> s.is(Items.WHEAT))) return true;
         if(guard&&!hasDefensiveSword(b)
                 &&craft(b,v,Items.STONE_SWORD,new String[]{"M","M","S"},STONE))return true;
         if(miner&&needsIronSurvey(v)&&!hasSurveyPick(b)&&maintainSurveyPick(b,v))return true;
+        if(v.expeditions.preparingMine(b.id())&&hasPickFor(b,Blocks.IRON_ORE.defaultBlockState())
+                &&MineSupplies.inspect(v.workers.get(b.id())).spare()<24
+                &&craft(b,v,Items.STONE_PICKAXE,new String[]{"MMM"," S "," S "},STONE))return true;
         int planks = Supplies.count(slots, PLANK);
         if (planks < 16 && craft(b,v,new String[]{"M"},s -> s.is(ItemTags.LOGS_THAT_BURN),PLANK)) return true;
         if (b.inventory().count(Items.STICK) < 4 && craft(b,v,Items.STICK,new String[]{"P","P"},PLANK)) return true;
-        if(steward&&v.index.beds.size()<v.state.residents.size()+2&&Supplies.find(b,s->s.is(Items.SHEARS)&&Supplies.usable(s))<0
+        if(v.farm.caretaker()==v.workers.get(b.id())&&v.farm.woolRequested()&&Supplies.find(b,s->s.is(Items.SHEARS)&&Supplies.usable(s))<0
                 &&craft(b,v,Items.SHEARS,new String[]{" I","I "},s->s.is(Items.IRON_INGOT)))return true;
         // Every role crosses natural ravines and may need to cut an emergency stairway.
         if (Supplies.find(b,s -> s.is(ItemTags.PICKAXES) && Supplies.usable(s)) < 0) {
@@ -125,7 +133,7 @@ final class VillageWorkshop {
         return false;
     }
     static boolean hasPickFor(BotHandle b,net.minecraft.world.level.block.state.BlockState state){return Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s)&&s.isCorrectToolForDrops(state))>=0;}
-    static boolean needsIronSurvey(Village v){return v.count(s->s.is(Items.RAW_IRON)||s.is(Items.IRON_INGOT))<Math.max(8,v.workers.size()*3);}
+    static boolean needsIronSurvey(Village v){return IronSupply.rawNeeded(v)>0;}
     static boolean hasSurveyPick(BotHandle b){return Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&s.isCorrectToolForDrops(Blocks.IRON_ORE.defaultBlockState())&&s.getMaxDamage()-s.getDamageValue()>=80)>=0;}
     private static boolean maintainSurveyPick(BotHandle b,Village v){
         var slots=b.inventory().snapshot().slots();
@@ -166,7 +174,9 @@ final class VillageWorkshop {
             }
         }
         if (!changed || !Supplies.matches(prior,Supplies.copy(furnace)) || !Supplies.replace(b,before,next)) return false;
-        for (int i = 0; i < 3; i++) furnace.setItem(i,replacement.get(i)); furnace.setChanged(); return true;
+        for (int i = 0; i < 3; i++) furnace.setItem(i,replacement.get(i)); furnace.setChanged();
+        if(!prior.get(2).isEmpty()&&replacement.get(2).isEmpty())ProductionBuildings.record(v,furnace.getBlockPos(),prior.get(2));
+        return true;
     }
     static boolean wantsFurnace(BotHandle b,Village v,FurnaceBlockEntity f){
         return !f.getItem(2).isEmpty()||!f.getItem(0).isEmpty()&&f.getItem(1).isEmpty()

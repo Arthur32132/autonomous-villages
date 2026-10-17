@@ -1,0 +1,31 @@
+{
+  "success": true,
+  "scope": "planning_only",
+  "checks": [
+    "[11:13:09] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+    "[11:13:12] [Server thread/INFO]: VILLAGE_TEST PASS road_dependency_blocks_earthworks_before_approach_is_built",
+    "[11:13:13] [Server thread/INFO]: VILLAGE_TEST PASS real_grading_preserves_drop_and_replacement_does_not_reopen_cut",
+    "[11:13:14] [Server thread/INFO]: VILLAGE_TEST PASS real_bucket_recipe_soil_mining_source_pickup_and_irrigation_conserve_materials",
+    "[11:13:14] [Server thread/INFO]: VILLAGE_TEST PASS seed_bank_access_and_food_budget_preserve_real_planting_reserve",
+    "[11:13:19] [Server thread/INFO]: VILLAGE_TEST PASS distinct_workshops_pay_actual_blocks_and_measure_planks_bread_and_smelted_iron",
+    "[11:13:19] [Server thread/INFO]: VILLAGE_TEST PASS real_commands_preserve_boundary_chest_save_and_accept_removed_house_cell",
+    "[11:13:20] [Server thread/INFO]: VILLAGE_TEST PASS indoor_storage_below_roof_does_not_block_outdoor_building_access",
+    "[11:13:20] [Server thread/INFO]: VILLAGE_TEST PASS growth_prerequisites_precede_real_native_food_issue_without_spawning_children",
+    "[11:13:20] [Server thread/INFO]: VILLAGE_TEST PASS confirmed_death_transfers_role_and_order_and_preserves_real_drop_recovery",
+    "[11:13:20] [Server thread/INFO]: VILLAGE_TEST PASS systems_snapshot_saved_with_actual_native_bags_and_durability",
+    "[11:13:30] [Server thread/INFO]: VILLAGE_TEST PASS actual_process_restart_preserves_roles_land_policy_output_and_native_inventory"
+  ],
+  "junit": {
+    "tests": 69,
+    "failures": 0,
+    "errors": 0
+  },
+  "requestedTps": 40,
+  "scenarioWallSeconds": 14.409465200005798,
+  "jars": {
+    "autonomous-villages-0.2.1.jar": "9c60128b9027851d2a4472802c9321b5ba81064fa5a4e0b1adc046a637fce4e0",
+    "autonomous-villages-validation-0.2.1.jar": "7e8afbff1794a7ef7d70377347b376c710c84159fadf69001a6c217008f4784e",
+    "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+    "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+  }
+}

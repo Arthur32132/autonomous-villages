@@ -1,8 +1,10 @@
 package dev.autonomousvillages;
 
 import static org.junit.jupiter.api.Assertions.*;
+import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.Vec3;
 import org.junit.jupiter.api.Test;
 
 class VillageRulesTest {
@@ -17,7 +19,7 @@ class VillageRulesTest {
         assertFalse(Resident.crossedScheduleBoundary(1000,14000,0,true));
     }
     @Test void commonDestinationsNeverCompeteWithExclusiveResourceJobs(){
-        for(String job:java.util.List.of("home","native_work","storage","table","air","escape","farm_watch","supply","pickup"))assertFalse(Resident.exclusiveJob(job),job);
+        for(String job:java.util.List.of("home","native_work","storage","table","air","escape","farm_watch","supply","pickup","deliver"))assertFalse(Resident.exclusiveJob(job),job);
         for(String job:java.util.List.of("wood","stone","ore","harvest","build","renovate","shear"))assertTrue(Resident.exclusiveJob(job),job);
     }
     @Test void treeAtVillageBorderKeepsItsExteriorBranchesRegistered(){
@@ -214,5 +216,50 @@ class VillageRulesTest {
         for(long clock:new long[]{0,999,11500,13000,23000,23999,24000})assertTrue(Resident.nightRestWindow(clock,false));
         for(long clock:new long[]{1000,3000,9000,11499,25000})assertFalse(Resident.nightRestWindow(clock,false));
         assertTrue(Resident.nightRestWindow(6000,true));
+    }
+    @Test void retreatCorridorRejectsOnlyAnEnemyAcrossTheStraightApproach(){
+        Vec3 from=new Vec3(0,64,0),to=new Vec3(30,64,0);
+        assertTrue(Resident.approachExposed(from,to,new Vec3(10,64,0)));
+        assertTrue(Resident.approachExposed(from,to,new Vec3(10,64,3)));
+        assertFalse(Resident.approachExposed(from,to,new Vec3(10,64,10)));
+        assertFalse(Resident.approachExposed(from,to,new Vec3(-5,64,0)));
+        assertFalse(Resident.approachExposed(from,to,new Vec3(36,64,0)));
+        assertTrue(Resident.approachExposed(new Vec3(0,64,0),new Vec3(10,64,10),new Vec3(5,64,5)));
+        assertFalse(Resident.approachExposed(new Vec3(0,64,0),new Vec3(10,64,10),new Vec3(5,64,-2)));
+    }
+    @Test void standExposureRejectsAnEnemyAcrossTheApproachOrACloserStand(){
+        Vec3 from=new Vec3(0,64,0),enemy=new Vec3(8,64,3);
+        assertTrue(Resident.standExposed(from,new BlockPos(16,64,2),enemy));
+        assertFalse(Resident.standExposed(from,new BlockPos(-6,64,-4),enemy));
+    }
+    @Test void shelterOrderFiltersDistantUnknownAndEnemyAdjacentBeds(){
+        Vec3 from=new Vec3(0,64,0),enemy=new Vec3(8,64,3);
+        BlockPos near=new BlockPos(6,64,-3),far=new BlockPos(-4,64,6);
+        assertEquals(List.of(far),Resident.orderedShelters(from,enemy,List.of(near,far),far::equals));
+        assertEquals(List.of(near,far),Resident.orderedShelters(from,enemy,List.of(far,near),bed->true));
+        assertTrue(Resident.orderedShelters(from,new Vec3(6,64,0),List.of(new BlockPos(3,64,0)),bed->true).isEmpty());
+        assertTrue(Resident.orderedShelters(from,new Vec3(0,64,-14),List.of(new BlockPos(6,64,-3)),bed->false).isEmpty());
+    }
+    @Test void shelteredStandSkipsAnUnusableFirstHouseAndKeepsTheSecond(){
+        Vec3 from=new Vec3(0,64,0),enemy=new Vec3(8,64,3);
+        BlockPos near=new BlockPos(6,64,-3),far=new BlockPos(-4,64,6);
+        List<BlockPos> beds=List.of(near,far);
+        var chosen=Resident.shelteredStand(from,enemy,beds,bed->true,bed->bed.equals(near)?null:new BlockPos(-4,64,4));
+        assertNotNull(chosen);
+        assertEquals(far,chosen.bed());
+        assertEquals(new BlockPos(-4,64,4),chosen.stand());
+        var blocked=Resident.shelteredStand(from,enemy,beds,bed->true,bed->bed.equals(near)?new BlockPos(10,64,1):new BlockPos(-4,64,4));
+        assertNotNull(blocked);
+        assertEquals(far,blocked.bed());
+        assertNull(Resident.shelteredStand(from,enemy,beds,bed->true,bed->null));
+    }
+    @Test void shelteredStandRejectsANearlyCurrentStandAndKeepsAFartherAlternative(){
+        Vec3 from=new Vec3(0,64,0),enemy=new Vec3(0,64,-10);
+        BlockPos near=new BlockPos(2,64,0),far=new BlockPos(12,64,0);
+        assertNull(Resident.shelteredStand(from,enemy,List.of(near),bed->true,bed->bed));
+        var chosen=Resident.shelteredStand(from,enemy,List.of(near,far),bed->true,bed->bed);
+        assertNotNull(chosen);
+        assertEquals(far,chosen.bed());
+        assertEquals(far,chosen.stand());
     }
 }

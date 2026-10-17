@@ -16,6 +16,10 @@ public final class TownBuilding {
     public int tier;
     public boolean completed;
     public List<Plan> blocks=new ArrayList<>();
+    public List<Long> cuts=new ArrayList<>();
+    public List<Plan> foundation=new ArrayList<>();
+    public Long approach;
+    public Long housingFor;
     public static final class Plan {
         public long pos;
         public String state;
@@ -40,9 +44,12 @@ public final class TownBuilding {
     void add(BlockPos p,BlockState state){if(state.getBlock().asItem()!=Items.AIR)blocks.add(new Plan(p,state));}
     int built(Village v){return (int)blocks.stream().filter(p->p.matches(v)).count();}
     void validate(VillageState village){
-        if(kind==null||!Set.of("house","warehouse","native_house").contains(kind)||blocks==null||blocks.size()>4096||tier<0||tier>3
+        if(kind==null||!Set.of("house","warehouse","native_house","sheep_pen","field","road","lumber_yard","smithy","granary","watch_post").contains(kind)||blocks==null||blocks.size()>4096||tier<0||tier>3
                 ||!village.contains(BlockPos.of(origin)))throw new IllegalArgumentException("Повреждённый проект здания");
-        for(Plan p:blocks)if(p==null||p.state==null||p.state.length()>2048||!village.contains(p.position())||p.block().getBlock().asItem()==Items.AIR
+        if(cuts==null||cuts.size()>64||cuts.stream().anyMatch(p->p==null||!village.contains(BlockPos.of(p)))||foundation==null||foundation.size()>64
+                ||approach!=null&&!village.contains(BlockPos.of(approach))||housingFor!=null&&!village.contains(BlockPos.of(housingFor)))throw new IllegalArgumentException("Повреждённая подготовка площадки");
+        var all=new ArrayList<>(blocks);all.addAll(foundation);
+        for(Plan p:all)if(p==null||p.state==null||p.state.length()>2048||!village.contains(p.position())||p.block().getBlock().asItem()==Items.AIR
                 ||p.block().getBlock() instanceof DoorBlock&&!village.contains(p.position().above())
                 ||p.block().getBlock() instanceof BedBlock&&!village.contains(p.position().relative(p.block().getValue(BedBlock.FACING))))
             throw new IllegalArgumentException("Повреждённая деталь здания");

@@ -16,6 +16,8 @@ final class UnloadingRegression {
     static Map<UUID,Long> deposits,minerals;
     static List<ItemStack> carrierBag,helperBag;static Vec3 helperPos;static boolean helperNoAi;
     static ExpeditionState previous;static long started;static boolean yielded;
+    static long lastTick,helperWaitTicks,partyWaitTicks,realStarted;
+    static boolean helperWaiting,partyWaiting;
     static void begin(Village village,Resident worker,BlockPos origin){
         v=village;carrier=worker;helper=v.workers.values().stream().filter(r->r!=worker).findFirst().orElseThrow();
         carrier.cancel();helper.cancel();v.expeditions.stop();previous=v.state.expedition;
@@ -41,17 +43,23 @@ final class UnloadingRegression {
         helper.body().snapTo(Vec3.atBottomCenterOf(chest.south(2)),0,0);helper.body().setDeltaMovement(Vec3.ZERO);
         var party=new ExpeditionState();party.phase="unload";party.team.add(carrier.id);party.team.add(helper.id);party.target=chest.asLong();party.started=party.phaseSince=v.level.getGameTime();v.state.expedition=party;
         VillageSelfTest.require(v.meetingPoint().equals(rally)&&carrier.hasSurplus()&&!helper.hasSurplus(),"actual cargo and empty helper start at a single-aisle depot with an exterior rally point");
-        started=v.level.getGameTime();yielded=false;
+        started=lastTick=v.level.getGameTime();yielded=false;
+        helperWaitTicks=partyWaitTicks=0;helperWaiting=partyWaiting=false;realStarted=System.nanoTime();
     }
     static boolean tick(BlockPos origin){
         v.expeditions.work(helper);v.expeditions.work(carrier);
         long elapsed=v.level.getGameTime()-started;
-        if(!yielded&&elapsed>=180){
+        long delta=Math.max(0,v.level.getGameTime()-lastTick);lastTick=v.level.getGameTime();
+        if(helperWaiting)helperWaitTicks+=delta;if(partyWaiting)partyWaitTicks+=delta;
+        helperWaiting=v.expeditions.waitingForInfrastructure(helper.id);
+        partyWaiting=helperWaiting||v.expeditions.waitingForInfrastructure(carrier.id);
+        VillageSelfTest.require(System.nanoTime()-realStarted<30_000_000_000L,"unloading fixture infrastructure exceeded30real seconds");
+        if(!yielded&&elapsed-helperWaitTicks>=180){
             VillageSelfTest.require(helper.body().position().distanceToSqr(Vec3.atBottomCenterOf(rally))<=1,"empty unloaded helper reaches the exterior waiting spot instead of stopping near the aisle entrance; pos="+helper.body().position()+" status="+helper.status);
             VillageSelfTest.pass("unloaded_party_helper_physically_waits_outside_single_width_depot_aisle");yielded=true;
         }
         var box=(ChestBlockEntity)v.level.getBlockEntity(chest);
-        VillageSelfTest.require(elapsed<1000,"depot queue must deliver through the real aisle; carrier="+carrier.body().position()+" job="+carrier.job+" failure="+carrier.lastFailure+" helper="+helper.body().position()+" helperJob="+helper.job+" helperStatus="+helper.status+" stored="+box.countItem(Items.COBBLESTONE));
+        VillageSelfTest.require(elapsed-partyWaitTicks<1000,"depot queue must deliver through the real aisle; carrier="+carrier.body().position()+" job="+carrier.job+" failure="+carrier.lastFailure+" helper="+helper.body().position()+" helperJob="+helper.job+" helperStatus="+helper.status+" stored="+box.countItem(Items.COBBLESTONE));
         if(!yielded||box.countItem(Items.COBBLESTONE)==0||carrier.hasSurplus())return false;
         VillageSelfTest.require(box.countItem(Items.COBBLESTONE)+carrier.bot().inventory().count(Items.COBBLESTONE)+helper.bot().inventory().count(Items.COBBLESTONE)==64,"queued physical chest delivery conserves every one of the64 actual stones");
         VillageSelfTest.require(carrier.body().getHealth()==20&&helper.body().getHealth()==20,"queue preserves both native bodies");

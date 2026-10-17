@@ -7,6 +7,18 @@ import net.minecraft.world.item.*;
 
 /** Recipe requests come from actual missing architectural pieces. Every recipe debits real items. */
 final class TownCrafting {
+    /** Keep/fetch recipe inputs, not only finished blocks. Stone stairs cannot be made from zero stone. */
+    static int ingredientReserve(Resident r,ItemStack stack){
+        if(!r.v.builder(r.id))return 0;
+        int wanted=0;
+        for(var p:r.v.town.wantedPlans(r)){
+            var block=p.block();
+            if(stack.is(Items.COBBLESTONE)&&(Construction.stoneStairs(block)||Construction.stoneSlab(block)||block.is(BlockTags.WALLS)||block.is(net.minecraft.world.level.block.Blocks.FURNACE)))wanted=Math.max(wanted,16);
+            if(block.is(net.minecraft.world.level.block.Blocks.TORCH)&&(stack.is(Items.COAL)||stack.is(Items.CHARCOAL)))wanted=Math.max(wanted,4);
+            if(block.is(net.minecraft.world.level.block.Blocks.GLASS_PANE)&&(stack.is(Items.SAND)||stack.is(Items.GLASS)))wanted=Math.max(wanted,6);
+        }
+        return wanted;
+    }
     static boolean make(BotHandle b,Village v){
         Resident r=v.workers.get(b.id());if(r==null)return false;
         for(var p:v.town.wantedPlans(r)){

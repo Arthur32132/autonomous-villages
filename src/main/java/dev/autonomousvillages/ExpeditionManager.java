@@ -23,7 +23,16 @@ final class ExpeditionManager {
     private final Map<UUID,BlockPos> waitingSpots=new HashMap<>();
     private final Map<UUID,Long> retryAt=new HashMap<>();
     private long lastDecision;
+    private ExpeditionState timedParty;
+    private String timedPhase;
+    private long lastPhaseTick;
     ExpeditionManager(Village v){this.v=v;}
+    boolean waitingForInfrastructure(UUID id){
+        var travel=moving.get(id);var r=resident(id);
+        return travel!=null&&travel.waitingForInfrastructure()
+            ||r!=null&&(r.navigation!=null&&r.navigation.waitingForInfrastructure()
+                ||r.excavation!=null&&r.excavation.waitingForInfrastructure());
+    }
     static boolean departureWindow(long clock,boolean dark){long day=Math.floorMod(clock,24000);return !dark&&day>=1000&&day<=8000;}
     static int plannedMineLength(int entranceY,int completed,int pickDurability,boolean needsIron,long clock){
         long day=Math.floorMod(clock,24000);int additional=8;
@@ -37,9 +46,12 @@ final class ExpeditionManager {
         int durability=leader.bot().inventory().snapshot().slots().stream()
                 .filter(s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s)&&s.isCorrectToolForDrops(Blocks.IRON_ORE.defaultBlockState()))
                 .mapToInt(s->s.getMaxDamage()-s.getDamageValue()).max().orElse(0);
-        return plannedMineLength(BlockPos.of(e.target).getY(),e.completedSegments,durability,
+        int requested=plannedMineLength(BlockPos.of(e.target).getY(),e.completedSegments,durability,
                 VillageWorkshop.needsIronSurvey(v),v.level.getOverworldClockTime());
+        return Math.min(requested,e.completedSegments+MineSupplies.inspect(leader).segments());
     }
+    boolean preparingMine(UUID id){var e=v.state.expedition;return e!=null&&e.purpose.equals("mine")&&e.phase.equals("prepare")&&e.team.contains(id);}
+
     boolean owns(UUID id){return v.state.expedition!=null&&v.state.expedition.team.contains(id)&&!v.state.expedition.phase.equals("prepare")&&!v.state.expedition.phase.equals("scout");}
     boolean permits(BlockPos p){var e=v.state.expedition;return e!=null&&Math.abs((long)p.getX()-BlockPos.of(e.target).getX())<=80&&Math.abs((long)p.getZ()-BlockPos.of(e.target).getZ())<=80;}
     Set<Long> chunks(){
@@ -60,7 +72,7 @@ final class ExpeditionManager {
     boolean preparingSurveyPick(UUID id){
         var e=v.state.expedition;var r=resident(id);
         return e!=null&&e.purpose.equals("mine")&&e.phase.equals("prepare")&&!e.team.isEmpty()&&e.team.getFirst().equals(id)
-                &&r!=null&&(v.roleIndex(id)%6==4||v.workers.size()<3)&&VillageWorkshop.needsIronSurvey(v)
+                &&r!=null&&(v.miner(id))&&VillageWorkshop.needsIronSurvey(v)
                 &&v.count(s->s.is(Items.COBBLESTONE))>=6&&!VillageWorkshop.hasSurveyPick(r.bot());
     }
     void tick(){
@@ -77,6 +89,16 @@ final class ExpeditionManager {
         e.unloadedMembers.retainAll(e.team);
         if(e.team.isEmpty()){finish(e,false,"no_living_members");return;}
         if(e.team.stream().anyMatch(id->resident(id)==null))return;
+        if(now%100==0&&Set.of("scout","prepare","rally","travel","work").contains(e.phase)
+                &&!v.expeditionCoverage(new HashSet<>(e.team))){
+            if(e.phase.equals("prepare")||e.phase.equals("rally")||e.phase.equals("scout")){finish(e,false,"home_duties_uncovered");return;}
+            phase(e,"return");v.event("Вылазка возвращается: дома не хватает работников для еды, ремонта или охраны");
+        }
+        boolean infrastructurePending=excavation!=null&&excavation.waitingForInfrastructure()
+            ||e.team.stream().anyMatch(this::waitingForInfrastructure);
+        if(timedParty==e&&Objects.equals(timedPhase,e.phase)&&infrastructurePending)
+            e.phaseSince=Math.min(now,e.phaseSince+Math.max(0,now-lastPhaseTick));
+        timedParty=e;timedPhase=e.phase;lastPhaseTick=now;
         if(e.purpose.equals("wool")){
             if(!e.woolSnapshot){e.woolCargoStart=carriedWool(e);e.woolSnapshot=true;}
             e.woolCollected=Math.max(e.woolCollected,carriedWool(e)-e.woolCargoStart);
@@ -95,15 +117,16 @@ final class ExpeditionManager {
             case "prepare"->{
                 boolean ready=e.team.stream().map(this::resident).allMatch(r->r!=null&&(!e.purpose.equals("mine")||!e.team.getFirst().equals(r.id)
                         ||Supplies.find(r.bot(),s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))>=0&&(v.count(s->s.is(Items.COBBLESTONE))<3||VillageWorkshop.hasPickFor(r.bot(),Blocks.IRON_ORE.defaultBlockState()))&&!preparingSurveyPick(r.id))
-                        &&r.body().getHealth()>8);
+                        &&r.body().getHealth()>8&&(!e.purpose.equals("mine")||MineSupplies.inspect(r).food()>=3&&MineSupplies.inspect(r).exitBlocks()>=8
+                            &&(!e.team.getFirst().equals(r.id)||MineSupplies.inspect(r).ready())));
                 boolean atomicJobsFinished=e.team.stream().map(this::resident).allMatch(r->r!=null&&r.mining==null&&r.excavation==null&&r.collectingUntil==0);
-                if(ready&&atomicJobsFinished){if(e.purpose.equals("mine"))e.length=mineLength(e);phase(e,"rally");}
+                if(ready&&atomicJobsFinished){if(e.purpose.equals("mine")){e.length=mineLength(e);if(!e.dug&&e.length<=e.completedSegments)return;}phase(e,"rally");}
                 else if(now-e.phaseSince>2400)finish(e,false,"preparation_timeout");
             }
             case "rally"->{
                 if(!departureWindow(v.level.getOverworldClockTime(),v.level.isDarkOutside())){finish(e,false,"nightfall_before_departure");return;}
                 var rally=v.meetingPoint();boolean gathered=e.team.stream().map(this::resident).allMatch(r->r.body().blockPosition().distSqr(rally)<64);
-                if(gathered){e.departingTogether=true;e.deliveryStart=deposited(e);e.mineralDeliveryStart=mineralsDeposited(e);e.mineralCargoStart=carriedMinerals(e);e.cargoSnapshot=true;if(e.purpose.equals("wool")){e.woolCargoStart=carriedWool(e);e.woolCollected=0;e.woolSnapshot=true;}phase(e,"travel");v.event("Вылазка отправилась: "+label(e)+", группа "+e.team.size());}
+                if(gathered){if(e.purpose.equals("mine")&&!MineSupplies.inspect(resident(e.team.getFirst())).ready()){finish(e,false,"mining_kit_missing_before_departure");return;}if(!v.expeditionCoverage(new HashSet<>(e.team))){finish(e,false,"home_duties_uncovered");return;}e.departingTogether=true;e.deliveryStart=deposited(e);e.mineralDeliveryStart=mineralsDeposited(e);e.mineralCargoStart=carriedMinerals(e);e.cargoSnapshot=true;if(e.purpose.equals("wool")){e.woolCargoStart=carriedWool(e);e.woolCollected=0;e.woolSnapshot=true;}phase(e,"travel");v.event("Вылазка отправилась: "+label(e)+", группа "+e.team.size());}
                 else if(now-e.phaseSince>Math.max(1200,e.phaseBudget))finish(e,false,"rally_timeout");
             }
             case "travel"->{
@@ -139,21 +162,26 @@ final class ExpeditionManager {
             String choice=null;
             if(v.index.trees.isEmpty()&&v.count(s->s.is(ItemTags.LOGS)||s.is(ItemTags.PLANKS))<v.town.woodDemand())choice="wood";
             else if(v.index.crops.isEmpty()&&v.count(s->s.is(Items.WHEAT_SEEDS)||s.is(Items.CARROT)||s.is(Items.POTATO))<4)choice="forage";
-            else if(v.index.beds.size()<v.state.residents.size()+2&&bedStock()<Math.min(4,v.state.residents.size()+2-v.index.beds.size())
+            else if(v.farm.state().flock.size()<2&&v.farm.state().base==null&&v.index.beds.size()<v.state.residents.size()+2&&bedStock()<Math.min(4,v.state.residents.size()+2-v.index.beds.size())
                     &&v.workers.values().stream().anyMatch(r->Supplies.find(r.bot(),s->s.is(Items.SHEARS)&&Supplies.usable(s))>=0))choice="wool";
-            else if(v.count(s->s.is(Items.RAW_IRON)||s.is(Items.IRON_INGOT))<Math.max(8,v.workers.size()*3)
-                    ||v.count(s->s.is(Items.COAL)||s.is(Items.CHARCOAL))<16||v.count(s->s.is(Items.COBBLESTONE))<128)choice="mine";
+            else if(IronSupply.rawNeeded(v)>0||v.count(s->s.is(Items.COBBLESTONE))<32)choice="mine";
             final String purpose=choice;
             if(purpose==null)return;
-            List<Resident> candidates=v.workers.values().stream().filter(r->(!v.builder(r.id)||v.workers.size()<3||purpose.equals("wool"))&&r.combat==null&&!r.body().isTrading()&&r.body().getHealth()>8)
+            List<Resident> candidates=v.workers.values().stream().filter(r->(!v.builder(r.id)||v.workers.size()<3||purpose.equals("wool"))&&r.canHelp()&&r.body().getHealth()>8)
                     .filter(r->v.state.contains(r.body().blockPosition())&&!r.shouldUnloadBeforeWork())
                     .filter(r->!purpose.equals("wool")||Supplies.find(r.bot(),s->s.is(Items.SHEARS)&&Supplies.usable(s))>=0)
-                    .sorted(Comparator.comparingInt(r->v.roleIndex(r.id)%6==4?0:v.roleIndex(r.id)%6==3||v.roleIndex(r.id)%6==5?1:2)).toList();
+                    .sorted(Comparator.comparingInt(r->v.hasRole(r.id,ResidentRoles.Role.MINER)?0:v.logger(r.id)||v.porter(r.id)?1:2)).toList();
             if(candidates.isEmpty())return;
-            if(purpose.equals("mine")&&Supplies.find(candidates.getFirst().bot(),s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))<0)return;
-            var e=new ExpeditionState();e.purpose=purpose;e.started=now;e.phaseSince=now;
+            var e=new ExpeditionState();e.resource=IronSupply.rawNeeded(v)>0?"iron":"stone";e.purpose=purpose;e.started=now;e.phaseSince=now;
             int teamSize=v.workers.size()>=6?2:1;
-            for(Resident r:candidates){e.team.add(r.id);if(e.team.size()>=teamSize)break;}
+            for(Resident r:candidates){
+                var proposed=new HashSet<>(e.team);proposed.add(r.id);
+                if(!v.expeditionCoverage(proposed))continue;
+                e.team.add(r.id);if(e.team.size()>=teamSize)break;
+            }
+            if(e.team.isEmpty())return;
+            if(SettlementEconomy.food(v)<SettlementEconomy.budget(v).food()+e.team.size()*6)return;
+            if(purpose.equals("mine")&&Supplies.find(resident(e.team.getFirst()).bot(),s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s))<0)return;
             e.deliveryStart=deposited(e);chooseSite(e);v.state.expedition=e;v.event("Готовят "+label(e)+", участников "+e.team.size());v.runtime.save();return;
     }
     private static boolean purposeIsMine(String purpose){return "mine".equals(purpose);}
@@ -173,8 +201,17 @@ final class ExpeditionManager {
             }
         }
         if(e.purpose.equals("mine")){
-            var mine=v.state.mines.stream().filter(m->m.length<64&&!m.blocked).findFirst().orElse(null);
-            if(mine!=null){e.target=mine.entrance;e.direction=mine.direction;e.length=Math.min(64,mine.length+8);e.completedSegments=mine.length;e.phase="prepare";return;}
+            for(var known:v.state.mines){
+                known.iron.removeIf(p->v.level.hasChunkAt(BlockPos.of(p))&&!MineKnowledge.iron(v,BlockPos.of(p)));
+                known.coal.removeIf(p->v.level.hasChunkAt(BlockPos.of(p))&&!MineKnowledge.coal(v,BlockPos.of(p)));
+            }
+            var mine=MineKnowledge.choose(v.state.mines,e.resource);
+            if(mine!=null){
+                e.target=mine.entrance;e.direction=mine.direction;e.length=Math.min(64,mine.length+8);e.completedSegments=mine.length;
+                var known=e.resource.equals("iron")?mine.iron:mine.coal;e.oreTargets.addAll(known);
+                if(!known.isEmpty()){e.dug=true;e.workedSegments=mine.length;e.oreSince=v.level.getGameTime();}
+                e.phase="prepare";return;
+            }
         }
         int i=v.state.exploredSites++;double angle=i*2.399963229728653;
         if(e.purpose.equals("wool")&&e.attempts%3==0&&!v.state.sheepPastures.isEmpty()){
@@ -250,14 +287,15 @@ final class ExpeditionManager {
         Resident leader=resident(e.team.getFirst());
         if(e.dug){
             if(leader.job!=null)return;
-            if(v.level.getGameTime()-e.oreSince>1600||e.oreCollected>=24){phase(e,"return");return;}
-            var ore=e.oreTargets.stream().map(BlockPos::of).filter(p->safeOre(leader,p))
+            if(v.level.getGameTime()-e.oreSince>1600||e.oreCollected>=24||e.resource.equals("iron")&&IronSupply.rawNeeded(v)==0){phase(e,"return");return;}
+            var ore=e.oreTargets.stream().map(BlockPos::of).filter(p->safeOre(leader,p)&&(e.resource.equals("iron")?MineKnowledge.iron(v,p):e.resource.equals("coal")?MineKnowledge.coal(v,p):true))
                     .min(Comparator.<BlockPos>comparingInt(p->v.level.getBlockState(p).is(Blocks.IRON_ORE)||v.level.getBlockState(p).is(Blocks.DEEPSLATE_IRON_ORE)?0:1)
                             .thenComparingDouble(p->p.distSqr(leader.body().blockPosition()))).orElse(null);
-            if(ore==null){phase(e,"return");return;}
+            if(ore==null){MineKnowledge.observe(v,e);phase(e,"return");return;}
             leader.assign("ore",ore);return;
         }
         if(excavation==null){
+            if(!MineSupplies.inspect(leader).ready()||e.length-e.completedSegments>MineSupplies.inspect(leader).segments()){phase(e,"return");return;}
             leader.cancel();
             var request=new ExcavationRequest(BlockPos.of(e.target),Direction.from2DDataValue(e.direction),ExcavationMode.STAIRCASE_DOWN,e.length,e.completedSegments);
             for(int i=e.completedSegments+1;i<=request.length();i++)for(BlockPos p:request.clearanceAt(i))if(v.town.protects(p)){phase(e,"return");return;}
@@ -268,17 +306,17 @@ final class ExpeditionManager {
         if(!excavation.completion().isDone())return;
         int completed=excavation.completedSegments();
         if(completed<=e.completedSegments&&excavation.status()!=ExcavationStatus.SUCCESS){
-            var blocked=v.state.mines.stream().filter(m->m.entrance==e.target).findFirst().orElse(null);
+            var blocked=v.state.mines.stream().filter(m->m.entrance==e.target&&m.direction==e.direction).findFirst().orElse(null);
             if(blocked==null){blocked=new ExpeditionState.Mine();blocked.entrance=e.target;blocked.direction=e.direction;v.state.mines.add(blocked);}
-            blocked.blocked=true;v.event("Отмечен непроходимый участок шахты; выберут другой вход");
+            blocked.blocked=true;blocked.hazard=excavation.completion().join().reason().substring(0,Math.min(160,excavation.completion().join().reason().length()));v.event("Отмечен непроходимый участок шахты; выберут другой вход");
         }
         if(completed>e.completedSegments){
-            var mine=v.state.mines.stream().filter(m->m.entrance==e.target).findFirst().orElse(null);
+            var mine=v.state.mines.stream().filter(m->m.entrance==e.target&&m.direction==e.direction).findFirst().orElse(null);
             if(mine==null){mine=new ExpeditionState.Mine();mine.entrance=e.target;mine.direction=e.direction;v.state.mines.add(mine);}
-            mine.length=Math.max(mine.length,completed);
+            // Length and observed resources are recorded together below.
         }
         if(excavation.status()!=ExcavationStatus.SUCCESS)v.event("Шахтёры возвращаются: "+excavation.completion().join().reason());
-        excavation=null;e.dug=true;e.workedSegments=completed;e.oreSince=v.level.getGameTime();discoverOres(e);v.runtime.save();
+        excavation=null;e.dug=true;e.workedSegments=completed;e.oreSince=v.level.getGameTime();discoverOres(e);MineKnowledge.observe(v,e);v.runtime.save();
     }
     private void discoverOres(ExpeditionState e){
         var request=new ExcavationRequest(BlockPos.of(e.target),Direction.from2DDataValue(e.direction),ExcavationMode.STAIRCASE_DOWN,e.length);
@@ -410,6 +448,7 @@ final class ExpeditionManager {
             BlockPos destination=phase.equals("travel")?BlockPos.of(e.target):v.meetingPoint();
             e.phaseBudget=routeBudget(e.team.stream().map(this::resident).filter(Objects::nonNull).mapToDouble(r->Math.sqrt(r.body().blockPosition().distSqr(destination))).max().orElse(0));
         }
+        if(phase.equals("work")&&e.dug)e.oreSince=v.level.getGameTime();
         if(phase.equals("unload"))e.unloadedMembers.clear();
         if(!phase.equals("scout")&&!v.state.rememberWorksite(e.target)){finish(e,false,"worksite_budget");return;}
         v.runtime.save();

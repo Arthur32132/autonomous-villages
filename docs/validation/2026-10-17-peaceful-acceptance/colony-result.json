@@ -1,0 +1,386 @@
+{
+  "success": false,
+  "scope": "colony",
+  "reason": "production_observation_timeout",
+  "ticks": 144001,
+  "requestedTps": 400,
+  "maxObservationTicks": 144000,
+  "exitCode": 0,
+  "fullAutonomyAccepted": false,
+  "sourcesUnchanged": true,
+  "evidence": {
+    "difficulty": "peaceful",
+    "itemDonations": 0,
+    "productionFixturesPlaced": 0,
+    "simulationTickRate": 400,
+    "requestedTps": 400,
+    "fixedDaylight": false,
+    "naturalThreats": false,
+    "measuredTps": 399.7491848007584,
+    "averageTps": 395.8041747719856,
+    "meanTickMs": 1.129333,
+    "initialResidents": 6,
+    "initialFood": 6,
+    "inheritedVerifiedMiningDeliveries": 0,
+    "inheritedExpeditionItemsUnloaded": 0,
+    "newMiningExpeditionsReturnedAndUnloaded": 0,
+    "newExpeditionItemsUnloaded": 0,
+    "navigationMetrics": {
+      "serverTicks": 144000,
+      "lastTickNanos": 28200,
+      "totalTickNanos": 64742009700,
+      "maxTickNanos": 51156200,
+      "snapshots": 3676,
+      "snapshotNanos": 57642239900,
+      "pathSearchesSubmitted": 3661,
+      "pathSearchesCompleted": 3656,
+      "pathSearchesCancelled": 56,
+      "pathSearchesRejected": 0,
+      "backpressureDeferrals": 0,
+      "nodeBudgetDeferrals": 0,
+      "pathSearchNanos": 505620997200,
+      "pathNodesVisited": 3697190,
+      "replans": 882,
+      "queuedSearches": 0,
+      "activeSearches": 0
+    },
+    "observedNightTicks": 60000,
+    "observedSleepTicks": 71224,
+    "naturalThreatsSeen": 0,
+    "clockTime": 144000,
+    "raining": false,
+    "thundering": false,
+    "darkOutside": false,
+    "knownMineWallOres": [],
+    "completedNewHouses": 0,
+    "newHouseContents": [],
+    "shearsObserved": false,
+    "peakWool": 0,
+    "currentStock": {
+      "coal": 0,
+      "cobblestone": 134,
+      "rawIron": 0,
+      "iron": 0
+    },
+    "sharedChestContents": [
+      {
+        "pos": "BlockPos{x=-303, y=77, z=-342}",
+        "items": [
+          "26 minecraft:dirt",
+          "33 minecraft:wheat_seeds",
+          "31 minecraft:cobblestone",
+          "3 minecraft:cobblestone",
+          "2 minecraft:egg",
+          "2 minecraft:beetroot_seeds",
+          "1 minecraft:bundle",
+          "7 minecraft:wheat",
+          "3 minecraft:apple",
+          "1 minecraft:crafting_table",
+          "2 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple",
+          "1 minecraft:apple"
+        ]
+      }
+    ],
+    "completeFootprint": {
+      "minX": -401,
+      "minZ": -392,
+      "maxX": -242,
+      "maxZ": -246
+    },
+    "allLoadedResidentsEnrolled": 6
+  },
+  "jars": {
+    "autonomous-villages-0.2.1.jar": "1fb2a9d66befae149d6c9d74954977b9e724a5a55e98b1d1fe7fbddcbd0d1330",
+    "autonomous-villages-client-validation-0.2.1.jar": "9cfd1505509020d32c46203dd105eaa1b4e6e002a5e694ece31883781f612d85",
+    "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+  },
+  "projects": [
+    {
+      "kind": "road",
+      "built": 3,
+      "total": 7
+    },
+    {
+      "kind": "warehouse",
+      "built": 0,
+      "total": 161
+    },
+    {
+      "kind": "road",
+      "built": 1,
+      "total": 9
+    },
+    {
+      "kind": "house",
+      "built": 0,
+      "total": 85
+    },
+    {
+      "kind": "road",
+      "built": 2,
+      "total": 7
+    },
+    {
+      "kind": "field",
+      "built": 0,
+      "total": 3
+    },
+    {
+      "kind": "road",
+      "built": 0,
+      "total": 1
+    },
+    {
+      "kind": "sheep_pen",
+      "built": 0,
+      "total": 24
+    }
+  ],
+  "actors": [
+    {
+      "uuid": "2b6925a6-ba1c-4e92-88fb-ab1b7bf84a21",
+      "role": "завхоз",
+      "health": 20.0,
+      "job": "null",
+      "status": "спит",
+      "bag": [
+        "1 minecraft:acacia_planks",
+        "7 minecraft:stick",
+        "1 minecraft:wooden_pickaxe",
+        "1 minecraft:wooden_axe",
+        "1 minecraft:wooden_sword",
+        "1 minecraft:wheat",
+        "1 minecraft:furnace",
+        "2 minecraft:cobblestone_stairs",
+        "12 minecraft:carrot",
+        "8 minecraft:cobblestone",
+        "4 minecraft:bread",
+        "5 minecraft:potato"
+      ],
+      "nativeFood": [
+        "8 minecraft:carrot"
+      ]
+    },
+    {
+      "uuid": "51095f3a-e5ba-423a-8a22-eb473c5a819d",
+      "role": "фермер",
+      "health": 20.0,
+      "job": "null",
+      "status": "спит",
+      "bag": [
+        "2 minecraft:stick",
+        "1 minecraft:wooden_pickaxe",
+        "1 minecraft:wooden_axe",
+        "8 minecraft:beetroot_seeds",
+        "2 minecraft:oak_planks",
+        "14 minecraft:potato",
+        "1 minecraft:beetroot",
+        "6 minecraft:wheat",
+        "12 minecraft:wheat_seeds",
+        "1 minecraft:stone_pickaxe",
+        "1 minecraft:crafting_table",
+        "1 minecraft:bread",
+        "12 minecraft:carrot",
+        "1 minecraft:poisonous_potato"
+      ],
+      "nativeFood": [
+        "2 minecraft:beetroot",
+        "4 minecraft:carrot"
+      ]
+    },
+    {
+      "uuid": "a79ac523-d501-4cc2-bab1-0aa03f7f02a5",
+      "role": "лесоруб",
+      "health": 20.0,
+      "job": "null",
+      "status": "спит",
+      "bag": [
+        "1 minecraft:wooden_sword",
+        "5 minecraft:stick",
+        "1 minecraft:wooden_pickaxe",
+        "1 minecraft:wooden_axe",
+        "8 minecraft:acacia_planks",
+        "1 minecraft:crafting_table",
+        "8 minecraft:oak_planks",
+        "1 minecraft:stone_pickaxe",
+        "3 minecraft:potato",
+        "11 minecraft:carrot"
+      ],
+      "nativeFood": [
+        "6 minecraft:carrot"
+      ]
+    },
+    {
+      "uuid": "1a8cc493-e30f-474d-ab7a-a059f4b70ddf",
+      "role": "строитель",
+      "health": 20.0,
+      "job": "null",
+      "status": "спит",
+      "bag": [
+        "1 minecraft:wooden_sword",
+        "7 minecraft:stick",
+        "1 minecraft:wooden_pickaxe",
+        "1 minecraft:wooden_axe",
+        "1 minecraft:crafting_table",
+        "12 minecraft:carrot",
+        "13 minecraft:acacia_planks",
+        "7 minecraft:potato",
+        "5 minecraft:oak_planks"
+      ],
+      "nativeFood": [
+        "6 minecraft:potato"
+      ]
+    },
+    {
+      "uuid": "ae913688-4be0-4db2-8a86-67fbaf48e146",
+      "role": "шахтёр",
+      "health": 20.0,
+      "job": "null",
+      "status": "ночует в безопасном доме",
+      "bag": [
+        "2 minecraft:oak_sapling",
+        "1 minecraft:wooden_sword",
+        "1 minecraft:stick",
+        "1 minecraft:wooden_pickaxe",
+        "1 minecraft:wooden_axe",
+        "1 minecraft:stone_pickaxe",
+        "1 minecraft:crafting_table",
+        "64 minecraft:cobblestone",
+        "1 minecraft:dirt",
+        "28 minecraft:cobblestone"
+      ],
+      "nativeFood": []
+    },
+    {
+      "uuid": "be6f5115-b0da-4f56-9d82-696cbb3facc6",
+      "role": "сторож",
+      "health": 20.0,
+      "job": "null",
+      "status": "спит",
+      "bag": [],
+      "nativeFood": []
+    }
+  ],
+  "land": {
+    "fields": [
+      {
+        "water": -88510687231937,
+        "seedChest": -89060443058112,
+        "produceChest": -87960931430336,
+        "entry": -88510687248320,
+        "cells": [
+          -89060443054016,
+          -89060443049920,
+          -89060443045824,
+          -89060443041728,
+          -89060443037632,
+          -88785565147072,
+          -88785565142976,
+          -88785565138880,
+          -88785565134784,
+          -88785565130688,
+          -88235809333184,
+          -88235809329088,
+          -88235809324992,
+          -88235809320896,
+          -88235809316800,
+          -87960931426240,
+          -87960931422144,
+          -87960931418048,
+          -87960931413952,
+          -87960931409856
+        ]
+      }
+    ],
+    "forests": [
+      {
+        "center": -93458489966522,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -84937274847166,
+        "restUntil": 107105,
+        "harvested": 2,
+        "replanted": 2
+      },
+      {
+        "center": -66795332984765,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -100330437615544,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -108301896904622,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -73392402710459,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -92084100329405,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -90434832768960,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -83837763108796,
+        "restUntil": 146205,
+        "harvested": 1,
+        "replanted": 1
+      },
+      {
+        "center": -109126530396081,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -66795332702125,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -70643623280577,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -93733367377844,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      },
+      {
+        "center": -68719477772225,
+        "restUntil": 0,
+        "harvested": 0,
+        "replanted": 0
+      }
+    ],
+    "rotation": 3
+  },
+  "status": "Observed | работает | центр -321, 73, -319 | территория -401,-392 — -242,-246 | жителей загружено 6, работников 6, кроватей 5 | сундуков 1, еды 82 | строительство дорога 0/1 | заказы: PLANKS 6/6 bed_planks, WOOL 0/6 bed_wool, SHEARS 0/1 bed_shears, IRON 0/2 iron_shears | запас еды нужен 48 | рост ждёт ресурсов/жилья | хозяйство работает\nспит, ночует в безопасном доме"
+}

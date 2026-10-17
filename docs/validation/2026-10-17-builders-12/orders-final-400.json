@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "scope": "orders_only",
+  "output": "C:\\minecraftWorkflow\\AutonomousVillages\\build\\validation\\20261017-120937-644344",
+  "requestedTps": 400,
+  "jars": {
+    "autonomous-villages-0.2.1.jar": "6fc32ec11688570bd562a383f6dfa4d00d84e382d867179f4f3d286ac98d20a9",
+    "autonomous-villages-validation-0.2.1.jar": "9d96d400bc8ab1a50af2e12f62e05fa5174ba2c91270adcdb83c382684676fee",
+    "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+    "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+  },
+  "scenarioWallSeconds": 7.011059800017392,
+  "checks": [
+    "[12:09:52] [Server thread/INFO]: VILLAGE_TEST PASS command_claim_real_village_and_rejections",
+    "[12:09:54] [Server thread/INFO]: VILLAGE_TEST PASS planks_in_another_backpack_are_not_free_stock",
+    "[12:09:54] [Server thread/INFO]: VILLAGE_TEST PASS two_beds_expand_to_materials_and_tools_without_reserving_the_personal_kit",
+    "[12:09:55] [Server thread/INFO]: VILLAGE_TEST PASS full_backpack_keeps_real_cargo_and_reports_blocked_delivery",
+    "[12:09:56] [Server thread/INFO]: VILLAGE_TEST PASS physical_delivery_conserves_items_and_preserves_personal_kit",
+    "[12:09:56] [Server thread/INFO]: VILLAGE_TEST PASS death_tracks_real_delivered_cargo_instead_of_unfulfilled_requests",
+    "[12:09:56] [Server thread/INFO]: VILLAGE_TEST PASS partial_then_complete_real_drop_return_conserves_all_items"
+  ],
+  "junit": {
+    "tests": 69,
+    "failures": 0,
+    "errors": 0
+  }
+}

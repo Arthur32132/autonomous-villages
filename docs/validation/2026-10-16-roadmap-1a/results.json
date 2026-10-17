@@ -1,0 +1,103 @@
+{
+  "date": "2026-10-16",
+  "status": "not_accepted_user_stopped_testing",
+  "delegation": {
+    "mcp": "opencode-mcp 3.0.0",
+    "server": "OpenCode 1.19.2",
+    "provider": "opencode",
+    "model": "deepseek-v4.1-flash-free",
+    "session": "ses_ebb099e64ffeIBc6u6XnnZZtg1"
+  },
+  "junit": {
+    "tests": 37,
+    "failures": 0,
+    "errors": 0
+  },
+  "python": {
+    "tests": 23,
+    "result": "PASS"
+  },
+  "finalJars": {
+    "autonomous-villages-0.2.1.jar": "a022f7b6484b725bb16381788c9e7f182bbafb4b31b0199ef98c2c3c857ef07b",
+    "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44",
+    "autonomous-villages-validation-0.2.1.jar": "1417e7e6c231193f952c4b1e08260d98d36a2591a8b2f032dafd9a699dec002a"
+  },
+  "finalProbeNote": "Diagnostic RETREAT_PROGRESS logging compiled after the last failure; not run after the user's stop instruction.",
+  "reports": [
+    {
+      "id": "server-20261016-193108-064686",
+      "success": true,
+      "scope": "night_only",
+      "requestedTps": 400,
+      "passedChecks": 12,
+      "error": null,
+      "scenarioWallSeconds": 5.487704399987706,
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "ff5064b8a963e517c4fe23b5c86ae5f1b5c3ab5bb1df40792166a9784b275fca",
+        "autonomous-villages-validation-0.2.1.jar": "2adcc358fc18e70a860da5c26edc378252377d0ad78a552eed97147c982d7349",
+        "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+      }
+    },
+    {
+      "id": "server-20261016-193157-717186",
+      "success": true,
+      "scope": "night_only",
+      "requestedTps": 40,
+      "passedChecks": 12,
+      "error": null,
+      "scenarioWallSeconds": 20.027109999995446,
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "ff5064b8a963e517c4fe23b5c86ae5f1b5c3ab5bb1df40792166a9784b275fca",
+        "autonomous-villages-validation-0.2.1.jar": "2adcc358fc18e70a860da5c26edc378252377d0ad78a552eed97147c982d7349",
+        "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+      }
+    },
+    {
+      "id": "server-20261016-193305-972941",
+      "success": false,
+      "scope": "full",
+      "requestedTps": 400,
+      "passedChecks": 74,
+      "error": "[19:34:06] [Server thread/INFO]: VILLAGE_TEST FAIL stage=55 java.lang.AssertionError: injured unarmed resident actually retreats across repeated threat scans: (2000.5966250039637, 100.0, 2000.5)",
+      "scenarioWallSeconds": 40.307328900002176,
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "ff5064b8a963e517c4fe23b5c86ae5f1b5c3ab5bb1df40792166a9784b275fca",
+        "autonomous-villages-validation-0.2.1.jar": "2adcc358fc18e70a860da5c26edc378252377d0ad78a552eed97147c982d7349",
+        "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+      }
+    },
+    {
+      "id": "server-20261016-193653-612052",
+      "success": false,
+      "scope": "full",
+      "requestedTps": 400,
+      "passedChecks": 54,
+      "error": "[19:37:50] [Server thread/INFO]: VILLAGE_TEST FAIL stage=31 java.lang.AssertionError: canopy actual drops and survival",
+      "scenarioWallSeconds": 35.56974629999604,
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "a022f7b6484b725bb16381788c9e7f182bbafb4b31b0199ef98c2c3c857ef07b",
+        "autonomous-villages-validation-0.2.1.jar": "2adcc358fc18e70a860da5c26edc378252377d0ad78a552eed97147c982d7349",
+        "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+      }
+    },
+    {
+      "id": "server-20261016-194206-535592",
+      "success": false,
+      "scope": "night_only",
+      "requestedTps": 400,
+      "passedChecks": 12,
+      "error": "[19:42:38] [Server thread/INFO]: VILLAGE_TEST FAIL stage=55 java.lang.AssertionError: injured unarmed resident actually retreats across repeated threat scans: (2000.5966250039637, 100.0, 2000.4950000001118)",
+      "scenarioWallSeconds": 10.823442200009595,
+      "jars": {
+        "autonomous-villages-0.2.1.jar": "a022f7b6484b725bb16381788c9e7f182bbafb4b31b0199ef98c2c3c857ef07b",
+        "autonomous-villages-validation-0.2.1.jar": "f247caf9aaf2d8d78ca1b6db7745189b0ae2f5db0d8df5c87fa7414b33e22912",
+        "fabric-api-0.161.0+26.2.jar": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "navigation-ai-0.2.1.jar": "fb6fbe824cb226668d72987c2d45eead13e103ed328b14fe3647a322a0995d44"
+      }
+    }
+  ]
+}

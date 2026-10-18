@@ -58,7 +58,8 @@ final class Worker {
     boolean active(){var b=bot();return b!=null&&b.state()==BotState.ACTIVE&&b.entity().isAlive();}
     String jobKind(){return job==null?null:job.kind();}
     boolean ready(String key){return now()>=cooldowns.getOrDefault(key,0L);}
-    void cooldown(String key,long ticks){cooldowns.put(key,now()+ticks);}
+    /** A cooldown never gets shorter: a job's own long pause survives the generic one set on failure. */
+    void cooldown(String key,long ticks){cooldowns.merge(key,now()+ticks,Math::max);}
     ResidentRoles.Role role(){return v.primaryRole(id);}
 
     void tick(boolean mayPlan){

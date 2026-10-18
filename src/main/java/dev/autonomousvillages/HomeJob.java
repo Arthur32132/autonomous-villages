@@ -12,7 +12,8 @@ final class HomeJob extends Job {
         if(walk==null)walk=new Walk(Vec3.atBottomCenterOf(w.restHome()),3);
         return switch(walk.tick()){
             case MOVING->true;
-            case FAILED->{w.cooldown("home",400);yield fail("не нашёл дорогу домой");}
+            // The vanilla brain finds its own bed and opens its own doors: leave the rest of the night to it.
+            case FAILED->{w.cooldown("home",6000);yield fail("не нашёл дорогу домой");}
             default->false;
         };
     }

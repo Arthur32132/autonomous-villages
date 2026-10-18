@@ -107,8 +107,12 @@ final class Projects {
             if(b.path.isEmpty())b.path.addAll(footpath(b));
             v.runtime.save();
         }
-        var active=active();
-        if(active!=null){stage="строят "+label(active)+" "+built(active)+"/"+size(active);return;}
+        var unfinished=unfinished();
+        var active=unfinished.isEmpty()?null:unfinished.getFirst();
+        if(active!=null){
+            stage=(waiting(active)?"ждут материалы: ":"строят ")+label(active)+" "+built(active)+"/"+size(active);
+            if(unfinished.size()>=3||!unfinished.stream().allMatch(this::waiting))return;
+        }
         if(v.state.buildings.size()>=256||v.state.completedShelters>=64){stage="все проекты завершены";return;}
         int beds=v.index.beds.size();
         if(beds<v.state.residents.size()+2){
@@ -126,6 +130,13 @@ final class Projects {
     TownBuilding active(){
         return v.state.buildings.stream().filter(b->!b.completed&&!b.kind.equals("native_house")).findFirst().orElse(null);
     }
+    List<TownBuilding> unfinished(){return v.state.buildings.stream().filter(b->!b.completed&&!b.kind.equals("native_house")).toList();}
+    /** Since when nothing of a project could be paid for (by origin); builders report it. */
+    private final Map<Long,Long> unpaidSince=new HashMap<>();
+    void unpaid(TownBuilding b){unpaidSince.putIfAbsent(b.origin,v.level.getGameTime());}
+    void paid(TownBuilding b){unpaidSince.remove(b.origin);}
+    /** A house waiting for something the village cannot make yet (a bed without wool) does not block the next one. */
+    boolean waiting(TownBuilding b){Long since=unpaidSince.get(b.origin);return since!=null&&v.level.getGameTime()-since>3000;}
     static String label(TownBuilding b){
         String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";default->b.kind;};
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";

@@ -39,7 +39,8 @@ final class VillagePlanner {
         Item colour=null;int wool=0;
         for(var c:st.chests())for(int i=0;i<c.getContainerSize();i++){var item=c.getItem(i);if(item.is(ItemTags.WOOL)){int n=st.count(x->x.is(item.getItem()));if(n>wool){wool=n;colour=item.getItem();}}}
         var project=v.town.active();
-        Map<String,Integer> missing=project==null?Map.of():v.town.missing(project);
+        var missing=new TreeMap<String,Integer>();
+        for(var b:v.town.unfinished())v.town.missing(b).forEach((k,n)->missing.merge(k,n,Integer::sum));
         boolean night=v.level.isDarkOutside()||Math.floorMod(v.level.getOverworldClockTime(),24000)>9000;
         var dark=v.state.lights.size()<160&&(night||now%1200<600)?Lighting.darkSpots(v,8):List.<BlockPos>of();
         BlockPos hub=v.meetingPoint();
@@ -188,12 +189,16 @@ final class VillagePlanner {
     }
 
     // --- construction -----------------------------------------------------------------------------
+    /** The first unfinished building with something to clear or to place from the store. */
     private Job build(Worker w,Snapshot s){
-        var project=s.project();
-        if(project==null||!w.ready("build")||v.activeJobs("build")>=Math.max(1,v.workers.size()/2))return null;
-        var job=new BuildJob(w,project);
-        if(v.town.pendingCuts(project,1).isEmpty()&&job.affordable(1).isEmpty())return null;
-        return job;
+        if(s.project()==null||!w.ready("build")||v.activeJobs("build")>=Math.max(1,v.workers.size()/2))return null;
+        for(var project:v.town.unfinished()){
+            var job=new BuildJob(w,project);
+            if(v.town.pendingCuts(project,1).isEmpty()&&job.affordable(1).isEmpty()){v.town.unpaid(project);continue;}
+            v.town.paid(project);
+            return job;
+        }
+        return null;
     }
     /** Items in the store and in every worker's backpack: a crafted door waits in the crafter's bag first. */
     private int owned(Predicate<ItemStack> test){

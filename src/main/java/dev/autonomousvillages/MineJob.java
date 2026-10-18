@@ -35,8 +35,7 @@ final class MineJob extends Job {
             if(state==Harvest.State.DONE){broken++;v.chronicle.mined();}
             targets.poll();
         }
-        while(!targets.isEmpty()&&(!VillageIndex.oreResource(v.level.getBlockState(targets.peek()))&&!v.level.getBlockState(targets.peek()).is(net.minecraft.world.level.block.Blocks.STONE)
-                ||!VillageCrafting.hasPickFor(bot(),v.level.getBlockState(targets.peek()))))targets.poll();
+        while(!targets.isEmpty()&&!mineable(v.level.getBlockState(targets.peek())))targets.poll();
         if(targets.isEmpty()||broken>=12)return false;
         if(approach==null)approach=new Approach(targets.peek(),4.5,true);
         var state=approach.tick();
@@ -44,6 +43,11 @@ final class MineJob extends Job {
         if(state==Approach.State.FAILED){v.rejected.put(targets.poll().asLong(),now()+1200);approach=null;return !targets.isEmpty();}
         harvest=new Harvest(targets.peek());
         return true;
+    }
+    /** Stone and ore need a fitting pick; sand comes away by hand. */
+    private boolean mineable(net.minecraft.world.level.block.state.BlockState s){
+        if(s.is(net.minecraft.world.level.block.Blocks.SAND)||s.is(net.minecraft.world.level.block.Blocks.RED_SAND))return true;
+        return (VillageIndex.oreResource(s)||s.is(net.minecraft.world.level.block.Blocks.STONE))&&VillageCrafting.hasPickFor(bot(),s);
     }
     private boolean shaft(){
         if(excavation==null){

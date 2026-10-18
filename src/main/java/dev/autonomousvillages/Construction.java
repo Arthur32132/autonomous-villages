@@ -77,6 +77,7 @@ final class Construction {
                 :step.state().getBlock() instanceof BedBlock?s->s.is(net.minecraft.tags.ItemTags.BEDS):s->s.is(step.item());
     }
     static boolean masonry(BlockState s){return s.is(BlockTags.TERRACOTTA)||s.is(BlockTags.STONE_BRICKS)||s.is(Blocks.MOSSY_COBBLESTONE)
+            ||s.is(Blocks.PACKED_ICE)||s.is(Blocks.BLUE_ICE)
             ||s.is(Blocks.BRICKS)||s.is(Blocks.SANDSTONE)||s.is(Blocks.CUT_SANDSTONE)||s.is(Blocks.SMOOTH_SANDSTONE)
             ||s.is(Blocks.RED_SANDSTONE)||s.is(Blocks.CUT_RED_SANDSTONE)||s.is(Blocks.SMOOTH_RED_SANDSTONE)||s.is(Blocks.SNOW_BLOCK);}
     static boolean stoneStairs(BlockState s){return s.is(BlockTags.STAIRS)&&!s.is(BlockTags.WOODEN_STAIRS);}

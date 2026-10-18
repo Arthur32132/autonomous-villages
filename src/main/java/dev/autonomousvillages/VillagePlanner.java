@@ -76,14 +76,14 @@ final class VillagePlanner {
             case BUILDER->first(()->build(w,s),()->craftForProject(w,s),()->chop(w,s,true));
             case STEWARD->first(()->craftForProject(w,s),()->workshop(w,s),()->build(w,s));
             case LOGGER->chop(w,s,false);
-            case MINER->mine(w,s,false);
+            case MINER->first(()->mine(w,s,false),()->sand(w,s));
             case FARMER->first(()->farm(w),()->bread(w,s),()->shear(w,s));
             case GUARD->chop(w,s,true);
             default->null;
         };
         if(own!=null)return own;
         Job shared=first(()->build(w,s),()->craftForProject(w,s),()->workshop(w,s),()->shear(w,s),()->chop(w,s,true),
-                ()->mine(w,s,true),()->farm(w),()->bread(w,s),()->pave(w,s));
+                ()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
         if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0)return new DepositJob(w);
         return shared;
     }
@@ -203,6 +203,12 @@ final class VillagePlanner {
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
         if(s.need("slab")>owned(x->x.is(ItemTags.WOODEN_SLABS))&&!crafting(w,VillageCrafting.SLAB)&&CraftJob.affordable(v,VillageCrafting.SLAB,2,w))return new CraftJob(w,VillageCrafting.SLAB,2);
         if(s.need("stairs")>owned(x->x.is(ItemTags.WOODEN_STAIRS))&&!crafting(w,VillageCrafting.STAIRS)&&CraftJob.affordable(v,VillageCrafting.STAIRS,2,w))return new CraftJob(w,VillageCrafting.STAIRS,2);
+        if(s.need("stone_stairs")>owned(x->x.is(Items.COBBLESTONE_STAIRS))&&!crafting(w,VillageCrafting.COBBLE_STAIRS)&&CraftJob.affordable(v,VillageCrafting.COBBLE_STAIRS,2,w))return new CraftJob(w,VillageCrafting.COBBLE_STAIRS,2);
+        if(s.need("stone_slab")>owned(x->x.is(Items.COBBLESTONE_SLAB))&&!crafting(w,VillageCrafting.COBBLE_SLAB)&&CraftJob.affordable(v,VillageCrafting.COBBLE_SLAB,2,w))return new CraftJob(w,VillageCrafting.COBBLE_SLAB,2);
+        if(s.need("stone_wall")>owned(x->x.is(Items.COBBLESTONE_WALL))&&!crafting(w,VillageCrafting.COBBLE_WALL)&&CraftJob.affordable(v,VillageCrafting.COBBLE_WALL,1,w))return new CraftJob(w,VillageCrafting.COBBLE_WALL,1);
+        if(s.need("trapdoor")>owned(x->x.is(ItemTags.WOODEN_TRAPDOORS))&&!crafting(w,VillageCrafting.TRAPDOOR)&&CraftJob.affordable(v,VillageCrafting.TRAPDOOR,1,w))return new CraftJob(w,VillageCrafting.TRAPDOOR,1);
+        if(s.need("ladder")>owned(x->x.is(Items.LADDER))&&!crafting(w,VillageCrafting.LADDER)&&CraftJob.affordable(v,VillageCrafting.LADDER,1,w))return new CraftJob(w,VillageCrafting.LADDER,1);
+        if(s.need("glass_pane")>owned(x->x.is(Items.GLASS_PANE))&&!crafting(w,VillageCrafting.GLASS_PANE)&&CraftJob.affordable(v,VillageCrafting.GLASS_PANE,1,w))return new CraftJob(w,VillageCrafting.GLASS_PANE,1);
         if(s.need("fence")>owned(x->x.is(ItemTags.WOODEN_FENCES))&&!crafting(w,VillageCrafting.FENCE)&&CraftJob.affordable(v,VillageCrafting.FENCE,1,w))return new CraftJob(w,VillageCrafting.FENCE,1);
         if(s.need("chest")>owned(x->x.is(Items.CHEST))&&!crafting(w,VillageCrafting.CHEST)&&CraftJob.affordable(v,VillageCrafting.CHEST,1,w))return new CraftJob(w,VillageCrafting.CHEST,1);
         if(s.need("crafting_table")>owned(x->x.is(Items.CRAFTING_TABLE))&&!crafting(w,VillageCrafting.TABLE)&&CraftJob.affordable(v,VillageCrafting.TABLE,1,w))return new CraftJob(w,VillageCrafting.TABLE,1);
@@ -221,6 +227,8 @@ final class VillagePlanner {
         if(s.furnace()!=null&&w.ready("smelt")&&v.activeJobs("smelt")==0){
             if(s.furnaceOutput())return new SmeltJob(w,s.furnace(),x->false,0,"забирает готовое");
             if(s.rawIron()>0)return new SmeltJob(w,s.furnace(),x->x.is(Items.RAW_IRON),Math.min(16,s.rawIron()),"железо");
+            int glassWanted=s.need("glass_pane")>owned(x->x.is(Items.GLASS_PANE))?6:0,sand=v.stock.count(VillageCrafting.SAND);
+            if(glassWanted>owned(VillageCrafting.GLASS)&&sand>0)return new SmeltJob(w,s.furnace(),VillageCrafting.SAND,Math.min(16,sand),"стекло");
             if((s.need("torch")>0||!s.dark().isEmpty())&&s.fuel()<2&&s.logs()>=6)return new SmeltJob(w,s.furnace(),VillageCrafting.LOG,4,"древесный уголь");
         }
         if(s.table()!=null&&w.ready("craft")){
@@ -271,7 +279,8 @@ final class VillagePlanner {
     }
     private Job mine(Worker w,Snapshot s,boolean helping){
         boolean ironWanted=s.need("bed")>0&&!s.shears()&&s.iron()+s.rawIron()<2;
-        int wanted=STONE_RESERVE+s.need("cobblestone");
+        // Stone shapes are cut from cobblestone: 6 make 4 stairs, 3 make 6 slabs, 6 make 6 walls.
+        int wanted=STONE_RESERVE+s.need("cobblestone")+(s.need("stone_stairs")*3+1)/2+(s.need("stone_slab")+1)/2+s.need("stone_wall");
         if(s.cobble()>=wanted&&!ironWanted)return null;
         if(!w.ready("mine")||!w.hasTool(ItemTags.PICKAXES))return null;
         BlockPos from=w.body().blockPosition();
@@ -290,6 +299,15 @@ final class VillagePlanner {
         BlockPos entrance=mineEntrance();
         if(entrance==null||v.activeJobs("shaft")>0){w.cooldown("mine",600);return null;}
         return new MineJob(w,entrance);
+    }
+    /** Sand for window glass, dug by hand. */
+    private Job sand(Worker w,Snapshot s){
+        if(!w.ready("mine")||s.need("glass_pane")<=owned(x->x.is(Items.GLASS_PANE))||owned(VillageCrafting.GLASS)+owned(VillageCrafting.SAND)>=6)return null;
+        BlockPos from=w.body().blockPosition();
+        var sand=v.index.sand.stream().filter(p->v.level.getBlockState(p).is(Blocks.SAND)||v.level.getBlockState(p).is(Blocks.RED_SAND))
+                .filter(p->v.ready(p,w.id)&&v.state.policy.allows("mine",p)&&!v.town.protects(p)&&Math.abs(p.getY()-from.getY())<=8&&p.distSqr(from)<64*64)
+                .sorted(Comparator.comparingDouble(p->{double dy=p.getY()-from.getY();return p.distSqr(from)+15*dy*dy;})).limit(8).toList();
+        return sand.size()>=2?new MineJob(w,sand):null;
     }
     /** A staircase mine starts at the edge of the claim on natural ground, away from beds. */
     BlockPos mineEntrance(){

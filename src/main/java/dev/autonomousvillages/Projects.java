@@ -186,6 +186,12 @@ final class Projects {
         if(s.is(BlockTags.WOODEN_STAIRS))return "stairs";
         if(s.is(BlockTags.WOODEN_SLABS))return "slab";
         if(s.is(BlockTags.WOODEN_FENCES))return "fence";
+        if(s.is(BlockTags.WOODEN_TRAPDOORS))return "trapdoor";
+        if(s.is(Blocks.COBBLESTONE_STAIRS))return "stone_stairs";
+        if(s.is(Blocks.COBBLESTONE_SLAB))return "stone_slab";
+        if(s.is(Blocks.COBBLESTONE_WALL))return "stone_wall";
+        if(s.is(Blocks.GLASS_PANE))return "glass_pane";
+        if(s.is(Blocks.LADDER))return "ladder";
         if(s.is(Blocks.CHEST))return "chest";
         if(s.is(Blocks.CRAFTING_TABLE))return "crafting_table";
         if(s.is(Blocks.FURNACE))return "furnace";

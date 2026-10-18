@@ -97,13 +97,26 @@ final class Blueprints {
     static boolean structural(BlockState s){
         if(VillageIndex.naturalSoil(s)||s.is(Blocks.DIRT_PATH)||s.is(Blocks.FARMLAND))return false;
         return s.is(BlockTags.PLANKS)||s.is(BlockTags.LOGS)||s.is(BlockTags.WOODEN_STAIRS)||s.is(BlockTags.WOODEN_SLABS)||s.is(BlockTags.WOODEN_FENCES)
-                ||s.is(BlockTags.WOODEN_DOORS)||s.getBlock() instanceof BedBlock||s.is(Blocks.TORCH)||s.is(Blocks.WALL_TORCH)
-                ||s.is(Blocks.COBBLESTONE)||Construction.masonry(s)||s.is(Blocks.STONE)||s.is(Blocks.SMOOTH_STONE)
-                ||s.is(Blocks.CHEST)||s.is(Blocks.CRAFTING_TABLE)||s.is(Blocks.FURNACE);
+                ||s.is(BlockTags.WOODEN_DOORS)||s.is(BlockTags.WOODEN_TRAPDOORS)||s.getBlock() instanceof BedBlock||s.is(Blocks.TORCH)||s.is(Blocks.WALL_TORCH)
+                ||s.is(Blocks.COBBLESTONE)||Construction.masonry(s)||stone(s)||Construction.stoneStairs(s)||Construction.stoneSlab(s)||s.is(BlockTags.WALLS)
+                ||s.is(Blocks.GLASS_PANE)||s.is(Blocks.LADDER)||s.is(Blocks.CHEST)||s.is(Blocks.CRAFTING_TABLE)||s.is(Blocks.FURNACE);
     }
-    /** Cobblestone stands in for the stone, sandstone, terracotta and brick of other biomes. */
+    private static boolean stone(BlockState s){
+        return s.is(Blocks.STONE)||s.is(Blocks.SMOOTH_STONE)||s.is(Blocks.DIORITE)||s.is(Blocks.ANDESITE)||s.is(Blocks.GRANITE)
+                ||s.is(Blocks.POLISHED_DIORITE)||s.is(Blocks.POLISHED_ANDESITE)||s.is(Blocks.POLISHED_GRANITE);
+    }
+    /** Cobblestone stands in for the stone, sandstone, terracotta and brick of other biomes, keeping each block's shape. */
     static BlockState buildable(BlockState s){
-        if(s.is(Blocks.STONE)||s.is(Blocks.SMOOTH_STONE)||Construction.masonry(s))return Blocks.COBBLESTONE.defaultBlockState();
+        if(Construction.stoneStairs(s)&&!s.is(Blocks.COBBLESTONE_STAIRS))return reshape(s,Blocks.COBBLESTONE_STAIRS);
+        if(Construction.stoneSlab(s)&&!s.is(Blocks.COBBLESTONE_SLAB))return reshape(s,Blocks.COBBLESTONE_SLAB);
+        if(s.is(BlockTags.WALLS)&&!s.is(Blocks.COBBLESTONE_WALL))return reshape(s,Blocks.COBBLESTONE_WALL);
+        if(stone(s)||Construction.masonry(s))return Blocks.COBBLESTONE.defaultBlockState();
         return s;
+    }
+    @SuppressWarnings({"rawtypes","unchecked"})
+    private static BlockState reshape(BlockState from,Block to){
+        BlockState out=to.defaultBlockState();
+        for(var property:from.getProperties())if(out.hasProperty(property))out=out.setValue((net.minecraft.world.level.block.state.properties.Property)property,(Comparable)from.getValue(property));
+        return out;
     }
 }

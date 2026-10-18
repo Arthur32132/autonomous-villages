@@ -30,7 +30,7 @@ final class VillageCrafting {
     record Recipe(String name,String[] pattern,Predicate<ItemStack> material,Predicate<ItemStack> output,String label){
         boolean needsTable(){return pattern.length>2||pattern[0].length()>2;}
         /** Vanilla wants one kind of wood for these; tools, chests and tables take mixed planks. */
-        boolean coherent(){return Set.of("door","fence","stairs","slab","sign").contains(name);}
+        boolean coherent(){return Set.of("door","fence","stairs","slab","sign","trapdoor").contains(name);}
         Map<Character,Integer> symbols(){
             var out=new TreeMap<Character,Integer>();
             for(String row:pattern)for(char c:row.toCharArray())if(c!=' ')out.merge(c,1,Integer::sum);
@@ -51,6 +51,15 @@ final class VillageCrafting {
     static final Recipe STAIRS=new Recipe("stairs",new String[]{"P  ","PP ","PPP"},PLANK,s->s.is(ItemTags.WOODEN_STAIRS),"ступени");
     static final Recipe SLAB=new Recipe("slab",new String[]{"PPP"},PLANK,s->s.is(ItemTags.WOODEN_SLABS),"плиты");
     static final Recipe SIGN=new Recipe("sign",new String[]{"PPP","PPP"," S "},PLANK,s->s.is(ItemTags.SIGNS),"табличка");
+    static final Predicate<ItemStack> COBBLESTONE=s->s.is(Items.COBBLESTONE);
+    static final Predicate<ItemStack> SAND=s->s.is(Items.SAND)||s.is(Items.RED_SAND);
+    static final Predicate<ItemStack> GLASS=s->s.is(Items.GLASS);
+    static final Recipe COBBLE_STAIRS=new Recipe("cobblestone_stairs",new String[]{"M  ","MM ","MMM"},COBBLESTONE,s->s.is(Items.COBBLESTONE_STAIRS),"каменные ступени");
+    static final Recipe COBBLE_SLAB=new Recipe("cobblestone_slab",new String[]{"MMM"},COBBLESTONE,s->s.is(Items.COBBLESTONE_SLAB),"каменные плиты");
+    static final Recipe COBBLE_WALL=new Recipe("cobblestone_wall",new String[]{"MMM","MMM"},COBBLESTONE,s->s.is(Items.COBBLESTONE_WALL),"каменная ограда");
+    static final Recipe TRAPDOOR=new Recipe("trapdoor",new String[]{"PPP","PPP"},PLANK,s->s.is(ItemTags.WOODEN_TRAPDOORS),"ставни");
+    static final Recipe LADDER=new Recipe("ladder",new String[]{"S S","SSS","S S"},STICK,s->s.is(Items.LADDER),"лестница");
+    static final Recipe GLASS_PANE=new Recipe("glass_pane",new String[]{"MMM","MMM"},GLASS,s->s.is(Items.GLASS_PANE),"оконное стекло");
     static Recipe tool(String family,String tier){
         Predicate<ItemStack> material=switch(tier){case "stone"->COBBLE;case "iron"->IRON;default->PLANK;};
         String[] pattern=switch(family){

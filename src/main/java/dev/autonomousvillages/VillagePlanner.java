@@ -140,6 +140,12 @@ final class VillagePlanner {
             if(!v.state.contains(p)||!v.level.hasChunkAt(p)||!Construction.clear(v.level.getBlockState(p))||v.town.protects(p)||v.town.protects(p.below())
                     ||!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP)||v.level.getBlockState(p.below()).is(Blocks.FARMLAND)
                     ||!Construction.clear(v.level.getBlockState(p.above()))||p.distSqr(hub)<4||!v.state.policy.allows("build",p))continue;
+            // On the ground, not on the roof of the well or the bell's shelter, and with room to stand beside it.
+            var ground=v.level.getBlockState(p.below());
+            if(!(VillageIndex.naturalSoil(ground)||ground.is(Blocks.DIRT_PATH)||ground.is(Blocks.GRAVEL)||ground.is(Blocks.SAND)||ground.is(Blocks.COBBLESTONE)
+                    ||ground.is(Blocks.SANDSTONE)||ground.is(Blocks.SNOW_BLOCK)))continue;
+            boolean standable=false;for(Direction d:Direction.Plane.HORIZONTAL)if(v.safeFeet(p.relative(d)))standable=true;
+            if(!standable)continue;
             boolean doorway=false;for(var door:v.town.doors())if(door.distSqr(p)<9)doorway=true;
             if(doorway||v.index.beds.stream().anyMatch(b->b.distSqr(p)<9))continue;
             // A spot beside an existing chest keeps the store compact, but never in a 1-wide corridor.

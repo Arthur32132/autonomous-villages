@@ -79,7 +79,7 @@ final class MineJob extends Job {
         var request=new ExcavationRequest(entrance,Direction.from2DDataValue(v.state.mineDirection),ExcavationMode.STAIRCASE_DOWN,Math.max(1,v.state.mineLength));
         for(int step=0;step<=v.state.mineLength;step++)for(BlockPos cell:request.clearanceAt(step))for(Direction d:Direction.values()){
             BlockPos p=cell.relative(d);
-            if(v.level.hasChunkAt(p)&&VillageIndex.oreResource(v.level.getBlockState(p)))v.index.ore.add(p.immutable());
+            if(v.level.hasChunkAt(p)&&VillageIndex.oreResource(v.level.getBlockState(p))){v.index.ore.add(p.immutable());v.index.shaftOre.add(p.immutable());}
         }
     }
     @Override void stop(){

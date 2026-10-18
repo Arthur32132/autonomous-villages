@@ -14,6 +14,8 @@ final class VillageIndex {
     final Set<BlockPos> crops = new LinkedHashSet<>(), soil = new LinkedHashSet<>(), trees = new LinkedHashSet<>(),
             stone = new LinkedHashSet<>(), ore = new LinkedHashSet<>(), tables = new LinkedHashSet<>(), grass = new LinkedHashSet<>(),sand=new LinkedHashSet<>(),farmSites=new LinkedHashSet<>();
     List<BlockPos> beds = List.of();
+    /** Ore seen next to the village staircase mine: reachable down the stairs at any depth. */
+    final Set<BlockPos> shaftOre = new LinkedHashSet<>();
     private int cursor;
     private int localCursor;
     private List<BlockPos> residents=List.of();

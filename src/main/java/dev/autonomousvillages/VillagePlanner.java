@@ -294,7 +294,7 @@ final class VillagePlanner {
         BlockPos from=w.body().blockPosition();
         // Cave walls far below are seen by the survey but not reachable on foot: stay near the worker's level.
         Predicate<BlockPos> usable=p->v.ready(p,w.id)&&v.state.policy.allows("mine",p)&&!v.town.protects(p)&&VillageIndex.exposed(v.level,p)
-                &&Math.abs(p.getY()-from.getY())<=8&&VillageCrafting.hasPickFor(w.bot(),v.level.getBlockState(p))&&p.distSqr(from)<64*64;
+                &&(Math.abs(p.getY()-from.getY())<=8||v.index.shaftOre.contains(p))&&VillageCrafting.hasPickFor(w.bot(),v.level.getBlockState(p))&&p.distSqr(from)<80*80;
         Comparator<BlockPos> near=Comparator.comparingDouble(p->{double dy=p.getY()-from.getY();return p.distSqr(from)+15*dy*dy;});
         var ores=v.index.ore.stream().filter(p->MineKnowledge.iron(v,p)||v.level.getBlockState(p).is(Blocks.COAL_ORE)||v.level.getBlockState(p).is(Blocks.DEEPSLATE_COAL_ORE))
                 .filter(usable).sorted(near).limit(6).toList();

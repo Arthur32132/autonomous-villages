@@ -227,7 +227,8 @@ final class VillagePlanner {
         return new PathJob(w,cells);
     }
     private Job bread(Worker w,Snapshot s){
-        if(s.wheat()>=3&&s.table()!=null&&w.ready("craft"))return new CraftJob(w,VillageCrafting.BREAD,Math.min(4,s.wheat()/3));
+        if(s.wheat()>=3&&s.bread()<32&&s.table()!=null&&w.ready("craft")&&!busy(w,VillageCrafting.BREAD,Blocks.AIR))
+            return new CraftJob(w,VillageCrafting.BREAD,Math.min(4,s.wheat()/3));
         return null;
     }
     private Job shear(Worker w,Snapshot s){

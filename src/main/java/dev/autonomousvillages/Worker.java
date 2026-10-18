@@ -74,7 +74,8 @@ final class Worker {
         if(combat!=null){if(!combat.completion().isDone()&&now()-fleeSince<600)return;combat=null;}
 
         long day=Math.floorMod(v.level.getOverworldClockTime(),24_000);
-        boolean night=nightRest();
+        // During an alarm the unarmed take cover as at night; the armed keep their posts.
+        boolean night=nightRest()||v.alarm()&&!armed();
         boolean social=day>=socialStart()&&day<socialStart()+1000;
         boolean profession=day>=professionStart()&&day<professionStart()+600
                 &&e.getBrain().getMemory(MemoryModuleType.JOB_SITE).filter(p->p.dimension().equals(v.level.dimension())).isPresent();
@@ -86,7 +87,7 @@ final class Worker {
             if(job==null&&night&&!atHome()&&ready("home"))start(new HomeJob(this));
             if(job==null){
                 if(!released){b.stopAll();released=true;}
-                status=night?(e.isSleeping()?"спит":"идёт спать"):profession?"работает по профессии и обновляет торговлю":"общение и отдых";
+                status=v.alarm()&&!nightRest()?"прячется: тревога":night?(e.isSleeping()?"спит":"идёт спать"):profession?"работает по профессии и обновляет торговлю":"общение и отдых";
                 return;
             }
         }

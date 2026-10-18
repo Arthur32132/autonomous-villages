@@ -1,9 +1,9 @@
 # Contributing to Autonomous Villages
 
 Bug reports, design discussions, forks and pull requests are welcome. English
-and Russian are both welcome. The project is experimental: the latest roadmap 3
-source has not been built or validated in Minecraft. Full village autonomy has
-not passed acceptance. See [the roadmap](docs/ROADMAP.md) before choosing work.
+and Russian are both welcome. The project is experimental: 0.3 is in development
+on a new core (shared store, job classes, one planner). See [the 0.3 plan](docs/PLAN-v0.3.md)
+and [the work log](docs/WORKLOG.md) before choosing work.
 
 ## Build from a fresh checkout
 
@@ -63,14 +63,9 @@ PRs and identify which revisions need to be used together.
 
 ## Game validation and repository hygiene
 
-Read [AGENTS.md](AGENTS.md), [VALIDATION.md](VALIDATION.md) and the
-[400-TPS audit](docs/validation/2026-10-16-tps-audit/REPORT.md) first. Use the
-existing runners and `tools/test_session.py` shared lock. Run only one Minecraft
-test process, use disposable worlds, preserve originals, and respect artifact
-and disk budgets. A private Modrinth profile is not supplied by this repository;
-inspect runner options with `--help` and provide your own local installation.
-Retain a 40-TPS comparison when investigating timing; 400 TPS is local throughput
-evidence, not universal hardware or gameplay acceptance.
+Read [AGENTS.md](AGENTS.md) and [tools/soak/README.md](tools/soak/README.md) first. Game behaviour is
+checked with headless soak runs on disposable worlds; compare builds on the same seeds, difficulty and
+tick rate (100 TPS by default). Preserve original worlds and profiles.
 
 Do not commit credentials, `.env` files, game binaries, decompiled Minecraft,
 world saves, copied profiles, caches or complete logs containing private data.

@@ -65,7 +65,6 @@ final class Projects {
         }
         for(BlockPos home:survey.homes())captureHouse(home);
         captured=true;invalidate();
-        planDoors();
     }
     private void captureHouse(BlockPos home){
         if(v.state.buildings.size()>=256)return;
@@ -79,50 +78,6 @@ final class Projects {
             for(Direction d:Direction.values())todo.add(p.relative(d));
         }
         if(!house.blocks.isEmpty()){house.completed=true;v.state.buildings.add(house);}
-    }
-    /**
-     * Desert and savanna houses have open doorways, and a zombie walks in on the sleepers. A door in
-     * each open doorway is cheap and zombies on normal difficulty cannot break it.
-     */
-    void planDoors(){
-        if(v.state.buildings.stream().anyMatch(b->b.kind.equals("doors")))return;
-        var doors=new TownBuilding("doors",v.meetingPoint());var seen=new HashSet<BlockPos>();
-        for(var house:v.state.buildings){
-            if(!house.kind.equals("native_house")||house.blocks.isEmpty())continue;
-            int minX=Integer.MAX_VALUE,minY=Integer.MAX_VALUE,minZ=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE,maxY=Integer.MIN_VALUE,maxZ=Integer.MIN_VALUE;
-            for(var p:house.blocks){var q=p.position();minX=Math.min(minX,q.getX());maxX=Math.max(maxX,q.getX());minY=Math.min(minY,q.getY());maxY=Math.max(maxY,q.getY());minZ=Math.min(minZ,q.getZ());maxZ=Math.max(maxZ,q.getZ());}
-            if((maxX-minX)*(maxZ-minZ)>400||maxY-minY>20)continue;
-            for(BlockPos q:BlockPos.betweenClosed(minX,minY+1,minZ,maxX,Math.min(maxY,minY+4),maxZ)){
-                BlockPos p=q.immutable();
-                if(seen.contains(p)||!v.state.contains(p))continue;
-                Direction out=doorway(p);
-                if(out==null)continue;
-                seen.add(p);seen.add(p.relative(out.getClockWise()));seen.add(p.relative(out.getCounterClockWise()));
-                doors.add(p,Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,out.getOpposite()));
-            }
-        }
-        doors.blocks.removeIf(p->!v.state.contains(p.position())||!v.state.contains(p.position().above()));
-        if(doors.blocks.isEmpty()||!v.state.contains(BlockPos.of(doors.origin)))return;
-        // Doors go first: they are the cheapest protection the village can buy.
-        v.state.buildings.addFirst(doors);invalidate();
-        v.chronicle.event("Нужны двери в "+doors.blocks.size()+" открытых проёмах");
-    }
-    /** The outward direction of an open two-block doorway at p, or null. */
-    private Direction doorway(BlockPos p){
-        var level=v.level;
-        if(!Construction.clear(level.getBlockState(p))||!Construction.clear(level.getBlockState(p.above()))||level.canSeeSky(p)
-                ||!level.getBlockState(p.below()).isFaceSturdy(level,p.below(),Direction.UP)||Construction.clear(level.getBlockState(p.above(2))))return null;
-        for(Direction d:Direction.Plane.HORIZONTAL){
-            BlockPos outside=p.relative(d),inside=p.relative(d.getOpposite());
-            if(!level.canSeeSky(outside)||level.canSeeSky(inside)||!Construction.clear(level.getBlockState(inside))||!Construction.clear(level.getBlockState(outside)))continue;
-            boolean walls=true;
-            for(Direction side:new Direction[]{d.getClockWise(),d.getCounterClockWise()})for(int y=0;y<=1;y++){
-                var wall=level.getBlockState(p.relative(side).above(y));
-                if(Construction.clear(wall)||wall.getBlock() instanceof DoorBlock)walls=false;
-            }
-            if(walls)return d;
-        }
-        return null;
     }
     /** Unlocked chests and furnaces inside village houses become shared property on claim. */
     private void adopt(BlockPos p){

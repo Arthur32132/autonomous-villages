@@ -108,6 +108,7 @@ final class Village {
         }
         rotation++;
         presentation.tick();
+        if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){
             state.plantedTrees.removeIf(p->{var pos=BlockPos.of(p);return level.hasChunkAt(pos)&&!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.SaplingBlock)
                     &&!level.getBlockState(pos).is(net.minecraft.tags.BlockTags.LOGS)&&!state.fellingTrees.contains(p);});
@@ -169,6 +170,22 @@ final class Village {
         nextTickets=0;return true;
     }
 
+    /**
+     * At night every unoccupied wooden door of the village is shut. Residents open doors on their way
+     * and the library does not close them; one open door let husks reach a whole house of sleepers.
+     */
+    private void closeDoors(){
+        for(BlockPos p:town.doors()){
+            if(!level.hasChunkAt(p))continue;
+            var s=level.getBlockState(p);
+            if(!(s.getBlock() instanceof net.minecraft.world.level.block.DoorBlock door)||!s.is(net.minecraft.tags.BlockTags.WOODEN_DOORS)
+                    ||s.getValue(net.minecraft.world.level.block.DoorBlock.HALF)!=net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER
+                    ||!s.getValue(net.minecraft.world.level.block.DoorBlock.OPEN))continue;
+            if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new AABB(p).expandTowards(0,1,0).inflate(.2),net.minecraft.world.entity.LivingEntity::isAlive).isEmpty())continue;
+            door.setOpen(null,level,s,p,false);
+        }
+    }
+
     // --- store -----------------------------------------------------------------------------------
     List<ChestBlockEntity> chests(){
         List<ChestBlockEntity> result=new ArrayList<>();
@@ -193,9 +210,25 @@ final class Village {
     boolean guard(UUID id){return primaryRole(id)==ResidentRoles.Role.GUARD;}
     String role(UUID id){var a=primaryRole(id);return a==null?"без назначения":a.label;}
     long activeJobs(String... kinds){var names=Set.of(kinds);return workers.values().stream().filter(w->w.job!=null&&names.contains(w.job.kind())).count();}
-    /** Up to two armed, healthy residents who can see the enemy come to help. */
+    long alarmUntil;
+    private long nextBell;
+    /** While the alarm lasts the unarmed go home and the armed fight. */
+    boolean alarm(){return level.getGameTime()<alarmUntil;}
+    /**
+     * Up to two armed, healthy residents who can see the enemy come to help, and the bell rings: the
+     * vanilla bell makes the villagers who hear it hide at home.
+     */
     void raiseAlarm(Worker caller,Monster enemy){
         long now=level.getGameTime();if(now<nextAlarm)return;nextAlarm=now+40;
+        if(state.contains(enemy.blockPosition())){
+            if(alarmUntil<now)chronicle.add("alarms",1);
+            alarmUntil=now+400;
+            if(now>=nextBell&&!level.isDarkOutside()){
+                var hub=meetingPoint();
+                if(level.getBlockState(hub).getBlock() instanceof net.minecraft.world.level.block.BellBlock bell
+                        &&bell.attemptToRing(caller.body(),level,hub,Direction.NORTH))nextBell=now+100;
+            }
+        }
         workers.values().stream().filter(w->w!=caller&&w.active()&&!w.body().isSleeping()&&w.body().getHealth()>=16&&!w.body().isTrading()
                         &&w.body().distanceToSqr(enemy)<24*24&&w.body().hasLineOfSight(enemy)
                         &&(w.combat==null||w.combat.completion().isDone())&&w.armed())

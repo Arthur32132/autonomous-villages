@@ -87,10 +87,16 @@ final class VillageControls {
             var associated=v.state.orders.stream().filter(o->o.open()&&o.work==b.origin).toList();
             String carriers=associated.stream().map(o->o.carrier).filter(c->!c.isEmpty()).distinct().collect(java.util.stream.Collectors.joining(", "));
             lines.add(TownPlanner.label(b)+" "+b.built(v)+"/"+b.blocks.size()+": "+executor+", перевозчик "+(carriers.isEmpty()?"не назначен":carriers)+", заявки под проект "+associated.stream().mapToInt(Orders.Order::outstanding).sum()+", срезка "+b.cuts.size()+", подсыпка "+b.foundation.size()+", подход "+Infrastructure.prepared(v,b)
+                    +"; доступ: "+Infrastructure.accessReason(v,b)
                     +(b.housingFor==null?"":"; расширение жилого участка "+BlockPos.of(b.housingFor).toShortString())
                     +projectMaterials(v,b));
         }
         lines.add("Логистика: "+DeliveryRuns.status(v));
+        for(var entry:v.state.accessFailures.entrySet().stream().skip((long)(page-1)*8).limit(8).toList()){
+            var failure=entry.getValue();
+            lines.add("Подключение "+BlockPos.of(entry.getKey()).toShortString()+": "+(failure.resolved?"перепланировано; прежний отказ: ":"ожидает обхода: ")
+                    +failure.reason+"; попыток "+failure.attempts+", повтор через "+Math.max(0,failure.retryAt-v.level.getGameTime())+" тактов");
+        }
         lines.add("Выпуск мастерских (предметы; для поста — ответы на тревогу): "+v.state.workshopOutput);
         for(int i=0;i<v.state.policy.zones.size();i++){var z=v.state.policy.zones.get(i);lines.add("Запрет №"+i+" "+z.activity+": "+z.minX+","+z.minZ+"–"+z.maxX+","+z.maxZ);}
         lines.add("Страница "+page+"; остальные проекты: /avillage orders "+v.state.name+" "+(page+1));

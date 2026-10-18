@@ -246,9 +246,20 @@ final class SettlementNeeds {
                 "достаточно шерсти одного цвета на каждую кровать",usableWool>=3*Math.max(0,totalBeds-preparedBeds),Action.WOOL,List.of(shears));
         var housing=new ArrayList<Key>();
         for(var b:v.state.buildings){
+            if(b.kind.equals("road")){
+                roots.add(add(b.origin,"passage",Stage.TRANSPORT,builder,10,"связь рабочих участков","непрерывный безопасный проход; свет выполняется позже",
+                        Infrastructure.walkable(v,b),Action.BUILD,List.of()));
+                continue;
+            }
+            var accessDeps=b.approach==null?List.<Key>of():List.of(new Key(b.approach,"passage"));
+            // Legacy/damaged metadata can refer to a missing road: expose a wait instead of a missing graph key.
+            if(b.approach!=null&&v.state.buildings.stream().noneMatch(r->r.kind.equals("road")&&r.origin==b.approach))accessDeps=List.of();
+            var access=add(b.origin,"access",Stage.TRANSPORT,builder,10,"доступ к стройке и снабжению","подход безопасен",
+                    Infrastructure.approachReady(v,b),Action.BUILD,accessDeps,null,0,"",
+                    Infrastructure.approachReady(v,b)?"":Infrastructure.accessReason(v,b));
             int beds=(int)b.blocks.stream().filter(p->p.block().getBlock() instanceof BedBlock&&!p.matches(v)).count();
             var shell=add(b.origin,"shell",Stage.SHELTER,builder,10,"дом должен укрывать жителей","все элементы кроме кроватей установлены",
-                    b.blocks.stream().filter(p->!(p.block().getBlock() instanceof BedBlock)).allMatch(p->p.matches(v)),Action.BUILD,List.of());
+                    b.blocks.stream().filter(p->!(p.block().getBlock() instanceof BedBlock)).allMatch(p->p.matches(v)),Action.BUILD,List.of(access));
             var dependencies=new ArrayList<Key>(List.of(shell));
             if(beds>0){
                 int prepared=Math.min(beds,preparedBeds);preparedBeds-=prepared;

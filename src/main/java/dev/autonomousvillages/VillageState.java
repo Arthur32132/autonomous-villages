@@ -42,6 +42,14 @@ public final class VillageState {
     public VillagePolicy policy=new VillagePolicy();
     public ManagedLand land=new ManagedLand();
     public Map<Long,Integer> roadFailures=new LinkedHashMap<>();
+    public Long routeRoot;
+    public Map<Long,AccessFailure> accessFailures=new LinkedHashMap<>();
+    public static final class AccessFailure {
+        public String reason="";
+        public long retryAt;
+        public int attempts;
+        public boolean resolved;
+    }
     public Map<String,Long> workshopOutput=new LinkedHashMap<>();
     public Set<ResidentRoles.Role> vacantRoles=new LinkedHashSet<>();
     /** Order and reserve metadata only; the items themselves stay in chests and backpacks. */
@@ -58,6 +66,8 @@ public final class VillageState {
         if(workshopOutput==null)workshopOutput=new LinkedHashMap<>();
         if(policy==null)policy=new VillagePolicy();if(land==null)land=new ManagedLand();
         if(roadFailures==null)roadFailures=new LinkedHashMap<>();if(vacantRoles==null)vacantRoles=new LinkedHashSet<>();
+        if(accessFailures==null)accessFailures=new LinkedHashMap<>();
+        for(var building:buildings)if(building.routeCells==null)building.routeCells=new ArrayList<>();
         if(sheepFarm==null)sheepFarm=new SheepFarm.State();
         trimOldest(plantedCrops,512);trimOldest(reforestation,2048);trimOldest(capturedPieces,4096);
         if(orders==null)orders=new ArrayList<>();
@@ -155,6 +165,13 @@ public final class VillageState {
         return dx * dx + dz * dz <= r * r;
     }
     public void validate() {
+        if(routeRoot!=null&&!contains(BlockPos.of(routeRoot))||accessFailures==null||accessFailures.size()>128)
+            throw new IllegalArgumentException("Повреждённая сеть доступности");
+        for(var e:accessFailures.entrySet()){
+            var failure=e.getValue();
+            if(e.getKey()==null||!contains(BlockPos.of(e.getKey()))||failure==null||failure.reason==null||failure.reason.length()>240
+                    ||failure.retryAt<0||failure.attempts<0||failure.attempts>1000000)throw new IllegalArgumentException("Повреждённая причина отказа в подключении");
+        }
         if(policy==null||land==null||roadFailures==null||roadFailures.size()>128||vacantRoles==null||vacantRoles.contains(null))throw new IllegalArgumentException("Повреждённое планирование хозяйства");
         policy.validate();land.validate(this);
         if(workshopOutput==null||workshopOutput.size()>4||workshopOutput.entrySet().stream().anyMatch(e->!ProductionBuildings.KINDS.contains(e.getKey())||e.getValue()==null||e.getValue()<0))throw new IllegalArgumentException("Повреждённый выпуск мастерских");

@@ -6,6 +6,19 @@ import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.Test;
 
 class PlanningRulesTest {
+    @Test void infrastructureFailuresAndPhysicalRouteSurviveReload(){
+        var v=new VillageState("Access",UUID.randomUUID(),new BlockPos(0,64,0),24);
+        var from=new BlockPos(0,64,0);var to=from.east();
+        var road=new TownBuilding("road",to);road.routeStart=from.asLong();road.routeCells.addAll(List.of(from.asLong(),to.asLong()));
+        v.buildings.add(road);v.routeRoot=from.asLong();
+        var failure=new VillageState.AccessFailure();failure.reason="опасный разрыв";failure.retryAt=1200;failure.attempts=3;
+        v.accessFailures.put(to.asLong(),failure);
+        var copy=VillageRuntime.GSON.fromJson(VillageRuntime.GSON.toJson(v),VillageState.class);copy.compactMetadata();copy.validate();
+        assertEquals(road.routeCells,copy.buildings.getFirst().routeCells);assertEquals(v.routeRoot,copy.routeRoot);
+        assertEquals("опасный разрыв",copy.accessFailures.get(to.asLong()).reason);assertEquals(1200,copy.accessFailures.get(to.asLong()).retryAt);
+        copy.buildings.getFirst().routeCells.set(1,to.east().asLong());
+        assertThrows(IllegalArgumentException.class,copy::validate);
+    }
     @Test void competingFoodNeedsIncreaseTheBudgetWithoutConsumingSeedOrTimberReserves(){
         var normal=SettlementEconomy.budget(6,0,0,0,2);
         var busy=SettlementEconomy.budget(6,2,1,2,2);
@@ -52,7 +65,10 @@ class PlanningRulesTest {
     }
     @Test void oldMetadataReceivesSafeDefaultsAndMalformedLandIsRejected(){
         var v=new VillageState("Old",UUID.randomUUID(),new BlockPos(0,64,0),24);
-        v.policy=null;v.land=null;v.roadFailures=null;v.vacantRoles=null;v.compactMetadata();v.validate();
+        v.policy=null;v.land=null;v.roadFailures=null;v.accessFailures=null;v.vacantRoles=null;
+        var legacyRoad=new TownBuilding("road",v.center());legacyRoad.routeCells=null;v.buildings.add(legacyRoad);
+        v.compactMetadata();v.validate();
+        assertTrue(v.accessFailures.isEmpty());assertTrue(legacyRoad.routeCells.isEmpty());
         assertEquals(4,v.policy.expansion.size());assertTrue(v.land.fields.isEmpty());
         var f=new ManagedLand.Field();f.water=new BlockPos(1000,64,0).asLong();v.land.fields.add(f);
         assertThrows(IllegalArgumentException.class,v::validate);

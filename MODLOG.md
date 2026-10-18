@@ -722,3 +722,36 @@ requested 400 TPS. No long colony run or additional game launch followed.
 Evidence, JAR SHA-256 and limitations are in
 docs/validation/2026-10-17-roadmap-2/REPORT.md. The local gameplay JAR is in
 build/libs; the historical distribution bundle was not replaced.
+
+
+## 2026-10-17 — roadmap 3, инфраструктурное размещение
+
+Прямое поручение: реализовать пункт 3. Маршрут — развитие существующего Fabric
+кода Minecraft 26.2 / Java 25, без установки загрузчиков и изменений профилей.
+Исходники найдены в C:/minecraftWorkflow/AutonomousVillages; исходная папка
+чата содержит отдельный Blockbench MCP и не менялась. Прочитаны AGENTS.md
+мода и родителя, локальный индекс universal-modder knowledge.
+
+Добавлены RouteSearch и NetworkRoutes: ограниченный поиск с ресурсными метками,
+реальными выходами и сохраняемыми клетками маршрутов. Infrastructure отвечает
+за подключение площадок, перенос неначатого проекта, обходы и ремонт; TownPlanner
+учитывает цену снабжения. SettlementNeeds связывает стройку с обязательной
+проходимостью, свет отделён. Добавлены сохранение отказов, диагностика,
+исходники unit-проверок и обновление короткой planning-сцены.
+
+Сохранён запрет на сборки, тесты и запуски Minecraft из локального AGENTS.md.
+Выполнен только parse() через JavacTask (66 Java-файлов, 0 синтаксических ошибок),
+без analyze()/generate(); это не компиляция и не разрешение типов.
+Отчёт: docs/validation/2026-10-17-roadmap-3/REPORT.md. JAR, distribution,
+оригинальные миры и профили не изменены. Следующий шаг: отдельная разрешённая
+компиляция и короткие проверки новых случаев, затем приёмка на 40/400 TPS.
+
+### Ревью пункта 3 — 2026-10-17
+
+По запросу человека проведено статическое code-review и исправлены три дефекта:
+зависимость подключения рабочих точек от фазы gameTime modulo 400, отказ ремонта
+моста при потере бокового ограждения с опорой, принятие маршрутов от прежнего
+корня сети. Изменены TownPlanner, Infrastructure и NetworkRoutes; подробности
+в docs/validation/2026-10-17-roadmap-3/REPORT.md. Выполнен git diff --check.
+Тесты, сборка, Minecraft, commit и push не запускались. Предшествующая
+незакоммиченная реализация сохранена; игровая приёмка остаётся открытой.

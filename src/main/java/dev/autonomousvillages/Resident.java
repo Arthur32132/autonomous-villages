@@ -690,7 +690,14 @@ final class Resident {
             case "mine" -> {
                 if(!MineSupplies.inspect(this).ready()){fail("не хватает припасов для шахты");return;}
                 BlockPos entrance=BlockPos.of(v.state.mineEntrance);
-                if(!Infrastructure.mineAccess(v,entrance)){finish();status="шахта ждёт подготовки пути снабжения";return;}
+                if(!Infrastructure.mineAccess(v,entrance)){
+                    var failure=v.state.accessFailures.get(entrance.asLong());
+                    if(failure!=null&&!failure.resolved&&failure.attempts>=3&&v.state.mineLength==0
+                            &&v.state.mines.stream().noneMatch(m->m.entrance==entrance.asLong()&&m.length>0)){
+                        v.state.mineEntrance=null;v.state.mineDirection=0;v.runtime.save();
+                    }
+                    finish();status="шахта ждёт подготовки пути снабжения или выбора другого входа";return;
+                }
                 var request=new ExcavationRequest(entrance,Direction.from2DDataValue(v.state.mineDirection),ExcavationMode.STAIRCASE_DOWN,
                         Math.min(32,v.state.mineLength+Math.min(8,MineSupplies.inspect(this).segments())),v.state.mineLength);
                 if(!v.state.contains(request.positionAt(request.length()))){fail("шахта достигла границы деревни");return;}
@@ -956,9 +963,13 @@ final class Resident {
         if(v.state.mineEntrance==null){
             for(Direction d:Direction.Plane.HORIZONTAL){
                 BlockPos column=v.state.localMineColumn(d);int x=column.getX(),z=column.getZ();
+                if(!v.level.hasChunkAt(column))continue;
                 BlockPos p=new BlockPos(x,v.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x,z),z);
+                if(Infrastructure.coolingDown(v,p))continue;
                 if(v.state.contains(p)&&v.state.contains(p.relative(d.getOpposite(),8).below(8))&&v.safeFeet(p)
                         &&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))&&v.index.beds.stream().allMatch(bed->bed.distSqr(p)>100)){
+                    var route=NetworkRoutes.plan(v,NetworkRoutes.root(v),p,Set.of());
+                    if(!route.found()){Infrastructure.reject(v,p,route.failure());v.runtime.save();continue;}
                     v.state.mineEntrance=p.asLong();v.state.mineDirection=d.getOpposite().get2DDataValue();v.runtime.save();break;
                 }
             }

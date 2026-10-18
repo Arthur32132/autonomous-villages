@@ -19,6 +19,11 @@ public final class TownBuilding {
     public List<Long> cuts=new ArrayList<>();
     public List<Plan> foundation=new ArrayList<>();
     public Long approach;
+    /** Actual feet cells, including unbuilt ground; empty for legacy road metadata. */
+    public List<Long> routeCells=new ArrayList<>();
+    public Long routeStart;
+    transient long routeCheckedTick=Long.MIN_VALUE;
+    transient boolean routeReady;
     public Long housingFor;
     public static final class Plan {
         public long pos;
@@ -44,6 +49,15 @@ public final class TownBuilding {
     void add(BlockPos p,BlockState state){if(state.getBlock().asItem()!=Items.AIR)blocks.add(new Plan(p,state));}
     int built(Village v){return (int)blocks.stream().filter(p->p.matches(v)).count();}
     void validate(VillageState village){
+        if(routeCells==null||routeCells.size()>NetworkRoutes.MAX_LENGTH+1||routeCells.stream().anyMatch(p->p==null||!village.contains(BlockPos.of(p)))
+                ||routeStart!=null&&!village.contains(BlockPos.of(routeStart))
+                ||!routeCells.isEmpty()&&(!"road".equals(kind)||routeStart==null||routeCells.getFirst().longValue()!=routeStart
+                    ||routeCells.getLast().longValue()!=origin))throw new IllegalArgumentException("Повреждённый маршрут здания");
+        for(int i=1;i<routeCells.size();i++){
+            var a=BlockPos.of(routeCells.get(i-1));var b=BlockPos.of(routeCells.get(i));
+            if(Math.abs(a.getX()-b.getX())+Math.abs(a.getZ()-b.getZ())!=1||Math.abs(a.getY()-b.getY())>1)
+                throw new IllegalArgumentException("Разрыв сохранённого маршрута");
+        }
         if(kind==null||!Set.of("house","warehouse","native_house","sheep_pen","field","road","lumber_yard","smithy","granary","watch_post").contains(kind)||blocks==null||blocks.size()>4096||tier<0||tier>3
                 ||!village.contains(BlockPos.of(origin)))throw new IllegalArgumentException("Повреждённый проект здания");
         if(cuts==null||cuts.size()>64||cuts.stream().anyMatch(p->p==null||!village.contains(BlockPos.of(p)))||foundation==null||foundation.size()>64

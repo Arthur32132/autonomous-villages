@@ -18,6 +18,7 @@ final class PlanningRegression {
     static void begin(Village v,BlockPos origin){
         town=v;base=origin;phase=0;clock=0;v.state.active=false;v.expeditions.stop();
         v.state.buildings.clear();v.state.orders.clear();v.state.storage.clear();v.state.furnaces.clear();v.index.tables.clear();v.index.trees.clear();
+        v.state.routeRoot=null;v.state.accessFailures.clear();
         v.state.land=new ManagedLand();v.state.policy=new VillagePolicy();v.state.workshopOutput.clear();v.state.vacantRoles.clear();v.town.invalidate();
         v.state.bounds=new VillageState.Bounds(origin.getX()-28,origin.getZ()-28,origin.getX()+28,origin.getZ()+28);
         v.state.x=origin.getX();v.state.y=origin.getY();v.state.z=origin.getZ();
@@ -28,14 +29,14 @@ final class PlanningRegression {
         v.state.residentRoles.keySet().retainAll(v.state.residents);
         role(builder,ResidentRoles.Role.BUILDER);role(farmer,ResidentRoles.Role.FARMER);
         soil=origin.offset(18,0,-10);v.level.setBlock(soil,Blocks.GRASS_BLOCK.defaultBlockState(),3);
-        // This dependency fixture needs a genuinely absent crossing, not just unlit natural ground.
+        // The new graph may go around this water instead of forcing a rectangular crossing.
         for(int x=4;x<=5;x++)v.level.setBlock(origin.offset(x,-1,-12),Blocks.WATER.defaultBlockState(),3);
         graded=new TownBuilding("house",soil);graded.add(soil,Blocks.OAK_PLANKS.defaultBlockState());
         require(Infrastructure.site(v,soil,1,1)!=null,"raised soil site accepts bounded real earthworks");
         require(Infrastructure.prepare(v,graded,1,1)&&!graded.cuts.isEmpty(),"real raised soil has a paid preparation and route from "+v.meetingPoint()+" to "+soil);
         v.state.buildings.add(graded);v.town.invalidate();give(builder.bot(),Items.STONE_SHOVEL,1);give(builder.bot(),Items.COBBLESTONE,8);
-        require(!Infrastructure.approachReady(v,graded)&&!Infrastructure.work(builder),"earthworks wait for incomplete real route");
-        pass("road_dependency_blocks_earthworks_before_approach_is_built");
+        require(Infrastructure.approachReady(v,graded),"search reuses safe ground around the two water cells without waiting for lighting");
+        pass("network_detours_around_water_and_unbuilt_lighting_does_not_block_access");
         for(var b:List.copyOf(v.state.buildings))if(b.kind.equals("road"))for(var p:b.blocks){require(p.pos!=soil.asLong(),"approach cannot assign a stair on future building floor");paid(builder,p);}
         near(builder,soil.west());require(Infrastructure.work(builder)&&"grade".equals(builder.job),"ready approach releases actual grading job");
     }

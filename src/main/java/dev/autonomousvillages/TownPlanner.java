@@ -32,9 +32,12 @@ final class TownPlanner {
     private List<TownBuilding.Plan> requested=List.of();
     private boolean coalesced;
     private long shelterTick=-1;
+    private long nextNetworkExpansion;
     private final Map<Long,Boolean> shelterCache=new HashMap<>();
     TownPlanner(Village v){this.v=v;}
-    void invalidate(){requestedTick=-1;materialsTick=-1;protectedCount=-1;shelterTick=-1;}
+    void invalidate(){requestedTick=-1;materialsTick=-1;protectedCount=-1;shelterTick=-1;
+        for(var building:v.state.buildings)building.routeCheckedTick=Long.MIN_VALUE;
+    }
     TownBuilding houseFor(BlockPos bed){
         return v.state.buildings.stream().filter(house->house.blocks.stream().anyMatch(plan->plan.block().getBlock() instanceof BedBlock
                 &&(plan.position().equals(bed)||plan.position().relative(plan.block().getValue(BedBlock.FACING)).equals(bed)))).findFirst().orElse(null);
@@ -152,6 +155,9 @@ final class TownPlanner {
             try{var survey=VillageDiscovery.survey(v.level,v.state.center());capture(survey);v.runtime.save();}catch(IllegalArgumentException ignored){}
         }
         if(now<nextPlanning)return;nextPlanning=now+100;
+        boolean expandNetwork=now>=nextNetworkExpansion;
+        if(expandNetwork)nextNetworkExpansion=now+400;
+        Infrastructure.maintain(v,expandNetwork);
         boolean adjusted=!coalesced&&coalesceHouses();
         for(var building:v.state.buildings){
             if(building.kind.equals("native_house"))adjusted|=building.blocks.removeIf(p->!structural(p.block()));
@@ -225,8 +231,8 @@ final class TownPlanner {
         return b.blocks.stream().filter(p->!p.matches(v)).mapToInt(p->warehousePhase(b,p)).min().orElse(4);
     }
     private int priority(TownBuilding b){
+        if(b.kind.equals("road"))return Infrastructure.walkable(v,b)?8:1;
         if(b.completed)return b.kind.equals("warehouse")?5:0;
-        if(b.kind.equals("road"))return 1;
         if(b.kind.equals("field")||b.kind.equals("sheep_pen"))return 3;
         if(b.kind.equals("warehouse"))return warehousePhase(b)==0?1:warehousePhase(b)+3;
         return b.tier==0?2:7;
@@ -238,7 +244,11 @@ final class TownPlanner {
     private List<TownBuilding.Plan> workPlans(TownBuilding b){
         if(!b.completed&&!SettlementEconomy.surplus(v)&&(ProductionBuildings.KINDS.contains(b.kind)||b.tier>0))return List.of();
         if(!Infrastructure.approachReady(v,b))return List.of();
-        if(!Infrastructure.prepared(v,b))return b.foundation.stream().filter(p->v.state.policy.allows("build",p.position())).toList();
+        if(!Infrastructure.groundReady(v,b))return b.foundation.stream().filter(p->v.state.policy.allows("build",p.position())).toList();
+        if(b.kind.equals("road")){
+            boolean structural=Infrastructure.walkable(v,b);
+            return b.blocks.stream().filter(p->(structural||!Infrastructure.optional(p))&&v.state.policy.allows("build",p.position())).toList();
+        }
         if(!b.kind.equals("warehouse"))return b.blocks.stream().filter(p->v.state.policy.allows("build",p.position())).toList();
         int phase=warehousePhase(b);
         return b.blocks.stream().filter(p->warehousePhase(b,p)==phase&&v.state.policy.allows("build",p.position())).toList();
@@ -315,9 +325,16 @@ final class TownPlanner {
         var bounds=v.state.bounds;if(bounds==null)return null;
         int columns=bounds.maxX-bounds.minX+1;
         BlockPos best=null;double bestScore=Double.POSITIVE_INFINITY;
+        record Candidate(BlockPos base,double score,int earthwork) { }
+        var candidates=new ArrayList<Candidate>();
         for(int n=0;n<48;n++){
             long random=++surveyCursor*0x9e3779b97f4a7c15L;
             int x=bounds.minX+(int)Math.floorMod(random,columns),z=bounds.minZ+(int)Math.floorMod(random>>>32,bounds.maxZ-bounds.minZ+1);
+            // Heightmap access must never synchronously load an unknown chunk.
+            boolean loaded=true;
+            for(int dx=-1;dx<=width;dx++)for(int dz=-4;dz<=depth;dz++)
+                if(!v.level.hasChunkAt(new BlockPos(x+dx,v.state.y,z+dz)))loaded=false;
+            if(!loaded)continue;
             int y=v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x,z),low=y,high=y;
             for(int dx=-1;dx<=width;dx++)for(int dz=-4;dz<=depth;dz++){
                 int height=v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x+dx,z+dz);low=Math.min(low,height);high=Math.max(high,height);
@@ -327,14 +344,23 @@ final class TownPlanner {
             if(high-low>1)continue;
             BlockPos base=new BlockPos(x,(low+high)/2,z);
             if(!v.level.hasChunkAt(base)||!siteWithinBounds(v.state,base,width,depth))continue;
-            boolean good=Infrastructure.site(v,base,width,depth)!=null;
-            if(good&&v.state.buildings.stream().noneMatch(b->BlockPos.of(b.origin).distSqr(base)<144)){
+            if(Infrastructure.coolingDown(v,base))continue;
+            var earthworks=Infrastructure.site(v,base,width,depth);
+            if(earthworks!=null&&v.state.buildings.stream().filter(b->!b.kind.equals("road")).noneMatch(b->BlockPos.of(b.origin).distSqr(base)<144)){
                 double score=v.index.beds.stream().mapToDouble(home->{double dy=home.getY()-base.getY();return home.distSqr(base)+15*dy*dy;}).average().orElse(base.distSqr(v.state.center()));
                 if(focus!=null)score+=2*focus.distSqr(base);
                 score+=.25*v.state.land.fields.stream().mapToDouble(f->BlockPos.of(f.entry).distSqr(base)).average().orElse(0);
-                if(score<bestScore){best=base;bestScore=score;}
+                candidates.add(new Candidate(base,score,earthworks.blocks()));
             }
         }
+        // At most six bounded searches, rather than searching the whole claim on every tick.
+        for(var candidate:candidates.stream().sorted(Comparator.comparingDouble(Candidate::score)).limit(6).toList()){
+            var connection=Infrastructure.connection(v,candidate.base(),width,depth);
+            if(!connection.found()){Infrastructure.reject(v,candidate.base(),connection.failure());continue;}
+            double score=candidate.score()+16*connection.cost()+8*connection.road().routeCells.size()+16*candidate.earthwork();
+            if(score<bestScore){best=candidate.base();bestScore=score;}
+        }
+        if(!candidates.isEmpty())v.runtime.save(); // rejected sites and retry deadlines survive reload
         if(best!=null){missingSiteCycles=0;return best;}
         if(++missingSiteCycles>=10&&v.level.getGameTime()-v.state.lastExpansion>2400){
             int direction=(surveyCursor/48)%4;

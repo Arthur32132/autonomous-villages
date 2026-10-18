@@ -22,6 +22,7 @@ final class TerrainRecovery {
             double best=Double.POSITIVE_INFINITY;
             for(int radius:new int[]{8,16,24})for(int dx=-1;dx<=1;dx++)for(int dz=-1;dz<=1;dz++)if(dx!=0||dz!=0){
                 int x=bot.entity().blockPosition().getX()+dx*radius,z=bot.entity().blockPosition().getZ()+dz*radius;
+                if(!v.level.hasChunkAt(new BlockPos(x,bot.entity().blockPosition().getY(),z)))continue; // never load a chunk for a heightmap probe
                 int y=v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x,z);BlockPos p=new BlockPos(x,y,z);
                 var ground=v.level.getBlockState(p.below());
                 if(!v.safeFeet(p)||(!VillageIndex.naturalSoil(ground)&&!ground.is(Blocks.STONE)&&!ground.is(Blocks.DEEPSLATE)))continue;

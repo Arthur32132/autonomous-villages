@@ -138,6 +138,9 @@ final class Construction {
         BlockPos p=step.pos();
         if(!v.state.policy.allows(step.state().getBlock() instanceof SaplingBlock?"wood":"build",p))return false;
         if(step.state().getBlock() instanceof SaplingBlock&&!v.state.plantedTrees.contains(p.asLong())&&v.state.plantedTrees.size()>=512)return false;
+        // canWork() also admits expedition ground; metadata outside validate()'s area would block every later save.
+        if((step.state().getBlock() instanceof SaplingBlock||step.item()==Items.CHEST||step.item()==Items.FURNACE)
+                &&!v.state.mayRecordPlacement(p,step.state().getBlock() instanceof SaplingBlock))return false;
         if(step.item()==Items.CRAFTING_TABLE&&!v.town.protects(p)&&v.state.temporaryWorkbenches.size()>=256)return false;
         if(step.item()==Items.CHEST&&v.state.storage.size()>=128&&!v.state.storage.contains(p.asLong()))return false;
         if(step.item()==Items.FURNACE&&v.state.furnaces.size()>=16&&!v.state.furnaces.contains(p.asLong()))return false;

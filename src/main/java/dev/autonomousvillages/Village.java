@@ -33,6 +33,8 @@ final class Village {
     private long nextTickets;
     private long nextSurvey;
     private long nextAlarm;
+    long nextErrorLog;
+    private long nextResidentErrorLog;
     private final ArrayDeque<String> history=new ArrayDeque<>();
     Village(VillageRuntime runtime, VillageState state) { this.runtime = runtime; this.state = state; this.level = runtime.server.overworld();this.town=new TownPlanner(this);this.farm=new SheepFarm(this);this.presentation=new VillagePresentation(this);this.expeditions=new ExpeditionManager(this);
         if(state.nextExpedition==0)state.nextExpedition=level.getGameTime()+1200;
@@ -92,7 +94,7 @@ final class Village {
             boolean mayPlan=runtime.residentDecisionRemainingNanos>0;
             long start=System.nanoTime();boolean idle=r.job==null;
             try { r.tick(mayPlan); }
-            catch (RuntimeException error) { r.fail("повторит действие позже"); if (time % 200 < 10) AutonomousVillagesMod.LOG.warn("Resident {}", r.id, error); }
+            catch (RuntimeException error) { r.fail("повторит действие позже"); if (time >= nextResidentErrorLog) { nextResidentErrorLog = time + 200; AutonomousVillagesMod.LOG.warn("Resident {}", r.id, error); } }
             finally{if(idle&&mayPlan)runtime.residentDecisionRemainingNanos-=System.nanoTime()-start;}
         }
         rotation++;

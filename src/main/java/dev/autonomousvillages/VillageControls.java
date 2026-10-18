@@ -46,6 +46,8 @@ final class VillageControls {
                     v.runtime.save();return "Разрешённые направления: "+v.state.policy.expansion;})))));
         root.then(Commands.literal("accept").then(Commands.argument("name",StringArgumentType.string()).then(Commands.argument("pos",BlockPosArgument.blockPos()).executes(c->run(c.getSource(),()->{
             var v=village(c.getSource(),StringArgumentType.getString(c,"name"));var p=BlockPosArgument.getLoadedBlockPos(c,"pos");
+            // Every saved plan cell must pass VillageState.validate(); one outside cell would block all later saves.
+            if(!v.state.contains(p))throw new IllegalArgumentException("Клетка вне территории деревни");
             var b=v.state.buildings.stream().filter(h->Set.of("house","native_house").contains(h.kind)&&h.blocks.stream().anyMatch(part->part.position().distSqr(p)<=4)).findFirst().orElseThrow(()->new IllegalArgumentException("Укажите изменённый участок известного жилого дома"));
             v.workers.values().forEach(Resident::cancel);
             // Match both physical halves to their single architectural intent, including a removed head.
@@ -57,6 +59,7 @@ final class VillageControls {
             b.blocks.removeAll(affected);
             for(var cell:positions){var actual=v.level.getBlockState(cell);if(TownPlanner.structural(actual)&&!TownPlanner.upperHalf(actual)){
                 if((actual.getBlock() instanceof DoorBlock||actual.getBlock() instanceof BedBlock)&&!new TownBuilding.Plan(cell,actual).matches(v))continue;
+                if(!v.state.contains(cell)||actual.getBlock() instanceof BedBlock&&!v.state.contains(cell.relative(actual.getValue(BedBlock.FACING))))continue;
                 b.add(cell,actual);
             }}
             b.completed=b.built(v)==b.blocks.size();v.town.invalidate();v.town.syncOrders(v.level.getGameTime());v.runtime.save();return "Изменение принято в плане дома: "+p.toShortString();

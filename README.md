@@ -1,5 +1,15 @@
 # Autonomous Villages 0.2.2
 
+Экспериментальный открытый проект под [MIT](LICENSE). Предложения, форки и pull request приветствуются:
+[как собрать проект и участвовать / contributing](CONTRIBUTING.md),
+[сообщить об ошибке или предложить улучшение](https://github.com/Arthur32132/autonomous-villages/issues/new/choose),
+[безопасность](SECURITY.md).
+
+**English:** Experimental Minecraft Fabric mod for autonomous native villager settlements.
+Full autonomy is not accepted; the latest roadmap 3 changes are source-only and
+have not been built or game-tested. See [CONTRIBUTING.md](CONTRIBUTING.md) for
+fresh-checkout setup, the pinned Navigation AI dependency, and the fork/PR workflow.
+
 Minecraft Java **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java **25**. Отдельный мод поселения использует библиотеку Navigation AI **0.2.2**. Настоящие жители сохраняют внешность, UUID, профессию, торговлю, возраст, обычную физику и правила смерти.
 
 **0.2.2 — кандидат после статического аудита; полная автономная приёмка не пройдена.**

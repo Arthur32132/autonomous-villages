@@ -4,3 +4,16 @@ run/
 tools/validation/lab/
 *.log
 __pycache__/
+*.pyc
+logs/
+out/
+.idea/
+.vscode/
+*.iml
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx

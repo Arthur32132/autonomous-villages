@@ -313,6 +313,19 @@ public final class SoakProbe implements ModInitializer {
         return "other";
     }
     /** Surface blocks by category plus the content of every chest in the area. */
+    /** Runs "/avillage <args>" with server permissions and returns what it printed. */
+    static String command(String args){
+        var out=new StringBuilder();
+        var sink=new net.minecraft.commands.CommandSource(){
+            public void sendSystemMessage(net.minecraft.network.chat.Component message){out.append(message.getString()).append('\n');}
+            public boolean acceptsSuccess(){return true;}
+            public boolean acceptsFailure(){return true;}
+            public boolean shouldInformAdmins(){return false;}
+        };
+        try{server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSource(sink),"avillage "+args);}
+        catch(RuntimeException error){out.append("EXCEPTION ").append(error);}
+        return out.toString();
+    }
     /** Top block of every column in the area (palette + indices + heights) and villager positions, for map.py. */
     static void writeMap(String file){
         try{
@@ -414,6 +427,10 @@ public final class SoakProbe implements ModInitializer {
                 summary.add("births",births);summary.add("deaths",deaths);
                 summary.add("modFinal",modView());
                 try{summary.addProperty("modStatus",AutonomousVillagesMod.runtime(server).status(null));}catch(RuntimeException ignored){}
+                // Player commands as an operator would type them; the last one releases the village.
+                var commands=new JsonObject();
+                for(String command:List.of("status Soak","plan Soak","chronicle Soak","chronicle Soak 2","release Soak","status"))commands.addProperty(command,command(command));
+                summary.add("commands",commands);
             }
         }catch(Throwable error){summary.addProperty("summaryError",error.toString());}
         stage=Stage.DONE;

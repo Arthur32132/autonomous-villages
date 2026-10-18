@@ -12,7 +12,8 @@ import net.minecraft.world.level.block.state.BlockState;
 /** Incremental loaded-only survey. At most 12 columns (360 blocks) per village/tick. */
 final class VillageIndex {
     final Set<BlockPos> crops = new LinkedHashSet<>(), soil = new LinkedHashSet<>(), trees = new LinkedHashSet<>(),
-            stone = new LinkedHashSet<>(), ore = new LinkedHashSet<>(), tables = new LinkedHashSet<>(), grass = new LinkedHashSet<>(),sand=new LinkedHashSet<>(),farmSites=new LinkedHashSet<>();
+            stone = new LinkedHashSet<>(), ore = new LinkedHashSet<>(), tables = new LinkedHashSet<>(), grass = new LinkedHashSet<>(),sand=new LinkedHashSet<>(),farmSites=new LinkedHashSet<>(),
+            hazards=new LinkedHashSet<>();
     List<BlockPos> beds = List.of();
     /** Ore seen next to the village staircase mine: reachable down the stairs at any depth. */
     final Set<BlockPos> shaftOre = new LinkedHashSet<>();
@@ -47,6 +48,7 @@ final class VillageIndex {
                 update(soil, p.above(), b.is(Blocks.FARMLAND));
                 update(stone, p, b.is(Blocks.STONE) && exposed(level, p));
                 update(sand,p,b.is(Blocks.SAND)&&exposed(level,p));
+                update(hazards,p,b.is(Blocks.POWDER_SNOW));
                 update(ore, p, oreResource(b) && exposed(level, p));
                 update(tables, p, b.is(Blocks.CRAFTING_TABLE));
                 update(grass, p, b.is(Blocks.SHORT_GRASS) || b.is(Blocks.TALL_GRASS));

@@ -72,6 +72,12 @@ final class VillagePlanner {
         // 4. Evening lights around homes.
         if((role==ResidentRoles.Role.GUARD||small||Math.floorMod(v.level.getOverworldClockTime(),24000)>8000)&&!s.dark().isEmpty()&&s.torches()+w.count(x->x.is(Items.TORCH))>0
                 &&v.activeJobs("light")==0&&w.ready("light"))return new LightJob(w,s.dark());
+        // 4b. Powder snow in the village freezes children and anyone walking home in the dark.
+        if(!v.index.hazards.isEmpty()&&v.activeJobs("hazard")==0&&w.ready("hazard")){
+            BlockPos from=w.body().blockPosition();
+            var cells=v.index.hazards.stream().filter(p->v.ready(p,w.id)&&v.state.contains(p)).sorted(Comparator.comparingDouble(p->p.distSqr(from))).limit(12).toList();
+            if(!cells.isEmpty())return new HazardJob(w,cells);
+        }
         // 5. The role's own work, then shared priorities.
         Job own=role==null?null:switch(role){
             case BUILDER->first(()->build(w,s),()->craftForProject(w,s),()->chop(w,s,true));

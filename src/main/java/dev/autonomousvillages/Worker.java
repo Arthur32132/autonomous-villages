@@ -257,6 +257,8 @@ final class Worker {
         BlockPos refuge=v.index.beds.stream().filter(bed->bed.distSqr(enemy.blockPosition())>e.blockPosition().distSqr(enemy.blockPosition())&&bed.distSqr(e.blockPosition())>4)
                 .min(Comparator.comparingDouble(bed->bed.distSqr(e.blockPosition()))).orElse(null);
         Vec3 point=refuge!=null?Vec3.atBottomCenterOf(refuge):e.position().add(away.x/length*12,0,away.z/length*12);
+        // Running blind into the dark can end in powder snow or off a cliff: without a bed to run to, run to the bell.
+        if(refuge==null&&!v.safeFeet(BlockPos.containing(point)))point=v.feetPosition(v.meetingPoint());
         flight=new HomeJob(this).new Walk(point,1.5);fleeing=true;fleeSince=now();released=false;
         flight.tick();status="убегает от угрозы";
         return true;

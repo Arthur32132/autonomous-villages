@@ -59,7 +59,9 @@ public final class AutonomousVillagesMod implements ModInitializer {
                 if (village.state.residents.remove(entity.getUUID())) {
                     village.state.residentPositions.remove(entity.getUUID());
                     village.workers.remove(entity.getUUID()); village.reservations.release(entity.getUUID());
-                    village.residentLost(entity.getUUID());
+                    // Runs inside vanilla die(): an order-limit exception here would crash the entity tick.
+                    try { village.residentLost(entity.getUUID()); }
+                    catch (RuntimeException error) { village.event("Учёт заказов погибшего не завершён: " + error.getMessage()); LOG.error("Village {} resident loss", village.state.name, error); }
                 }
             }
         });

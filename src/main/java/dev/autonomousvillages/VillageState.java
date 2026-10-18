@@ -108,9 +108,14 @@ public final class VillageState {
         if((long)fixed.maxX-fixed.minX<=4096&&(long)fixed.maxZ-fixed.minZ<=4096){bounds=fixed;x=(fixed.minX+fixed.maxX)/2;z=(fixed.minZ+fixed.maxZ)/2;radius=Math.max(24,(int)Math.ceil(Math.hypot(fixed.maxX-fixed.minX,fixed.maxZ-fixed.minZ)/2));}
     }
     boolean recordedWork(BlockPos p){return contains(p)||worksites.stream().map(BlockPos::of).anyMatch(site->Math.abs((long)site.getX()-p.getX())<=80&&Math.abs((long)site.getZ()-p.getZ())<=80);}
+    /** Same rule as validate(): chests/furnaces are village property, a sapling may stand at a remembered worksite. */
+    boolean mayRecordPlacement(BlockPos p,boolean sapling){return sapling?recordedWork(p):contains(p);}
     public static final class ResidentName {
         public String json="";
         public boolean visible;
+        /** The mod never replaced this name (baby, NoAI or never loaded): release must leave it as is. */
+        public boolean untouched;
+        static ResidentName untouched(){var name=new ResidentName();name.untouched=true;return name;}
     }
     public static final class Bounds {
         public int minX,minZ,maxX,maxZ;

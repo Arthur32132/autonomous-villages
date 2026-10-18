@@ -689,6 +689,8 @@ final class Resident {
             case "wood","stone","ore","harvest","seeds","renovate","hazard","sand","scaffold","bench","grade","dig_irrigation" -> {lastApproach=null;mining=b.miner().breakBlock(target);}
             case "mine" -> {
                 if(!MineSupplies.inspect(this).ready()){fail("не хватает припасов для шахты");return;}
+                // Another miner may have abandoned this entrance while this one was walking to it.
+                if(v.state.mineEntrance==null){finish();status="вход в шахту отменён; выберет другую работу";return;}
                 BlockPos entrance=BlockPos.of(v.state.mineEntrance);
                 if(!Infrastructure.mineAccess(v,entrance)){
                     var failure=v.state.accessFailures.get(entrance.asLong());
@@ -1012,6 +1014,8 @@ final class Resident {
         for(int n=0;n<12;n++){
             int angle=(id.hashCode()+n*37)&255;double rad=angle*Math.PI/128;
             int x=v.state.x+(int)(Math.cos(rad)*(v.state.radius-8)),z=v.state.z+(int)(Math.sin(rad)*(v.state.radius-8));
+            // The circumscribed radius reaches past the rectangle; a heightmap read must not load or generate a chunk.
+            if(!v.level.hasChunkAt(new BlockPos(x,v.state.y,z)))continue;
             int y=v.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x,z);
             BlockPos p=new BlockPos(x,y,z);
             if(v.state.policy.allows("wood",p)&&v.ready(p,id)&&v.safeFeet(p)&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))&&p.distSqr(v.state.center())>100){
@@ -1039,7 +1043,7 @@ final class Resident {
             for(int r=2;r<=6;r++)for(Direction d:Direction.Plane.HORIZONTAL){
                 BlockPos p=b.entity().blockPosition().relative(d,r);
                 for(int dy:new int[]{0,-1,1,-2,2}){BlockPos at=p.above(dy);
-                    if(v.ready(at,id)&&v.safeFeet(at)&&!v.town.protects(at)&&!v.town.constructionCell(at.below())&&v.index.beds.stream().noneMatch(bed->bed.distSqr(at)<4)){
+                    if(v.ready(at,id)&&v.safeFeet(at)&&(item!=Items.FURNACE||v.state.contains(at))&&!v.town.protects(at)&&!v.town.constructionCell(at.below())&&v.index.beds.stream().noneMatch(bed->bed.distSqr(at)<4)){
                         build=new Construction.Step(at,((BlockItem)item).getBlock().defaultBlockState(),item);assign("build",at);return true;}}
             }
         }

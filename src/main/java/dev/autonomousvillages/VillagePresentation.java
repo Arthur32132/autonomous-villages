@@ -55,7 +55,7 @@ final class VillagePresentation {
         }
     }
     static void restoreName(Villager resident,VillageState.ResidentName original){
-        if(original==null)return;
+        if(original==null||original.untouched)return;
         resident.setCustomName(original.json.isEmpty()?null:ComponentSerialization.CODEC.parse(JsonOps.INSTANCE,JsonParser.parseString(original.json)).getOrThrow());
         resident.setCustomNameVisible(original.visible);
     }

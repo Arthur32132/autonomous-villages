@@ -117,7 +117,7 @@ def run_one(java, batch_dir, seed, difficulty, args, jars):
     prepare_lab(lab, seed, difficulty, args, label, jars)
     started = time.time()
     with open(lab / 'server.log', 'wb') as log:
-        process = subprocess.Popen([str(java / 'bin/java'), f'-Xmx{args.heap}', '-XX:+UseZGC', '-jar', 'fabric-server-launch.jar', 'nogui'],
+        process = subprocess.Popen([str(java / 'bin/java'), f'-Xmx{args.heap}', '-XX:+UseG1GC', '-jar', 'fabric-server-launch.jar', 'nogui'],
                                    cwd=lab, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
         try:
             process.wait(timeout=args.max_real_seconds + 300)
@@ -159,7 +159,7 @@ def main():
     parser.add_argument('--parallel', type=int, default=1)
     parser.add_argument('--max-real-seconds', type=int, default=3600)
     parser.add_argument('--radius', type=int, default=112)
-    parser.add_argument('--heap', default='3G')
+    parser.add_argument('--heap', default='2G')
     parser.add_argument('--batch', default=None, help='report folder name; default timestamp')
     parser.add_argument('--no-claim', action='store_true', help='observe the untouched village (control run)')
     parser.add_argument('--skip-build', action='store_true')

@@ -21,6 +21,15 @@ final class Chronicle {
         var events=data().events;events.add(day()+": "+message);while(events.size()>60)events.removeFirst();
         AutonomousVillagesMod.LOG.info("SETTLEMENT {}: {}",v.state.name,message);
     }
+    /** An event worth telling: recorded, and shown in chat to players near the village. */
+    void announce(String message){
+        event(message);
+        var text=net.minecraft.network.chat.Component.literal("["+v.state.name+"] ").withStyle(net.minecraft.ChatFormatting.GOLD)
+                .append(net.minecraft.network.chat.Component.literal(message).withStyle(net.minecraft.ChatFormatting.YELLOW));
+        var area=VillageDiscovery.area(v.state,64);
+        for(var player:v.runtime.server.getPlayerList().getPlayers())
+            if(player.level()==v.level&&area.contains(player.position()))player.sendSystemMessage(text);
+    }
     void crafted(ItemStack output){add("crafted",output.getCount());add("crafted:"+BuiltInRegistries.ITEM.getKey(output.getItem()).getPath(),output.getCount());}
     void placed(){add("placed",1);}
     void treeFelled(int logs){add("trees",1);add("logs",logs);}
@@ -28,8 +37,8 @@ final class Chronicle {
     void harvested(){add("harvested",1);}
     void deposited(int items){add("deposited",items);}
     void lit(){add("torches",1);}
-    void born(String name){add("births",1);event("Родился "+name+"!");}
-    void died(String who,String cause){add("deaths",1);event("Погиб "+who+": "+cause);}
+    void born(String name){add("births",1);announce("Родился "+name+"!");}
+    void died(String who,String cause){add("deaths",1);announce("Погиб "+who+": "+cause);}
     String render(int page){
         var lines=new ArrayList<String>();
         lines.add(v.state.name+" — летопись ("+day()+")");

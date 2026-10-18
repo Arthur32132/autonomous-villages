@@ -65,6 +65,7 @@ final class Projects {
         }
         for(BlockPos home:survey.homes())captureHouse(home);
         captured=true;invalidate();
+        planDoors();
     }
     private void captureHouse(BlockPos home){
         if(v.state.buildings.size()>=256)return;
@@ -78,6 +79,50 @@ final class Projects {
             for(Direction d:Direction.values())todo.add(p.relative(d));
         }
         if(!house.blocks.isEmpty()){house.completed=true;v.state.buildings.add(house);}
+    }
+    /**
+     * Desert and savanna houses have open doorways, and a zombie walks in on the sleepers. A door in
+     * each open doorway is cheap and zombies on normal difficulty cannot break it.
+     */
+    void planDoors(){
+        if(v.state.buildings.stream().anyMatch(b->b.kind.equals("doors")))return;
+        var doors=new TownBuilding("doors",v.meetingPoint());var seen=new HashSet<BlockPos>();
+        for(var house:v.state.buildings){
+            if(!house.kind.equals("native_house")||house.blocks.isEmpty())continue;
+            int minX=Integer.MAX_VALUE,minY=Integer.MAX_VALUE,minZ=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE,maxY=Integer.MIN_VALUE,maxZ=Integer.MIN_VALUE;
+            for(var p:house.blocks){var q=p.position();minX=Math.min(minX,q.getX());maxX=Math.max(maxX,q.getX());minY=Math.min(minY,q.getY());maxY=Math.max(maxY,q.getY());minZ=Math.min(minZ,q.getZ());maxZ=Math.max(maxZ,q.getZ());}
+            if((maxX-minX)*(maxZ-minZ)>400||maxY-minY>20)continue;
+            for(BlockPos q:BlockPos.betweenClosed(minX,minY+1,minZ,maxX,Math.min(maxY,minY+4),maxZ)){
+                BlockPos p=q.immutable();
+                if(seen.contains(p)||!v.state.contains(p))continue;
+                Direction out=doorway(p);
+                if(out==null)continue;
+                seen.add(p);seen.add(p.relative(out.getClockWise()));seen.add(p.relative(out.getCounterClockWise()));
+                doors.add(p,Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,out.getOpposite()));
+            }
+        }
+        doors.blocks.removeIf(p->!v.state.contains(p.position())||!v.state.contains(p.position().above()));
+        if(doors.blocks.isEmpty()||!v.state.contains(BlockPos.of(doors.origin)))return;
+        // Doors go first: they are the cheapest protection the village can buy.
+        v.state.buildings.addFirst(doors);invalidate();
+        v.chronicle.event("Нужны двери в "+doors.blocks.size()+" открытых проёмах");
+    }
+    /** The outward direction of an open two-block doorway at p, or null. */
+    private Direction doorway(BlockPos p){
+        var level=v.level;
+        if(!Construction.clear(level.getBlockState(p))||!Construction.clear(level.getBlockState(p.above()))||level.canSeeSky(p)
+                ||!level.getBlockState(p.below()).isFaceSturdy(level,p.below(),Direction.UP)||Construction.clear(level.getBlockState(p.above(2))))return null;
+        for(Direction d:Direction.Plane.HORIZONTAL){
+            BlockPos outside=p.relative(d),inside=p.relative(d.getOpposite());
+            if(!level.canSeeSky(outside)||level.canSeeSky(inside)||!Construction.clear(level.getBlockState(inside))||!Construction.clear(level.getBlockState(outside)))continue;
+            boolean walls=true;
+            for(Direction side:new Direction[]{d.getClockWise(),d.getCounterClockWise()})for(int y=0;y<=1;y++){
+                var wall=level.getBlockState(p.relative(side).above(y));
+                if(Construction.clear(wall)||wall.getBlock() instanceof DoorBlock)walls=false;
+            }
+            if(walls)return d;
+        }
+        return null;
     }
     /** Unlocked chests and furnaces inside village houses become shared property on claim. */
     private void adopt(BlockPos p){
@@ -103,7 +148,9 @@ final class Projects {
         if(now<nextPlanning)return;
         nextPlanning=now+100;
         for(var b:v.state.buildings)if(!b.completed&&remaining(b)==0){
-            b.completed=true;v.chronicle.event("Построено: "+label(b));v.runtime.save();
+            b.completed=true;v.chronicle.announce("Построено: "+label(b));
+            if(b.path.isEmpty())b.path.addAll(footpath(b));
+            v.runtime.save();
         }
         var active=active();
         if(active!=null){stage="строят "+label(active)+" "+built(active)+"/"+size(active);return;}
@@ -117,7 +164,7 @@ final class Projects {
                 house=cottage(site);
             }
             v.state.buildings.add(house);v.state.completedShelters++;invalidate();
-            v.chronicle.event("Заложен "+label(house)+" у "+BlockPos.of(house.origin).toShortString());v.runtime.save();
+            v.chronicle.announce("Заложен "+label(house)+" у "+BlockPos.of(house.origin).toShortString());v.runtime.save();
             stage="заложен "+label(house);
         }else stage="жилья хватает; копят запасы";
     }
@@ -125,7 +172,7 @@ final class Projects {
         return v.state.buildings.stream().filter(b->!b.completed&&!b.kind.equals("native_house")).findFirst().orElse(null);
     }
     static String label(TownBuilding b){
-        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";default->b.kind;};
+        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";default->b.kind;};
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";
     }
     /** Structural blocks of the plan; decoration does not count toward progress. */
@@ -222,7 +269,7 @@ final class Projects {
             if(inside&&dy>=0&&!Construction.clear(s)&&!removable(s))return null;
             if(inside&&dy==-1&&s.isAir()&&!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP))return null;
         }
-        if(v.state.buildings.stream().filter(b->!b.kind.equals("road")).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
+        if(v.state.buildings.stream().filter(b->b.kind.equals("house")||b.kind.equals("native_house")).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
         return base;
     }
     /** Vanilla style of the village, by the most common villager type among residents. */
@@ -275,6 +322,56 @@ final class Projects {
         for(BlockPos rel:t.clear()){BlockPos p=base.offset(Blueprints.turn(rel,t.size(),rotation));if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());}
         b.blocks.removeIf(p->!v.state.contains(p.position()));b.cuts.removeIf(p->!v.state.contains(BlockPos.of(p)));
         return b;
+    }
+    /**
+     * Ground cells from the door of a building toward the bell: grass and dirt on the way become a
+     * footpath. The path ends where it meets an existing street or close to the centre.
+     */
+    List<Long> footpath(TownBuilding b){
+        var door=b.blocks.stream().filter(p->p.block().getBlock() instanceof DoorBlock).map(TownBuilding.Plan::position).findFirst().orElse(null);
+        if(door==null)return List.of();
+        BlockPos hub=v.meetingPoint();
+        var footprint=new HashSet<Long>();for(var p:b.blocks)footprint.add(BlockPos.asLong(p.position().getX(),0,p.position().getZ()));
+        BlockPos start=null;double best=Double.MAX_VALUE;
+        for(Direction d:Direction.Plane.HORIZONTAL){
+            BlockPos out=door.relative(d);
+            if(footprint.contains(BlockPos.asLong(out.getX(),0,out.getZ())))continue;
+            double dist=out.distSqr(hub);if(dist<best){best=dist;start=out;}
+        }
+        if(start==null)return List.of();
+        var out=new ArrayList<Long>();
+        int x0=start.getX(),z0=start.getZ(),x1=hub.getX(),z1=hub.getZ(),dx=Math.max(1,Math.abs(x1-x0)),dz=Math.max(1,Math.abs(z1-z0)),sx=x0<x1?1:-1,sz=z0<z1?1:-1;
+        int lastY=start.getY()-1;
+        for(int steps=0;steps<160;steps++){
+            if(Math.abs(x0-x1)<=2&&Math.abs(z0-z1)<=2)break;
+            int top=v.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x0,z0)-1;
+            BlockPos ground=new BlockPos(x0,top,z0);var state=v.level.getBlockState(ground);
+            if(state.is(Blocks.DIRT_PATH)&&steps>2)break; // joined a street
+            if(Math.abs(top-lastY)>1)break;                 // a cliff: the path would lead nowhere
+            if(!footprint.contains(BlockPos.asLong(x0,0,z0))&&(state.is(Blocks.GRASS_BLOCK)||state.is(Blocks.DIRT)||state.is(Blocks.COARSE_DIRT)||state.is(Blocks.PODZOL))
+                    &&v.state.contains(ground)&&!protects(ground))out.add(ground.asLong());
+            lastY=top;
+            // One axis at a time, toward whichever is further behind the straight line: a footpath
+            // made of diagonal corners cannot be walked along.
+            if((long)Math.abs(x1-x0)*dz>=(long)Math.abs(z1-z0)*dx&&x0!=x1)x0+=sx;else z0+=sz;
+        }
+        return out;
+    }
+    /** Path cells of finished buildings that are still grass or dirt. */
+    List<BlockPos> unpaved(int limit){
+        var out=new ArrayList<BlockPos>();
+        for(var b:v.state.buildings){
+            if(!b.completed)continue;
+            for(long packed:b.path){
+                BlockPos p=BlockPos.of(packed);
+                if(!v.level.hasChunkAt(p))continue;
+                var s=v.level.getBlockState(p);
+                if((s.is(Blocks.GRASS_BLOCK)||s.is(Blocks.DIRT)||s.is(Blocks.COARSE_DIRT)||s.is(Blocks.PODZOL))&&Construction.clear(v.level.getBlockState(p.above()))){
+                    out.add(p);if(out.size()>=limit)return out;
+                }
+            }
+        }
+        return out;
     }
     /** A small timber cottage: log corners, plank walls with window gaps, flat roof, two beds, door and lights. */
     TownBuilding cottage(BlockPos base){

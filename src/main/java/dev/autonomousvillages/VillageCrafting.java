@@ -99,6 +99,7 @@ final class VillageCrafting {
         return hit.getType()==net.minecraft.world.phys.HitResult.Type.MISS||hit.getBlockPos().equals(p);
     }
     static boolean hasPickFor(BotHandle b,BlockState state){return Supplies.find(b,s->s.is(ItemTags.PICKAXES)&&Supplies.usable(s)&&s.isCorrectToolForDrops(state))>=0;}
+    static boolean hasSword(BotHandle b){return Supplies.find(b,s->s.is(ItemTags.SWORDS)&&Supplies.usable(s))>=0;}
     static boolean hasDefensiveSword(BotHandle b){return Supplies.find(b,s->s.is(ItemTags.SWORDS)&&Supplies.usable(s)&&!s.is(Items.WOODEN_SWORD)&&!s.is(Items.GOLDEN_SWORD))>=0;}
 
     /** Collects the output, loads one input stack and tops up fuel. Charcoal is made from logs when nothing else burns. */

@@ -60,7 +60,7 @@ final class MineJob extends Job {
         }
         if(!excavation.completion().isDone())return true;
         int segments=excavation.completedSegments();
-        if(segments>v.state.mineLength){v.state.mineLength=Math.min(64,segments);v.chronicle.event("Шахта углубилась до "+v.state.mineLength+" ступеней");}
+        if(segments>v.state.mineLength){v.state.mineLength=Math.min(64,segments);v.chronicle.announce("Шахта углубилась до "+v.state.mineLength+" ступеней");}
         uncoverOres();
         if(excavation.status()!=ExcavationStatus.SUCCESS){
             String reason=excavation.completion().join().reason();

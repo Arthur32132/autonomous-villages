@@ -198,7 +198,7 @@ final class Village {
         long now=level.getGameTime();if(now<nextAlarm)return;nextAlarm=now+40;
         workers.values().stream().filter(w->w!=caller&&w.active()&&!w.body().isSleeping()&&w.body().getHealth()>=16&&!w.body().isTrading()
                         &&w.body().distanceToSqr(enemy)<24*24&&w.body().hasLineOfSight(enemy)
-                        &&(w.combat==null||w.combat.completion().isDone())&&VillageCrafting.hasDefensiveSword(w.bot()))
+                        &&(w.combat==null||w.combat.completion().isDone())&&w.armed())
                 .sorted(Comparator.comparingDouble(w->w.body().distanceToSqr(enemy))).limit(2).toList().forEach(w->w.defend(enemy));
     }
 

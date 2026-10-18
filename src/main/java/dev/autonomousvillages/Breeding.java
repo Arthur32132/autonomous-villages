@@ -16,11 +16,13 @@ final class Breeding {
     static final long INTERVAL=4800;
     private final Village v;
     Breeding(Village v){this.v=v;}
-    int freeBeds(){
-        var b=v.state.bounds;if(b==null)return 0;
+    int freeBeds(){return freeBedList().size();}
+    List<BlockPos> freeBedList(){
+        var b=v.state.bounds;if(b==null)return List.of();
         BlockPos center=new BlockPos((b.minX+b.maxX)/2,v.state.y,(b.minZ+b.maxZ)/2);
         int r=Math.max(b.maxX-b.minX,b.maxZ-b.minZ)/2+1;
-        return (int)v.level.getPoiManager().getInSquare(h->h.is(PoiTypes.HOME),center,r,PoiManager.Occupancy.HAS_SPACE).filter(p->v.state.contains(p.getPos())).count();
+        return v.level.getPoiManager().getInSquare(h->h.is(PoiTypes.HOME),center,r,PoiManager.Occupancy.HAS_SPACE)
+                .map(p->p.getPos()).filter(v.state::contains).toList();
     }
     /** Bread-equivalents in the store: a bread feeds as much as four vegetables. */
     int food(){return v.stock.count(s->s.is(Items.BREAD))+v.stock.count(s->s.is(Items.CARROT)||s.is(Items.POTATO)||s.is(Items.BEETROOT))/4;}
@@ -39,15 +41,22 @@ final class Breeding {
         for(UUID id:v.state.residents)if(v.level.getEntity(id) instanceof Villager body&&body.isAlive()&&!body.isBaby()&&!body.isSleeping()&&!body.isTrading()
                 &&v.state.contains(body.blockPosition()))adults.add(body);
         if(adults.size()<2)return;
-        Villager first=null,second=null;double best=Double.MAX_VALUE;
-        for(int i=0;i<adults.size();i++)for(int j=i+1;j<adults.size();j++){double d=adults.get(i).distanceToSqr(adults.get(j));if(d<best){best=d;first=adults.get(i);second=adults.get(j);}}
+        // The child is born at home: next to a free bed, to the two adults nearest to it.
+        var beds=freeBedList();if(beds.isEmpty())return;
+        BlockPos bed=beds.get(Math.floorMod((int)(now/200),beds.size()));
+        var nearest=adults.stream().sorted(java.util.Comparator.comparingDouble(a->a.blockPosition().distSqr(bed))).limit(2).toList();
+        Villager first=nearest.get(0),second=nearest.get(1);
+        BlockPos crib=v.safeFeet(bed.above())?bed.above():java.util.stream.Stream.of(net.minecraft.core.Direction.values()).map(bed::relative)
+                .filter(v::safeFeet).findFirst().orElse(null);
+        if(crib==null)return;
         int bread=Math.min(3,v.stock.count(s->s.is(Items.BREAD)));
         int eaten=v.stock.consume(s->s.is(Items.BREAD),bread);
         if(eaten<3)v.stock.consume(s->s.is(Items.CARROT)||s.is(Items.POTATO)||s.is(Items.BEETROOT),(3-eaten)*4);
         Villager baby=first.getBreedOffspring(v.level,second);
         if(baby==null)return;
         baby.setAge(-24000);
-        baby.snapTo(first.getX(),first.getY(),first.getZ(),0,0);
+        var spot=v.feetPosition(crib);
+        baby.snapTo(spot.x,spot.y,spot.z,0,0);
         v.level.addFreshEntityWithPassengers(baby);
         first.setAge(6000);second.setAge(6000);
         v.level.broadcastEntityEvent(first,(byte)12);v.level.broadcastEntityEvent(second,(byte)12);v.level.broadcastEntityEvent(baby,(byte)12);

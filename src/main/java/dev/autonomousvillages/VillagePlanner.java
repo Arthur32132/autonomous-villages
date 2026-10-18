@@ -83,7 +83,7 @@ final class VillagePlanner {
         };
         if(own!=null)return own;
         Job shared=first(()->build(w,s),()->craftForProject(w,s),()->workshop(w,s),()->shear(w,s),()->chop(w,s,true),
-                ()->mine(w,s,true),()->farm(w),()->bread(w,s));
+                ()->mine(w,s,true),()->farm(w),()->bread(w,s),()->pave(w,s));
         if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0)return new DepositJob(w);
         return shared;
     }
@@ -100,23 +100,27 @@ final class VillagePlanner {
         // Chests found in houses are shared too, but the store itself stands in the open by the bell.
         BlockPos hub=v.meetingPoint();
         boolean noChest=v.stock.chests().stream().noneMatch(c->c.getBlockPos().distSqr(hub)<=10*10),full=s.chests()>0&&s.freeSlots()<9&&s.chests()<48;
-        if(s.table()==null){
+        if(s.table()==null&&!busy(w,VillageCrafting.TABLE,Blocks.CRAFTING_TABLE)){
             if(w.has(x->x.is(Items.CRAFTING_TABLE))){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.CRAFTING_TABLE.defaultBlockState(),"верстак");}
             if(w.count(VillageCrafting.PLANK)>=4||w.count(VillageCrafting.LOG)>=1||CraftJob.affordable(v,VillageCrafting.TABLE,1,w))return new CraftJob(w,VillageCrafting.TABLE,1);
             if(noChest)return chop(w,s,true);
         }
-        if(noChest||full){
+        if((noChest||full)&&!busy(w,VillageCrafting.CHEST,Blocks.CHEST)){
             if(w.has(x->x.is(Items.CHEST))){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.CHEST.defaultBlockState(),"сундук");}
             if(s.table()!=null&&(w.count(VillageCrafting.PLANK)>=8||w.count(VillageCrafting.LOG)>=2||CraftJob.affordable(v,VillageCrafting.CHEST,1,w)))
                 return new CraftJob(w,VillageCrafting.CHEST,1);
-            if(noChest)return chop(w,s,true);
+            if(noChest&&s.chests()==0)return chop(w,s,true);
         }
-        if(s.furnace()==null&&s.cobble()>=8&&s.table()!=null&&v.activeJobs("place","craft")<2){
+        if(s.furnace()==null&&s.cobble()>=8&&s.table()!=null&&!busy(w,VillageCrafting.FURNACE,Blocks.FURNACE)){
             if(w.has(x->x.is(Items.FURNACE))){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.FURNACE.defaultBlockState(),"печь");}
             if(v.stock.count(x->x.is(Items.FURNACE))>0)return new FetchJob(w,new Job.Need(x->x.is(Items.FURNACE),1,"печь"));
             return new CraftJob(w,VillageCrafting.FURNACE,1);
         }
         return null;
+    }
+    /** Another worker is already making or placing this store block. */
+    private boolean busy(Worker w,VillageCrafting.Recipe recipe,Block block){
+        return v.workers.values().stream().anyMatch(o->o!=w&&(o.job instanceof CraftJob c&&c.recipe.name().equals(recipe.name())||o.job instanceof PlaceJob p&&p.state.is(block)));
     }
     /** Free floor next to the meeting point for store blocks; existing chests and the workbench attract new ones. */
     BlockPos utilitySpot(){
@@ -148,6 +152,13 @@ final class VillagePlanner {
             // A miner also needs an axe-free stone pick upgrade once cobble exists.
             if(family.equals("pick")&&!VillageCrafting.hasPickFor(w.bot(),Blocks.IRON_ORE.defaultBlockState())&&s.cobble()>=3&&s.table()!=null&&w.ready("tool"))
                 {w.cooldown("tool",1200);return new CraftJob(w,VillageCrafting.tool("pick","stone"),1);}
+            // Militia: every adult keeps a stone sword once the village has cobblestone to spare.
+            if(!VillageCrafting.hasDefensiveSword(w.bot())&&s.table()!=null&&w.ready("militia")){
+                w.cooldown("militia",1200);
+                if(v.stock.count(x->x.is(ItemTags.SWORDS)&&Supplies.usable(x)&&!x.is(Items.WOODEN_SWORD)&&!x.is(Items.GOLDEN_SWORD))>0)
+                    return new FetchJob(w,new Job.Need(x->x.is(ItemTags.SWORDS)&&Supplies.usable(x)&&!x.is(Items.WOODEN_SWORD)&&!x.is(Items.GOLDEN_SWORD),1,"меч"));
+                if(s.cobble()>=2&&CraftJob.affordable(v,VillageCrafting.tool("sword","stone"),1,w))return new CraftJob(w,VillageCrafting.tool("sword","stone"),1);
+            }
             return null;
         }
         if(!w.ready("tool"))return null;
@@ -200,6 +211,20 @@ final class VillagePlanner {
             if(s.planks()<24&&s.logs()>=4)return new CraftJob(w,VillageCrafting.PLANKS,4);
         }
         return null;
+    }
+    /** Footpaths from new houses, once there is nothing more urgent; a shovel is made for it. */
+    private Job pave(Worker w,Snapshot s){
+        if(!w.ready("path")||v.activeJobs("path")>0)return null;
+        var cells=v.town.unpaved(24);
+        if(cells.isEmpty()){w.cooldown("path",1200);return null;}
+        boolean shovel=w.hasTool(ItemTags.SHOVELS)||v.stock.count(x->x.is(ItemTags.SHOVELS)&&Supplies.usable(x))>0;
+        if(!shovel){
+            if(s.table()==null||busy(w,VillageCrafting.tool("shovel","wood"),Blocks.AIR))return null;
+            var recipe=VillageCrafting.tool("shovel",s.cobble()>=1?"stone":"wood");
+            if(!CraftJob.affordable(v,recipe,1,w)){w.cooldown("path",600);return null;}
+            return new CraftJob(w,recipe,1);
+        }
+        return new PathJob(w,cells);
     }
     private Job bread(Worker w,Snapshot s){
         if(s.wheat()>=3&&s.table()!=null&&w.ready("craft"))return new CraftJob(w,VillageCrafting.BREAD,Math.min(4,s.wheat()/3));

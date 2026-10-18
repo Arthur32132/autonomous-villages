@@ -143,7 +143,7 @@ final class Worker {
 
     /** An armed, healthy guard keeps watch at night instead of sleeping; two at most. */
     boolean watchman(){
-        return v.guard(id)&&body().getHealth()>=14&&VillageCrafting.hasDefensiveSword(bot())
+        return v.guard(id)&&body().getHealth()>=14&&armed()
                 &&v.activeJobs("patrol")<2&&!v.index.beds.isEmpty();
     }
     int socialStart(){return 9000+v.roleIndex(id)%3*1000;}
@@ -238,13 +238,12 @@ final class Worker {
         }
         if(combat!=null&&!combat.completion().isDone())return true;
         // Asleep or sheltering under a roof: running out into the dark is worse than staying put.
-        if((e.isSleeping()||job instanceof ShelterJob&&!e.level().canSeeSky(e.blockPosition()))&&e.distanceToSqr(enemy)>9){
+        if((e.isSleeping()||job instanceof ShelterJob&&!e.level().canSeeSky(e.blockPosition()))&&e.distanceToSqr(enemy)>36){
             if(!(enemy instanceof Creeper))v.raiseAlarm(this,enemy);
             return false;
         }
         if(!(enemy instanceof Creeper))v.raiseAlarm(this,enemy);
-        boolean armed=VillageCrafting.hasDefensiveSword(bot());
-        if(!(enemy instanceof Creeper)&&armed&&(e.getHealth()>=14||v.guard(id))){defend(enemy);return true;}
+        if(!(enemy instanceof Creeper)&&armed()&&(e.getHealth()>=14||v.guard(id)&&e.getHealth()>=8)){defend(enemy);return true;}
         // Keep running along the current route: planning a new one makes the body stand still.
         if(fleeing&&flight!=null&&now()-fleeSince<300&&flight.tick()==Job.Approach.State.MOVING)return true;
         if(job!=null){job.stop();job=null;}
@@ -257,6 +256,8 @@ final class Worker {
         flight.tick();status="убегает от угрозы";
         return true;
     }
+    /** A guard fights with any sword; others only with stone or better. */
+    boolean armed(){return v.guard(id)?VillageCrafting.hasSword(bot()):VillageCrafting.hasDefensiveSword(bot());}
     void defend(Monster enemy){
         if(job!=null){job.stop();job=null;}
         combat=bot().combat().fight(enemy,new CombatPolicy(CombatSkill.EXPERT,16,3,24,false,true,false).swordOnly());

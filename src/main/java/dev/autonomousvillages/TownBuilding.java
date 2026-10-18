@@ -11,7 +11,7 @@ import net.minecraft.world.level.block.state.properties.*;
 
 /** Persistent architectural intent. Inventories and building progress remain in the actual world. */
 public final class TownBuilding {
-    static final Set<String> KINDS=Set.of("house","native_house","well","lamp","path","workshop","farm_plot");
+    static final Set<String> KINDS=Set.of("house","native_house","doors","well","lamp","path","workshop","farm_plot");
     public String kind="house";
     public long origin;
     public boolean completed;
@@ -19,6 +19,8 @@ public final class TownBuilding {
     public List<Long> cuts=new ArrayList<>();
     /** Vanilla template the plan was made from, e.g. "plains_small_house_1"; empty for the mod's own designs. */
     public String design="";
+    /** Ground cells of the footpath from this building's door toward the village centre. */
+    public List<Long> path=new ArrayList<>();
     public static final class Plan {
         public long pos;
         public String state;
@@ -46,6 +48,9 @@ public final class TownBuilding {
     /** A building with a broken record is dropped on load rather than blocking the whole save. */
     boolean valid(VillageState village){
         if(design==null)design="";
+        if(path==null)path=new ArrayList<>();
+        path.removeIf(p->p==null||!village.contains(BlockPos.of(p)));
+        if(path.size()>256)return false;
         if(kind==null||!KINDS.contains(kind)||blocks==null||blocks.size()>4096||cuts==null||cuts.size()>4096||design.length()>128||!village.contains(BlockPos.of(origin)))return false;
         cuts.removeIf(p->p==null||!village.contains(BlockPos.of(p)));
         try{

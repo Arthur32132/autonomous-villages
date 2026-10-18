@@ -1,0 +1,247 @@
+package dev.autonomousvillages;
+
+import java.util.*;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.*;
+import net.minecraft.world.level.levelgen.Heightmap;
+
+/**
+ * Buildings of the village: generated houses are captured for protection, new projects are planned
+ * on flat free ground next to the village. No road network or order book gates construction.
+ */
+final class Projects {
+    static final int HOUSE_W=5,HOUSE_D=5;
+    final Village v;
+    String stage="осмотр деревни";
+    private boolean captured;
+    private final Set<Long> protectedBlocks=new HashSet<>();
+    private final Set<BlockPos> protectedDoors=new HashSet<>();
+    private int protectedCount=-1;
+    private long protectionTick=-1;
+    private long nextPlanning;
+    private int siteCursor;
+    Projects(Village v){this.v=v;}
+
+    void invalidate(){protectedCount=-1;}
+    boolean protects(BlockPos p){
+        if(protectedCount<0||protectionTick!=v.level.getGameTime()){
+            protectionTick=v.level.getGameTime();
+            int count=v.state.buildings.stream().mapToInt(b->b.blocks.size()).sum()+v.state.buildings.size();
+            if(count!=protectedCount){
+                protectedBlocks.clear();protectedDoors.clear();
+                for(var b:v.state.buildings)for(var s:b.blocks){
+                    protectedBlocks.add(s.pos);
+                    var block=s.block();
+                    if(block.getBlock() instanceof DoorBlock){protectedDoors.add(s.position());protectedBlocks.add(s.position().above().asLong());}
+                    if(block.getBlock() instanceof BedBlock)protectedBlocks.add(s.position().relative(block.getValue(BedBlock.FACING)).asLong());
+                }
+                protectedCount=count;
+            }
+        }
+        return protectedBlocks.contains(p.asLong());
+    }
+    Collection<BlockPos> doors(){protects(BlockPos.ZERO);return protectedDoors;}
+
+    // --- generated village houses ------------------------------------------------------------
+    void capture(VillageDiscovery.Survey survey){
+        for(var piece:survey.pieces()){
+            if(v.state.buildings.size()>=256)break;
+            var box=piece.getBoundingBox();
+            long pieceId=new BlockPos(box.minX(),box.minY(),box.minZ()).asLong();
+            if(v.state.capturedPieces.contains(pieceId)||survey.homes().stream().noneMatch(box::isInside))continue;
+            v.state.capturedPieces.add(pieceId);
+            var house=new TownBuilding("native_house",new BlockPos(box.minX(),box.minY(),box.minZ()));
+            for(BlockPos q:BlockPos.betweenClosed(new BlockPos(box.minX(),box.minY(),box.minZ()),new BlockPos(box.maxX(),box.maxY(),box.maxZ()))){
+                BlockPos p=q.immutable();BlockState s=v.level.getBlockState(p);
+                if(!v.state.contains(p)||!structural(s)||upperHalf(s))continue;
+                house.add(p,s);adopt(p);
+            }
+            if(!house.blocks.isEmpty()){house.completed=true;v.state.buildings.add(house);}
+        }
+        for(BlockPos home:survey.homes())captureHouse(home);
+        captured=true;invalidate();
+    }
+    private void captureHouse(BlockPos home){
+        if(v.state.buildings.size()>=256)return;
+        if(v.state.buildings.stream().anyMatch(b->b.blocks.stream().anyMatch(s->s.block().getBlock() instanceof BedBlock&&s.position().distSqr(home)<4)))return;
+        var house=new TownBuilding("native_house",home);var todo=new ArrayDeque<BlockPos>();var seen=new HashSet<BlockPos>();
+        todo.add(home);todo.add(home.below());
+        while(!todo.isEmpty()&&seen.size()<1500){
+            BlockPos p=todo.removeFirst();if(!seen.add(p)||!v.state.contains(p)||p.distSqr(home)>16*16)continue;
+            var s=v.level.getBlockState(p);if(!structural(s))continue;
+            if(!upperHalf(s)){house.add(p,s);adopt(p);}
+            for(Direction d:Direction.values())todo.add(p.relative(d));
+        }
+        if(!house.blocks.isEmpty()){house.completed=true;v.state.buildings.add(house);}
+    }
+    /** Unlocked chests and furnaces inside village houses become shared property on claim. */
+    private void adopt(BlockPos p){
+        if(!v.state.policy.privateChests.contains(p.asLong())&&v.state.storage.size()<128&&v.level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.ChestBlockEntity c&&!c.isLocked())v.state.storage.add(p.asLong());
+        if(v.state.furnaces.size()<16&&v.level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.FurnaceBlockEntity f&&!f.isLocked())v.state.furnaces.add(p.asLong());
+        if(v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE))v.index.tables.add(p);
+    }
+    static boolean upperHalf(BlockState s){return s.getBlock() instanceof DoorBlock&&s.getValue(DoorBlock.HALF)==DoubleBlockHalf.UPPER
+            ||s.getBlock() instanceof BedBlock&&s.getValue(BedBlock.PART)==BedPart.HEAD;}
+    static boolean structural(BlockState s){
+        if(s.isAir()||s.getBlock().asItem()==Items.AIR||VillageIndex.naturalSoil(s)||s.is(BlockTags.LEAVES)||s.getBlock() instanceof CropBlock
+                ||s.is(Blocks.STONE)||s.is(Blocks.DEEPSLATE)||s.is(Blocks.WATER)||s.is(Blocks.SAND)||s.is(Blocks.GRAVEL)
+                ||s.is(Blocks.DIRT_PATH)||s.is(Blocks.FARMLAND)||s.is(Blocks.BUSH)||s.is(BlockTags.FLOWERS))return false;
+        return !Construction.clear(s)&&!(s.getBlock() instanceof SaplingBlock);
+    }
+
+    // --- projects --------------------------------------------------------------------------------
+    void tick(){
+        long now=v.level.getGameTime();
+        if(!captured&&now%100==0){
+            try{capture(VillageDiscovery.survey(v.level,v.state.center()));v.runtime.save();}catch(IllegalArgumentException ignored){}
+        }
+        if(now<nextPlanning)return;
+        nextPlanning=now+100;
+        for(var b:v.state.buildings)if(!b.completed&&remaining(b)==0){
+            b.completed=true;v.chronicle.event("Построено: "+label(b));v.runtime.save();
+        }
+        var active=active();
+        if(active!=null){stage="строят "+label(active)+" "+built(active)+"/"+active.blocks.size();return;}
+        if(v.state.buildings.size()>=256||v.state.completedShelters>=64){stage="все проекты завершены";return;}
+        int beds=v.index.beds.size();
+        if(beds<v.state.residents.size()+2){
+            BlockPos site=findSite(HOUSE_W,HOUSE_D);
+            if(site==null){stage="ищут место для нового дома";return;}
+            var house=cottage(site);
+            v.state.buildings.add(house);v.state.completedShelters++;invalidate();
+            v.chronicle.event("Заложен новый дом у "+site.toShortString());v.runtime.save();
+            stage="заложен новый дом";
+        }else stage="жилья хватает; копят запасы";
+    }
+    TownBuilding active(){
+        return v.state.buildings.stream().filter(b->!b.completed&&!b.kind.equals("native_house")).findFirst().orElse(null);
+    }
+    static String label(TownBuilding b){return switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";default->b.kind;};}
+    int built(TownBuilding b){return (int)b.blocks.stream().filter(p->p.matches(v)).count();}
+    int remaining(TownBuilding b){
+        int n=0;for(long cut:b.cuts)if(!Construction.clear(v.level.getBlockState(BlockPos.of(cut)))&&!planned(b,cut))n++;
+        for(var p:b.blocks)if(!p.matches(v)&&!blockedForever(p))n++;
+        return n;
+    }
+    private boolean planned(TownBuilding b,long pos){return b.blocks.stream().anyMatch(p->p.pos==pos&&p.matches(v));}
+    /** A foreign, non-natural block standing in a planned cell is left alone; the plan skips it. */
+    boolean blockedForever(TownBuilding.Plan p){
+        var actual=v.level.getBlockState(p.position());
+        return !Construction.clear(actual)&&!Construction.sameMaterial(p.step(),actual)&&!removable(actual);
+    }
+    static boolean removable(BlockState s){
+        return VillageIndex.naturalSoil(s)||s.is(Blocks.STONE)||s.is(Blocks.SAND)||s.is(Blocks.GRAVEL)||s.is(BlockTags.LEAVES)||s.is(BlockTags.FLOWERS)
+                ||s.is(Blocks.DIRT_PATH)||s.getBlock() instanceof SaplingBlock||s.is(Blocks.BUSH)||s.is(Blocks.SNOW)||s.is(Blocks.SNOW_BLOCK);
+    }
+    /** Cells to clear first, then missing blocks bottom-up. */
+    List<BlockPos> pendingCuts(TownBuilding b,int limit){
+        var out=new ArrayList<BlockPos>();
+        for(long cut:b.cuts){BlockPos p=BlockPos.of(cut);var s=v.level.getBlockState(p);if(!Construction.clear(s)&&removable(s)&&!planned(b,cut))out.add(p);if(out.size()>=limit)break;}
+        for(var plan:b.blocks){if(out.size()>=limit)break;var s=v.level.getBlockState(plan.position());if(!plan.matches(v)&&!Construction.clear(s)&&removable(s)&&!out.contains(plan.position()))out.add(plan.position());}
+        return out;
+    }
+    List<TownBuilding.Plan> nextSteps(TownBuilding b,int limit){
+        return b.blocks.stream().filter(p->!p.matches(v)&&!blockedForever(p)&&Construction.clear(v.level.getBlockState(p.position())))
+                .sorted(Comparator.<TownBuilding.Plan>comparingInt(p->p.position().getY()).thenComparingInt(Projects::stepOrder))
+                .limit(limit).toList();
+    }
+    /** Doors and beds after the walls around them; torches last. */
+    private static int stepOrder(TownBuilding.Plan p){
+        var s=p.block();
+        if(s.getBlock() instanceof DoorBlock)return 2;
+        if(s.getBlock() instanceof BedBlock)return 3;
+        if(s.is(Blocks.TORCH)||s.is(Blocks.WALL_TORCH))return 4;
+        return 0;
+    }
+    /** Missing blocks of a project grouped by the item that pays for them. */
+    Map<String,Integer> missing(TownBuilding b){
+        var out=new TreeMap<String,Integer>();
+        for(var p:b.blocks)if(!p.matches(v)&&!blockedForever(p))out.merge(materialKey(p.block()),Construction.cost(p.step()),Integer::sum);
+        return out;
+    }
+    static String materialKey(BlockState s){
+        if(s.is(BlockTags.PLANKS))return "planks";
+        if(s.is(BlockTags.LOGS))return "logs";
+        if(s.is(BlockTags.WOODEN_DOORS))return "door";
+        if(s.getBlock() instanceof BedBlock)return "bed";
+        if(s.is(Blocks.TORCH)||s.is(Blocks.WALL_TORCH))return "torch";
+        if(s.is(Blocks.COBBLESTONE))return "cobblestone";
+        if(s.is(BlockTags.WOODEN_STAIRS))return "stairs";
+        if(s.is(BlockTags.WOODEN_SLABS))return "slab";
+        if(s.is(BlockTags.WOODEN_FENCES))return "fence";
+        if(s.is(Blocks.CHEST))return "chest";
+        if(s.is(Blocks.CRAFTING_TABLE))return "crafting_table";
+        if(s.is(Blocks.FURNACE))return "furnace";
+        return s.getBlock().asItem().toString();
+    }
+
+    // --- sites and blueprints ----------------------------------------------------------------------
+    /** Flat, free, natural ground near the meeting point; rings outward a few candidates per call. */
+    BlockPos findSite(int width,int depth){
+        var bounds=v.state.bounds;if(bounds==null)return null;
+        BlockPos hub=v.meetingPoint();
+        for(int attempt=0;attempt<24;attempt++){
+            int n=siteCursor++;int ring=6+(n/16%12)*4;double angle=(n%16)*Math.PI/8+(n/16)*0.37;
+            int x=hub.getX()+(int)Math.round(Math.cos(angle)*ring)-width/2,z=hub.getZ()+(int)Math.round(Math.sin(angle)*ring)-depth/2;
+            BlockPos base=siteAt(x,z,width,depth);
+            if(base!=null)return base;
+        }
+        return null;
+    }
+    BlockPos siteAt(int x,int z,int width,int depth){
+        int low=Integer.MAX_VALUE,high=Integer.MIN_VALUE;var heights=new ArrayList<Integer>();
+        for(int dx=-2;dx<=width+1;dx++)for(int dz=-3;dz<=depth+1;dz++){
+            BlockPos column=new BlockPos(x+dx,v.state.y,z+dz);
+            if(!v.level.hasChunkAt(column)||!v.state.contains(column))return null;
+            int h=v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x+dx,z+dz);
+            if(dx>=0&&dx<width&&dz>=0&&dz<depth){low=Math.min(low,h);high=Math.max(high,h);heights.add(h);}
+        }
+        if(high-low>1)return null;
+        heights.sort(null);int y=heights.get(heights.size()/2);
+        BlockPos base=new BlockPos(x,y,z);
+        for(int dx=-2;dx<=width+1;dx++)for(int dz=-3;dz<=depth+1;dz++)for(int dy=-1;dy<=5;dy++){
+            BlockPos p=base.offset(dx,dy,dz);var s=v.level.getBlockState(p);
+            if(protects(p)||s.getBlock() instanceof BedBlock||s.is(Blocks.FARMLAND)||s.getBlock() instanceof CropBlock||!s.getFluidState().isEmpty()
+                    ||s.is(BlockTags.LOGS)||s.getBlock() instanceof net.minecraft.world.level.block.ChestBlock||!v.state.policy.allows("build",p))return null;
+            boolean inside=dx>=0&&dx<width&&dz>=0&&dz<depth;
+            if(inside&&dy>=0&&!Construction.clear(s)&&!removable(s))return null;
+            if(inside&&dy==-1&&s.isAir()&&!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP))return null;
+        }
+        if(v.state.buildings.stream().filter(b->!b.kind.equals("road")).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
+        return base;
+    }
+    /** A small timber cottage: log corners, plank walls with window gaps, flat roof, two beds, door and lights. */
+    TownBuilding cottage(BlockPos base){
+        var b=new TownBuilding("house",base);
+        int w=HOUSE_W,d=HOUSE_D;
+        for(int x=0;x<w;x++)for(int z=0;z<d;z++){
+            BlockPos floor=base.offset(x,0,z);
+            for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,Blocks.COBBLESTONE.defaultBlockState());}
+            b.add(floor,Blocks.OAK_PLANKS.defaultBlockState());
+            for(int y=1;y<=4;y++)if(!Construction.clear(v.level.getBlockState(floor.above(y))))b.cuts.add(floor.above(y).asLong());
+        }
+        for(int y=1;y<=2;y++)for(int x=0;x<w;x++)for(int z=0;z<d;z++){
+            boolean edge=x==0||z==0||x==w-1||z==d-1;if(!edge)continue;
+            boolean corner=(x==0||x==w-1)&&(z==0||z==d-1);
+            if(x==2&&z==0)continue; // door
+            if(!corner&&y==2&&(x==2&&z==d-1||z==2&&(x==0||x==w-1)))continue; // windows
+            b.add(base.offset(x,y,z),corner?Blocks.OAK_LOG.defaultBlockState():Blocks.OAK_PLANKS.defaultBlockState());
+        }
+        for(int x=-1;x<=w;x++)for(int z=-1;z<=d;z++){
+            boolean rim=x==-1||z==-1||x==w||z==d;
+            b.add(base.offset(x,3,z),rim?Blocks.OAK_SLAB.defaultBlockState().setValue(SlabBlock.TYPE,SlabType.BOTTOM):Blocks.OAK_PLANKS.defaultBlockState());
+        }
+        b.add(base.offset(2,1,0),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.SOUTH));
+        b.add(base.offset(1,1,2),Blocks.BED.white().defaultBlockState().setValue(BedBlock.FACING,Direction.SOUTH).setValue(BedBlock.PART,BedPart.FOOT));
+        b.add(base.offset(3,1,2),Blocks.BED.white().defaultBlockState().setValue(BedBlock.FACING,Direction.SOUTH).setValue(BedBlock.PART,BedPart.FOOT));
+        b.add(base.offset(2,2,3),Blocks.WALL_TORCH.defaultBlockState().setValue(WallTorchBlock.FACING,Direction.NORTH));
+        b.add(base.offset(1,2,-1),Blocks.WALL_TORCH.defaultBlockState().setValue(WallTorchBlock.FACING,Direction.NORTH));
+        b.blocks.removeIf(p->!v.state.contains(p.position()));
+        return b;
+    }
+}

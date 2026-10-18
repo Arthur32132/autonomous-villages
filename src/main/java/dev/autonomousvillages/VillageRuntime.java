@@ -54,13 +54,15 @@ public final class VillageRuntime {
         }else if(villages.values().stream().anyMatch(v->!v.state.active&&v.state.residents.contains(id)))
             bots.find(id).filter(b->b.state()==BotState.ACTIVE).ifPresent(BotHandle::stopAll);
     }
+    /** Library mining asks here: a worker only breaks protected or farmland blocks its own job is about. */
     boolean mayBreak(UUID id,BlockPos pos){
         Village owner=villages.values().stream().filter(v->v.state.residents.contains(id)).findFirst().orElse(null);
         if(owner==null)return true;
         var worker=owner.workers.get(id);
-        String activity=worker==null?"mine":Resident.miningActivity(worker.job);
+        var job=worker==null?null:worker.job;
+        String activity=job==null?"mine":job.activity();
         if(!owner.state.policy.allows(activity,pos)||owner.state.policy.isPrivate(owner,pos))return false;
-        boolean explicit=worker!=null&&("renovate".equals(worker.job)||"harvest".equals(worker.job)||"grade".equals(worker.job)||"dig_irrigation".equals(worker.job))&&pos.equals(worker.target);
+        boolean explicit=job!=null&&job.mayBreak(pos);
         for(var other:villages.values())if(other.town.protects(pos))return other==owner&&explicit;
         var block=server.overworld().getBlockState(pos);
         return !block.is(net.minecraft.world.level.block.Blocks.FARMLAND)&&!(block.getBlock() instanceof net.minecraft.world.level.block.CropBlock)||explicit;
@@ -85,7 +87,8 @@ public final class VillageRuntime {
         for (Village other : villages.values()) if (state.overlaps(other.state)) throw new IllegalArgumentException("Территория пересекает " + other.state.name);
         for (Villager v : residents) if (bots.find(v.getUUID()).isPresent()) throw new IllegalArgumentException("Один из жителей уже управляется библиотекой.");
         residents.forEach(v -> state.residents.add(v.getUUID()));
-        Village village = new Village(this, state); villages.put(name.toLowerCase(Locale.ROOT), village); village.ticket(true);village.town.capture(survey);save();
+        Village village = new Village(this, state); villages.put(name.toLowerCase(Locale.ROOT), village); village.ticket(true);village.town.capture(survey);
+        village.chronicle.event("Поселение "+name+" основано: жителей "+residents.size());save();
         return "Поселение " + name + " выбрано по зданиям и рабочим точкам: " + state.center().toShortString() + ", жителей сейчас " + residents.size()
                 + ". Автономность включена. /avillage status " + name;
     }
@@ -157,22 +160,63 @@ public final class VillageRuntime {
     private void load() {
         if (!Files.exists(file)) return;
         try {
-            Save data = GSON.fromJson(Files.readString(file), Save.class);
-            if (data == null || data.version<1||data.version>3 || data.villages == null || data.villages.size() > 4
+            var json=JsonParser.parseString(Files.readString(file));
+            int version=json.isJsonObject()&&json.getAsJsonObject().has("version")?json.getAsJsonObject().get("version").getAsInt():0;
+            if(version>=1&&version<Save.VERSION){retire(json,version);return;}
+            Save data = GSON.fromJson(json, Save.class);
+            if (data == null || data.version!=Save.VERSION || data.villages == null || data.villages.size() > 4
                     ||data.pendingReleases==null||data.pendingReleases.size()>16384||data.pendingReleases.entrySet().stream().anyMatch(e->e.getKey()==null||e.getValue()==null||e.getValue().json==null)) throw new IllegalArgumentException("Invalid village save");
             Map<String, Village> restored = new LinkedHashMap<>(); Set<UUID> people = new HashSet<>();
             for (VillageState state : data.villages) {
                 state.compactMetadata();
-                state.recoverProjectBounds();
-                if(state.migrateLegacyMineReference())AutonomousVillagesMod.LOG.warn("Recovered legacy local mine outside footprint for {}; existing excavation retained as an expedition worksite",state.name);
                 state.validate(); String key = state.name.toLowerCase(Locale.ROOT);
                 if (restored.containsKey(key) || restored.values().stream().anyMatch(v -> state.overlaps(v.state))) throw new IllegalArgumentException("Duplicate/overlapping village");
-                for (UUID id : state.residents) if (id == null || !people.add(id)) throw new IllegalArgumentException("Duplicate resident");
+                for (UUID id : state.residents) if (!people.add(id)) throw new IllegalArgumentException("Duplicate resident");
                 restored.put(key, new Village(this, state));
             }
             pendingReleases.putAll(data.pendingReleases);
             villages.putAll(restored); villages.values().stream().filter(v -> v.state.active).toList().forEach(v -> v.ticket(true));
         } catch (Exception error) { loadFailed = true; AutonomousVillagesMod.LOG.error("Cannot load villages; preserving original file", error); }
+    }
+    /**
+     * A save from 0.2.x describes orders and expeditions that no longer exist. It is kept as a backup;
+     * its residents are released with their original names, and the player claims the village again.
+     */
+    /** Every resident of an old save with the name it had before the mod renamed it. */
+    static Map<UUID,VillageState.ResidentName> legacyReleases(JsonObject root){
+        var names=new LinkedHashMap<UUID,VillageState.ResidentName>();
+        if(root.get("pendingReleases") instanceof JsonObject pending)for(var e:pending.entrySet())
+            legacyName(e.getKey(),e.getValue()).ifPresent(n->names.put(UUID.fromString(e.getKey()),n));
+        if(root.get("villages") instanceof JsonArray villages)for(var village:villages){
+            if(!(village instanceof JsonObject state)||!(state.get("residents") instanceof JsonArray residents))continue;
+            var recorded=state.get("residentNames") instanceof JsonObject r?r:new JsonObject();
+            for(var id:residents){
+                if(!id.isJsonPrimitive())continue;
+                String key=id.getAsString();
+                var name=recorded.has(key)?legacyName(key,recorded.get(key)):legacyName(key,null);
+                name.ifPresent(n->names.putIfAbsent(UUID.fromString(key),n));
+            }
+        }
+        while(names.size()>16384)names.remove(names.keySet().iterator().next());
+        return names;
+    }
+    /** One entry of an old save; an unreadable entry is skipped, not the whole file. */
+    private static Optional<VillageState.ResidentName> legacyName(String id,JsonElement recorded){
+        try{
+            UUID.fromString(id);
+            if(recorded==null)return Optional.of(VillageState.ResidentName.untouched());
+            var name=GSON.fromJson(recorded,VillageState.ResidentName.class);
+            return name==null||name.json==null?Optional.empty():Optional.of(name);
+        }catch(RuntimeException malformed){return Optional.empty();}
+    }
+    private void retire(JsonElement json,int version)throws java.io.IOException{
+        Path backup=file.resolveSibling("autonomous_villages.v"+version+"-backup.json");
+        for(int n=1;Files.exists(backup);n++)backup=file.resolveSibling("autonomous_villages.v"+version+"-backup-"+n+".json");
+        Files.copy(file,backup);
+        var names=legacyReleases(json.getAsJsonObject());
+        pendingReleases.putAll(names);
+        AutonomousVillagesMod.LOG.warn("Village save v{} is from an older mod version: backed up to {}; {} residents return to vanilla life. Claim the villages again with /avillage claim.",version,backup.getFileName(),names.size());
+        save();
     }
     public void close() {
         save();
@@ -180,5 +224,5 @@ public final class VillageRuntime {
         // Do not detach on shutdown: library may already be closed and it owns backpack persistence.
         for (Village v : villages.values()) {v.presentation.close();v.ticket(false);}
     }
-    static final class Save { int version = 3; List<VillageState> villages;Map<UUID,VillageState.ResidentName> pendingReleases=new LinkedHashMap<>(); }
+    static final class Save { static final int VERSION=4; int version = VERSION; List<VillageState> villages;Map<UUID,VillageState.ResidentName> pendingReleases=new LinkedHashMap<>(); }
 }

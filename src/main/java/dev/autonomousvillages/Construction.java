@@ -11,30 +11,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.*;
 import net.minecraft.world.phys.*;
 
-/** A finite, resource-paid shelter blueprint; never overwrites an existing nonmatching block. */
+/** Paid block placement and blueprint matching; never overwrites an existing nonmatching block. */
 final class Construction {
     record Step(BlockPos pos, BlockState state, Item item) { }
-    static List<Step> shelter(BlockPos base) {
-        List<Step> steps = new ArrayList<>();
-        for (int x=0;x<5;x++) for (int z=0;z<5;z++) steps.add(new Step(base.offset(x,0,z),Blocks.OAK_PLANKS.defaultBlockState(),Items.OAK_PLANKS));
-        steps.add(new Step(base.offset(2,0,-1),Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING,Direction.SOUTH),Items.OAK_STAIRS));
-        for (int y=1;y<=2;y++) for (int x=0;x<5;x++) for (int z=0;z<5;z++) if ((x==0||z==0||x==4||z==4) && !(x==2&&z==0))
-            steps.add(new Step(base.offset(x,y,z),Blocks.OAK_PLANKS.defaultBlockState(),Items.OAK_PLANKS));
-        for (int x=0;x<5;x++) for (int z=0;z<5;z++) steps.add(new Step(base.offset(x,3,z),Blocks.OAK_PLANKS.defaultBlockState(),Items.OAK_PLANKS));
-        steps.add(new Step(base.offset(2,1,0),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.SOUTH),Items.OAK_DOOR));
-        steps.add(new Step(base.offset(1,1,2),Blocks.BED.white().defaultBlockState().setValue(BedBlock.FACING,Direction.SOUTH).setValue(BedBlock.PART,BedPart.FOOT),Items.BED.white()));
-        steps.add(new Step(base.offset(3,1,2),Blocks.BED.white().defaultBlockState().setValue(BedBlock.FACING,Direction.SOUTH).setValue(BedBlock.PART,BedPart.FOOT),Items.BED.white()));
-        steps.add(new Step(base.offset(2,1,3),Blocks.TORCH.defaultBlockState(),Items.TORCH));
-        return steps;
-    }
-    static Step next(Village v) {
-        if (v.state.shelter == null) return null;
-        for (Step step : shelter(BlockPos.of(v.state.shelter))) {
-            BlockState actual = v.level.getBlockState(step.pos());
-            if (!matches(step,actual)) return step;
-        }
-        v.state.shelter = null; v.state.completedShelters++; v.runtime.save(); return null;
-    }
     static boolean matches(Step step, BlockState actual) {
         if(!sameMaterial(step,actual))return false;
         for(var property:step.state().getProperties())if((Set.of("facing","half","axis","part","hinge","rotation").contains(property.getName())
@@ -104,44 +83,13 @@ final class Construction {
     static boolean stoneSlab(BlockState s){return s.is(BlockTags.SLABS)&&!s.is(BlockTags.WOODEN_SLABS);}
     @SuppressWarnings({"rawtypes","unchecked"})
     private static BlockState copyProperty(BlockState to,BlockState from,Property property){return to.setValue(property,from.getValue(property));}
-    static boolean site(Village v, BlockPos base) {
-        return siteProblem(v,base)==null;
-    }
-    static String siteProblem(Village v,BlockPos base){
-        if (!v.state.contains(base.offset(-2,0,-2)) || !v.state.contains(base.offset(6,4,6))) return "outside claim "+v.state.center();
-        for (int x=-1;x<=5;x++) for (int z=-1;z<=5;z++) {
-            BlockPos p=base.offset(x,0,z);
-            var ground=v.level.getBlockState(p.below());
-            if (!VillageIndex.naturalSoil(ground) || !ground.isFaceSturdy(v.level,p.below(),Direction.UP)) return "ground "+p.below()+" "+ground;
-            for (int y=0;y<4;y++) if (!clear(v.level.getBlockState(p.above(y)))) return "blocked "+p.above(y)+" "+v.level.getBlockState(p.above(y));
-        }
-        return null;
-    }
-    static boolean start(Village v) {
-        if (v.state.shelter != null || v.state.completedShelters >= 8 || v.index.beds.size() >= Math.min(24,v.state.residents.size()+2)) return false;
-        // Rotate bounded site search, don't clear houses/trees/player blocks to make space.
-        int phase=(int)(v.level.getGameTime()/200);
-        for (int attempt=0;attempt<12;attempt++) {
-            int angle=(phase*12+attempt)*37;
-            double radians=Math.toRadians(angle);
-            int distance=10+((phase+attempt)%Math.max(1,v.state.radius-20));
-            int x=v.state.x+(int)(Math.cos(radians)*distance),z=v.state.z+(int)(Math.sin(radians)*distance);
-            int y=v.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x,z);
-            BlockPos p=new BlockPos(x,y,z);
-            if (site(v,p)) { v.state.shelter=p.asLong();v.runtime.save();return true; }
-        }
-        return false;
-    }
     static boolean place(Village v, BotHandle b, Step step) {
-        var resident=v.workers.get(b.id());
-        if(resident!=null&&!SettlementNeeds.mayPlace(v,resident,step))return false;
         BlockPos p=step.pos();
         if(!v.state.policy.allows(step.state().getBlock() instanceof SaplingBlock?"wood":"build",p))return false;
         if(step.state().getBlock() instanceof SaplingBlock&&!v.state.plantedTrees.contains(p.asLong())&&v.state.plantedTrees.size()>=512)return false;
         // canWork() also admits expedition ground; metadata outside validate()'s area would block every later save.
         if((step.state().getBlock() instanceof SaplingBlock||step.item()==Items.CHEST||step.item()==Items.FURNACE)
                 &&!v.state.mayRecordPlacement(p,step.state().getBlock() instanceof SaplingBlock))return false;
-        if(step.item()==Items.CRAFTING_TABLE&&!v.town.protects(p)&&v.state.temporaryWorkbenches.size()>=256)return false;
         if(step.item()==Items.CHEST&&v.state.storage.size()>=128&&!v.state.storage.contains(p.asLong()))return false;
         if(step.item()==Items.FURNACE&&v.state.furnaces.size()>=16&&!v.state.furnaces.contains(p.asLong()))return false;
         if (!v.canWork(p) || b.entity().getEyePosition().distanceToSqr(Vec3.atCenterOf(p))>20.25 || !clear(v.level.getBlockState(p))
@@ -160,19 +108,16 @@ final class Construction {
         v.level.setBlock(p,step.state(),second == null ? 3 : 18);
         v.town.invalidate();
         if (second != null) { v.level.setBlock(second,secondState,18); v.level.updateNeighborsAt(p,step.state().getBlock()); v.level.updateNeighborsAt(second,secondState.getBlock()); }
-        if (step.item()==Items.CHEST) v.state.storage.add(p.asLong());
+        if (step.item()==Items.CHEST) {v.state.storage.add(p.asLong());v.stock.invalidate();v.moved();}
         if (step.item()==Items.FURNACE) v.state.furnaces.add(p.asLong());
-        if (step.item()==Items.CRAFTING_TABLE) {
-            v.index.tables.add(p);
-            if(!v.town.protects(p))v.state.temporaryWorkbenches.add(p.asLong());
-        }
+        if (step.item()==Items.CRAFTING_TABLE) v.index.tables.add(p);
         if(v.level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign){
             var text=sign.getFrontText().setMessage(0,net.minecraft.network.chat.Component.literal("СКЛАД"))
                     .setMessage(1,net.minecraft.network.chat.Component.literal(v.state.name))
                     .setMessage(2,net.minecraft.network.chat.Component.literal("Общие припасы"));
             sign.setText(text,true);sign.setChanged();v.level.sendBlockUpdated(p,step.state(),step.state(),3);
         }
-        if (step.state().getBlock() instanceof SaplingBlock) {v.state.plantedTrees.add(p.asLong());v.state.reforestation.remove(p.asLong());ManagedLand.planted(v,p);}
+        if (step.state().getBlock() instanceof SaplingBlock) {v.state.plantedTrees.add(p.asLong());v.state.reforestation.remove(p.asLong());}
         if(step.item()==Items.CHEST || step.item()==Items.FURNACE)v.runtime.save();
         b.entity().swing(net.minecraft.world.InteractionHand.MAIN_HAND);
         var sound=step.state().getSoundType();v.level.playSound(null,p,sound.getPlaceSound(),net.minecraft.sounds.SoundSource.BLOCKS,.7f,1f);

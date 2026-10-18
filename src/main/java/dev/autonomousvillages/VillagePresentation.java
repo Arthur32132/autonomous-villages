@@ -29,17 +29,14 @@ final class VillagePresentation {
             boolean near=player.level()==v.level&&VillageDiscovery.area(v.state,96).contains(player.position());
             if(near)bar.addPlayer(player);else bar.removePlayer(player);
         }
-        var current=v.state.buildings.stream().filter(b->b.built(v)<b.blocks.size()).findFirst().orElse(null);
-        bar.setName(Component.literal(v.state.name+" • "+(v.level.isDarkOutside()?"ночной отдых • ":"")+v.town.stage+" • еда "+v.count(Supplies::food)));
-        bar.setProgress(current==null?1f:(float)current.built(v)/Math.max(1,current.blocks.size()));
-        for(Resident r:v.workers.values()){
-            if(r.bot()==null||!(r.bot().entity() instanceof Villager resident))continue;
-            v.state.residentNames.computeIfAbsent(r.id,id->{var n=new VillageState.ResidentName();n.visible=resident.isCustomNameVisible();
+        var current=v.town.active();
+        bar.setName(Component.literal(v.state.name+" • "+(v.level.isDarkOutside()?"ночной отдых • ":"")+v.town.stage+" • жителей "+v.state.residents.size()+" • еда "+v.stock.count(Supplies::food)));
+        bar.setProgress(current==null?1f:Math.clamp((float)v.town.built(current)/Math.max(1,current.blocks.size()),0f,1f));
+        for(Worker w:v.workers.values()){
+            if(w.bot()==null||!(w.bot().entity() instanceof Villager resident))continue;
+            v.state.residentNames.computeIfAbsent(w.id,id->{var n=new VillageState.ResidentName();n.visible=resident.isCustomNameVisible();
                 if(resident.getCustomName()!=null)n.json=ComponentSerialization.CODEC.encodeStart(JsonOps.INSTANCE,resident.getCustomName()).getOrThrow().toString();return n;});
-            String text=v.role(r.id)+" • "+r.status;
-            if(r.job!=null&&Set.of("deliver","collect_order","supply").contains(r.job)&&!v.porter(r.id))text+=" • временная помощь";
-            if(r.job!=null&&r.target!=null&&r.job.equals("wood")&&r.treeBase!=null)text+=" • осталось брёвен "+v.state.treeWork.getOrDefault(r.treeBase.asLong(),List.of()).size();
-            resident.setCustomName(Component.literal(text));resident.setCustomNameVisible(true);
+            resident.setCustomName(Component.literal(v.role(w.id)+" • "+w.status));resident.setCustomNameVisible(true);
         }
     }
     void chest(ChestBlockEntity chest){

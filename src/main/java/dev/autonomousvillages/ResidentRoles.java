@@ -6,7 +6,7 @@ import java.util.*;
 final class ResidentRoles {
     enum Role {
         STEWARD("завхоз"),BUILDER("строитель"),FARMER("фермер"),LOGGER("лесоруб"),
-        MINER("шахтёр"),GUARD("сторож"),PORTER("носильщик");
+        MINER("шахтёр"),GUARD("сторож");
         final String label;
         Role(String label){this.label=label;}
     }
@@ -26,8 +26,7 @@ final class ResidentRoles {
             case "mason"->Role.BUILDER;
             case "toolsmith","weaponsmith"->Role.MINER;
             case "armorer"->Role.GUARD;
-            case "cartographer"->Role.PORTER;
-            case "librarian","cleric"->Role.STEWARD;
+            case "librarian","cleric","cartographer"->Role.STEWARD;
             case "fletcher"->Role.LOGGER;
             default->null;
         };

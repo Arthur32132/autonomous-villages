@@ -38,7 +38,7 @@ class ResidentRolesTest {
         var appointments=new LinkedHashMap<UUID,ResidentRoles.Assignment>();var adults=new LinkedHashMap<UUID,String>();
         for(int n=1;n<=7;n++)adults.put(id(n),"farmer");
         ResidentRoles.assign(appointments,adults);
-        assertEquals(7,appointments.values().stream().map(a->a.role).distinct().count());
+        assertEquals(ResidentRoles.Role.values().length,appointments.values().stream().map(a->a.role).distinct().count());
         assertTrue(appointments.values().stream().anyMatch(a->a.reason.startsWith("нужен специалист:")));
     }
     @Test void appointmentsAndScheduleSurviveSaveAndDeathCompaction(){

@@ -70,7 +70,24 @@ def build(java):
                    cwd=ROOT, env=env, check=True)
 
 
-def prepare_lab(lab, seed, difficulty, args, label):
+def snapshot_jars(batch_dir, jars_from=None):
+    """Copies the mod jars once per batch, so a rebuild while the batch runs cannot mix versions."""
+    target = batch_dir / 'jars'
+    shutil.rmtree(target, ignore_errors=True)
+    target.mkdir(parents=True)
+    v, nav = version(ROOT), version(NAV)
+    if jars_from:
+        sources = [p for p in Path(jars_from).glob('*.jar') if not p.name.endswith('-sources.jar')]
+    else:
+        sources = [ROOT / f'build/libs/autonomous-villages-{v}.jar', ROOT / f'build/libs/autonomous-villages-soak-{v}.jar']
+    sources += [NAV / f'build/libs/navigation-ai-{nav}.jar', TEMPLATE / f'fabric-api-{FABRIC_API}.jar']
+    for jar in sources:
+        if not any(jar.name == s.name for s in target.iterdir()):
+            shutil.copy2(jar, target / jar.name)
+    return target
+
+
+def prepare_lab(lab, seed, difficulty, args, label, jars):
     lab.mkdir(parents=True)
     for name in ['libraries', 'versions', '.fabric']:
         subprocess.run(['cp', '-al', str(TEMPLATE / name), str(lab / name)], check=True)
@@ -78,9 +95,7 @@ def prepare_lab(lab, seed, difficulty, args, label):
         shutil.copy2(TEMPLATE / name, lab / name)
     mods = lab / 'mods'
     mods.mkdir()
-    v, nav = version(ROOT), version(NAV)
-    for jar in [TEMPLATE / f'fabric-api-{FABRIC_API}.jar', NAV / f'build/libs/navigation-ai-{nav}.jar',
-                ROOT / f'build/libs/autonomous-villages-{v}.jar', ROOT / f'build/libs/autonomous-villages-soak-{v}.jar']:
+    for jar in jars.glob('*.jar'):
         shutil.copy2(jar, mods / jar.name)
     port = random.randint(26000, 29999)
     (lab / 'server.properties').write_text('\n'.join([
@@ -93,13 +108,13 @@ def prepare_lab(lab, seed, difficulty, args, label):
         'out=soak-result.json', 'timeline=soak-timeline.jsonl', '']))
 
 
-def run_one(java, batch_dir, seed, difficulty, args):
+def run_one(java, batch_dir, seed, difficulty, args, jars):
     label = f'{seed}-{difficulty}'
     lab = ROOT / 'build/soak-labs' / f'{batch_dir.name}-{label}'
     report = batch_dir / label
     report.mkdir(parents=True, exist_ok=True)
     shutil.rmtree(lab, ignore_errors=True)
-    prepare_lab(lab, seed, difficulty, args, label)
+    prepare_lab(lab, seed, difficulty, args, label, jars)
     started = time.time()
     with open(lab / 'server.log', 'wb') as log:
         process = subprocess.Popen([str(java / 'bin/java'), f'-Xmx{args.heap}', '-XX:+UseZGC', '-jar', 'fabric-server-launch.jar', 'nogui'],
@@ -148,6 +163,7 @@ def main():
     parser.add_argument('--batch', default=None, help='report folder name; default timestamp')
     parser.add_argument('--no-claim', action='store_true', help='observe the untouched village (control run)')
     parser.add_argument('--skip-build', action='store_true')
+    parser.add_argument('--jars', default=None, help='folder with the mod and soak jars to test instead of build/libs (e.g. an older release)')
     parser.add_argument('--keep-lab', action='store_true')
     parser.add_argument('--prepare-only', action='store_true', help='only download/boot the cached server template')
     args = parser.parse_args()
@@ -160,6 +176,7 @@ def main():
         build(java)
     batch_dir = ROOT / 'build/soak-reports' / (args.batch or time.strftime('%Y%m%d-%H%M%S'))
     batch_dir.mkdir(parents=True, exist_ok=True)
+    jars = snapshot_jars(batch_dir, args.jars)
     jobs = [(s.strip(), d.strip()) for s in args.seeds.split(',') for d in args.difficulty.split(',')]
     results, lock, queue = {}, threading.Lock(), list(jobs)
 
@@ -169,7 +186,7 @@ def main():
                 if not queue:
                     return
                 seed, difficulty = queue.pop(0)
-            label, result = run_one(java, batch_dir, seed, difficulty, args)
+            label, result = run_one(java, batch_dir, seed, difficulty, args, jars)
             with lock:
                 results[label] = result
                 print(row(label, result), flush=True)

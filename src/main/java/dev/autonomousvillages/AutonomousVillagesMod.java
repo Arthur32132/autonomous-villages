@@ -34,34 +34,20 @@ public final class AutonomousVillagesMod implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> runtime = new VillageRuntime(server));
         ServerEntityEvents.ENTITY_LOAD.register((entity,level)->{if(runtime!=null&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident&&level==runtime.server.overworld())runtime.residentLoaded(resident);});
         ServerTickEvents.END_SERVER_TICK.register(server -> { if (runtime != null) runtime.tick(); });
-        net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_UNLOAD.register((entity,level)->{
+        ServerEntityEvents.ENTITY_UNLOAD.register((entity,level)->{
             if(runtime!=null&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident&&resident.isAlive()&&level==runtime.server.overworld())
                 for(var village:runtime.villages.values())if(village.state.residents.contains(resident.getUUID()))village.state.residentPositions.put(resident.getUUID(),resident.blockPosition().asLong());
-            if(runtime!=null&&entity instanceof net.minecraft.world.entity.animal.sheep.Sheep&&level==runtime.server.overworld()
-                    &&entity.getRemovalReason()!=null&&entity.getRemovalReason().shouldDestroy())
-                for(var village:runtime.villages.values())if(village.farm.lost(entity.getUUID())){
-                    village.event("Племенная овца окончательно удалена; восстановят пару");runtime.save();
-                }
-        });
-        ServerLivingEntityEvents.AFTER_DEATH.register((entity,source)->{
-            if(runtime!=null&&entity instanceof net.minecraft.world.entity.animal.sheep.Sheep)
-                for(var village:runtime.villages.values())if(village.farm.lost(entity.getUUID())){
-                    village.event("Потеряна племенная овца; восстановят пару без расходования оставшихся животных");runtime.save();
-                }
-        });
-        ServerLivingEntityEvents.ALLOW_DEATH.register((entity,source,amount)->{
-            if(runtime!=null)for(var village:runtime.villages.values())
-                if(village.state.residents.contains(entity.getUUID()))village.rememberDyingCargo(entity.getUUID());
-            return true;
         });
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             if (runtime != null) for (Village village : runtime.villages.values()) {
                 if (village.state.residents.remove(entity.getUUID())) {
-                    village.state.residentPositions.remove(entity.getUUID());
-                    village.workers.remove(entity.getUUID()); village.reservations.release(entity.getUUID());
-                    // Runs inside vanilla die(): an order-limit exception here would crash the entity tick.
-                    try { village.residentLost(entity.getUUID()); }
-                    catch (RuntimeException error) { village.event("Учёт заказов погибшего не завершён: " + error.getMessage()); LOG.error("Village {} resident loss", village.state.name, error); }
+                    var worker=village.workers.remove(entity.getUUID());
+                    if(worker!=null&&worker.job!=null)worker.job.stop();
+                    village.reservations.release(entity.getUUID());
+                    village.residentLost(entity.getUUID());
+                    var killer=source.getEntity();
+                    village.chronicle.died(killer!=null?killer.getType().getDescription().getString():source.getMsgId());
+                    runtime.save();
                 }
             }
         });
@@ -94,7 +80,9 @@ public final class AutonomousVillagesMod implements ModInitializer {
         catch (Exception error) { s.sendFailure(Component.literal(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage())); return 0; }
     }
     private static int help(CommandSourceStack s) {
-        s.sendSuccess(() -> Component.literal("/avillage claim <имя> — выбрать всё поселение по зданиям и рабочим точкам; "
-                + "orders <имя>; protect <имя> <wood|mine|build|farm|all> <от x y z> <до x y z>; unprotect <имя> <номер>; private <имя> <x y z>; expansion <имя> <north|south|east|west|none|all>; accept <имя> <x y z>; status [имя]; pause <имя>; resume <имя>; release <имя>; storage <имя> <x y z> — разрешить общий сундук."), false); return 1;
+        s.sendSuccess(() -> Component.literal("/avillage claim <имя> — взять деревню под управление; status [имя]; plan <имя> — что видит планировщик; "
+                + "chronicle <имя> [стр] — летопись; storage <имя> <x y z> — сделать сундук общим; private <имя> <x y z>; "
+                + "protect <имя> <wood|mine|build|farm|all> <от> <до>; unprotect <имя> <номер>; expansion <имя> <north|south|east|west|none|all>; "
+                + "pause|resume|release <имя>."), false); return 1;
     }
 }

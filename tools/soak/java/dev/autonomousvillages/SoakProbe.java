@@ -222,7 +222,7 @@ public final class SoakProbe implements ModInitializer {
     /** Implementation-specific view of the mod. Kept in one place so a rewrite only touches this method. */
     static Map<UUID,String> jobs(){
         var out=new HashMap<UUID,String>();var village=village();if(village==null)return out;
-        for(var r:village.workers.values())out.put(r.id,r.job==null?"none":r.job);
+        for(var w:village.workers.values())out.put(w.id,w.job==null?"none":w.job.kind());
         return out;
     }
     static JsonObject modView(){
@@ -230,12 +230,24 @@ public final class SoakProbe implements ModInitializer {
         if(village==null){out.addProperty("claimed",false);return out;}
         out.addProperty("stage",village.town.stage);out.addProperty("problem",village.problem);
         out.addProperty("residents",village.state.residents.size());out.addProperty("workers",village.workers.size());
-        var histogram=new TreeMap<String,Integer>();for(var r:village.workers.values())histogram.merge(r.job==null?"none":r.job,1,Integer::sum);
-        out.add("jobs",GSON.toJsonTree(histogram));
+        var kinds=new TreeMap<String,Integer>();var statuses=new TreeMap<String,Integer>();var failures=new TreeMap<String,Integer>();
+        for(var w:village.workers.values()){
+            kinds.merge(w.job==null?"none":w.job.kind(),1,Integer::sum);statuses.merge(w.status,1,Integer::sum);
+            if(!w.lastFailure.isEmpty())failures.merge(w.lastFailure,1,Integer::sum);
+        }
+        out.add("jobs",GSON.toJsonTree(kinds));out.add("statuses",GSON.toJsonTree(statuses));out.add("lastFailures",GSON.toJsonTree(failures));
+        out.add("failures",GSON.toJsonTree(village.failures));
         int buildings=0,completed=0,planned=0,built=0;
         for(var b:village.state.buildings){if(b.kind.equals("native_house"))continue;buildings++;if(b.completed)completed++;planned+=b.blocks.size();built+=b.built(village);}
         out.addProperty("projects",buildings);out.addProperty("projectsCompleted",completed);out.addProperty("projectBlocks",built+"/"+planned);
-        out.addProperty("orders",village.state.orders.size());
+        var s=village.planner.snapshot();
+        var stock=new JsonObject();
+        stock.addProperty("planks",s.planks());stock.addProperty("logs",s.logs());stock.addProperty("cobble",s.cobble());stock.addProperty("bread",s.bread());
+        stock.addProperty("wheat",s.wheat());stock.addProperty("wool",s.wool());stock.addProperty("iron",s.iron());stock.addProperty("torches",s.torches());
+        stock.addProperty("chests",s.chests());stock.addProperty("freeSlots",s.freeSlots());stock.addProperty("table",s.table()!=null);stock.addProperty("furnace",s.furnace()!=null);
+        out.add("stock",stock);out.add("missing",GSON.toJsonTree(s.missing()));
+        out.addProperty("growth",village.breeding.blocker());
+        out.add("chronicle",GSON.toJsonTree(village.state.chronicle.totals));
         return out;
     }
 

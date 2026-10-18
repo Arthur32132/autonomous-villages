@@ -1,0 +1,59 @@
+package dev.autonomousvillages;
+
+import java.util.*;
+import java.util.function.Predicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
+
+/**
+ * The village's shared store: every unlocked shared chest acts as one inventory. A worker only
+ * takes or puts items while standing at a chest, but nobody negotiates who may use what.
+ */
+final class VillageStock {
+    private final Village v;
+    private long cachedTick=Long.MIN_VALUE;
+    private List<ChestBlockEntity> chests=List.of();
+    private final Map<Predicate<ItemStack>,Integer> counts=new IdentityHashMap<>();
+    VillageStock(Village v){this.v=v;}
+
+    List<ChestBlockEntity> chests(){
+        long now=v.level.getGameTime();
+        if(now!=cachedTick){cachedTick=now;chests=v.chests();counts.clear();}
+        return chests;
+    }
+    void invalidate(){cachedTick=Long.MIN_VALUE;}
+
+    /** Total matching items in shared chests; cached per tick and per predicate instance. */
+    int count(Predicate<ItemStack> test){
+        chests();
+        return counts.computeIfAbsent(test,t->{int n=0;for(var c:chests)for(int i=0;i<c.getContainerSize();i++){var s=c.getItem(i);if(!s.isEmpty()&&t.test(s))n+=s.getCount();}return n;});
+    }
+    int freeSlots(){int n=0;for(var c:chests())for(int i=0;i<c.getContainerSize();i++)if(c.getItem(i).isEmpty())n++;return n;}
+
+    /** Nearest chest to a position, preferring one that holds matching items when a test is given. */
+    ChestBlockEntity nearest(BlockPos from,Predicate<ItemStack> holding){return nearest(from,holding,Set.of());}
+    ChestBlockEntity nearest(BlockPos from,Predicate<ItemStack> holding,Set<BlockPos> excluded){
+        return chests().stream().filter(c->!excluded.contains(c.getBlockPos())&&(holding==null||contains(c,holding)))
+                .min(Comparator.comparingDouble(c->{double dy=c.getBlockPos().getY()-from.getY();return c.getBlockPos().distSqr(from)+15*dy*dy;})).orElse(null);
+    }
+    ChestBlockEntity nearestWithRoom(BlockPos from,Set<BlockPos> excluded){
+        return chests().stream().filter(c->!excluded.contains(c.getBlockPos())).filter(c->{for(int i=0;i<c.getContainerSize();i++)if(c.getItem(i).isEmpty())return true;return false;})
+                .min(Comparator.comparingDouble(c->c.getBlockPos().distSqr(from))).orElse(null);
+    }
+    static boolean contains(ChestBlockEntity c,Predicate<ItemStack> test){
+        for(int i=0;i<c.getContainerSize();i++){var s=c.getItem(i);if(!s.isEmpty()&&test.test(s))return true;}
+        return false;
+    }
+    /** Removes matching items straight from the chests (used when the household itself eats). */
+    int consume(Predicate<ItemStack> test,int amount){
+        int left=amount;
+        for(var c:chests()){
+            for(int i=0;i<c.getContainerSize()&&left>0;i++){var s=c.getItem(i);if(!s.isEmpty()&&test.test(s)){int n=Math.min(left,s.getCount());c.removeItem(i,n);left-=n;}}
+            if(left<amount)c.setChanged();
+            if(left==0)break;
+        }
+        invalidate();return amount-left;
+    }
+    void changed(ChestBlockEntity chest){chest.setChanged();invalidate();v.presentation.chest(chest);}
+}

@@ -153,6 +153,7 @@ public final class SoakProbe implements ModInitializer {
         for(var v:villagers()){seen.add(v.getUUID());initial.add(v.getUUID());lastPos.put(v.getUUID(),v.position());}
         startVillagers=initial.size();startBeds=beds(PoiManager.Occupancy.ANY);
         startCensus=census();lastCensus=startCensus;
+        writeMap("map-start.json");
         startGame=level.getGameTime();lastSampleGame=startGame;runNanos=System.nanoTime();lastSampleNanos=runNanos;
         try{timeline=Files.newBufferedWriter(Path.of(config.getProperty("timeline","soak-timeline.jsonl")),StandardCharsets.UTF_8);}catch(IOException error){throw new UncheckedIOException(error);}
         stage=Stage.RUN;server.tickRateManager().setTickRate((float)doubleConfig("tickRate",400));
@@ -312,6 +313,33 @@ public final class SoakProbe implements ModInitializer {
         return "other";
     }
     /** Surface blocks by category plus the content of every chest in the area. */
+    /** Top block of every column in the area (palette + indices + heights) and villager positions, for map.py. */
+    static void writeMap(String file){
+        try{
+            var palette=new LinkedHashMap<String,Integer>();int w=maxX-minX+1,d=maxZ-minZ+1;
+            var cells=new StringBuilder();var heights=new StringBuilder();
+            for(int z=minZ;z<=maxZ;z++)for(int x=minX;x<=maxX;x++){
+                int y=level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,x,z)-1;
+                var state=level.getBlockState(new BlockPos(x,y,z));
+                String id=BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+                int index=palette.computeIfAbsent(id,k->palette.size());
+                cells.append(index).append(',');heights.append(y).append(',');
+            }
+            var out=new JsonObject();out.addProperty("minX",minX);out.addProperty("minZ",minZ);out.addProperty("width",w);out.addProperty("depth",d);
+            out.add("palette",GSON.toJsonTree(palette.keySet()));out.addProperty("cells",cells.toString());out.addProperty("heights",heights.toString());
+            var people=new com.google.gson.JsonArray();
+            for(var v:villagers()){var row=new com.google.gson.JsonArray();row.add(v.getX());row.add(v.getZ());row.add(v.isBaby());people.add(row);}
+            out.add("villagers",people);
+            var village=village();
+            if(village!=null){
+                var bell=village.meetingPoint();var hub=new com.google.gson.JsonArray();hub.add(bell.getX());hub.add(bell.getZ());out.add("bell",hub);
+                var projects=new com.google.gson.JsonArray();
+                for(var b:village.state.buildings)if(!b.kind.equals("native_house")){var o=BlockPos.of(b.origin);var row=new com.google.gson.JsonArray();row.add(o.getX());row.add(o.getZ());row.add(b.kind+" "+b.design);row.add(b.completed);projects.add(row);}
+                out.add("projects",projects);
+            }
+            Files.writeString(Path.of(file),GSON.toJson(out),StandardCharsets.UTF_8);
+        }catch(IOException|RuntimeException error){log("map failed: "+error);}
+    }
     static JsonObject census(){
         long started=System.nanoTime();
         var blocks=new TreeMap<String,Integer>();var stock=new TreeMap<String,Integer>();int columns=0;
@@ -359,6 +387,7 @@ public final class SoakProbe implements ModInitializer {
                 summary.addProperty("avgTps",tpsSamples==0?0:Math.round(tpsSum/tpsSamples*10)/10.0);
                 summary.addProperty("runRealSeconds",Math.round((System.nanoTime()-runNanos)/1e7)/100.0);
                 var endCensus=census();var villagers=villagers();
+                writeMap("map-end.json");
                 var start=new JsonObject();start.addProperty("villagers",startVillagers);start.addProperty("beds",startBeds);start.add("census",startCensus);
                 var end=new JsonObject();end.addProperty("villagers",villagers.size());end.addProperty("beds",beds(PoiManager.Occupancy.ANY));
                 end.addProperty("occupiedBeds",beds(PoiManager.Occupancy.IS_OCCUPIED));end.add("census",endCensus);

@@ -17,6 +17,7 @@ final class BuildJob extends Job {
     private Approach approach;
     private Harvest harvest;
     private int placed,misses;
+    private boolean fetched;
     BuildJob(Worker w,TownBuilding project){
         super(w,"строит: "+Projects.label(project));this.project=project;
         cuts=new ArrayDeque<>(v.town.pendingCuts(project,6));
@@ -24,7 +25,8 @@ final class BuildJob extends Job {
     @Override String kind(){return "build";}
     @Override String activity(){return "build";}
     @Override boolean mayBreak(BlockPos p){return cuts.contains(p)||harvest!=null&&harvest.target.equals(p);}
-    @Override BlockPos target(){return BlockPos.of(project.origin);}
+    /** Several builders share a site; the steps themselves are not reserved. */
+    @Override BlockPos target(){return null;}
     @Override int timeLimit(){return 3600;}
     @Override boolean atomic(){return harvest!=null;}
     @Override boolean keeps(ItemStack s){return steps.stream().anyMatch(p->Construction.material(p.step()).test(s));}
@@ -62,19 +64,21 @@ final class BuildJob extends Job {
                     (a,b)->new Need(a.test(),a.amount()+b.amount(),a.label()));
             fetch=new Fetch(List.copyOf(needs.values()));
         }
-        var fetched=fetch.tick();
-        if(fetched==Approach.State.MOVING){status="берёт материалы на складе";return true;}
+        if(!fetched){
+            if(fetch.tick()==Approach.State.MOVING){status="берёт материалы на складе";return true;}
+            fetched=true; // whatever the store had; placing uses it up and must not trigger new fetches
+        }
         while(!steps.isEmpty()&&(steps.peek().matches(v)||Construction.available(bot(),steps.peek().step())==null||!Construction.clear(v.level.getBlockState(steps.peek().position())))){steps.poll();approach=null;}
-        if(steps.isEmpty())return placed>0||fail("материалы не донесены");
+        if(steps.isEmpty())return placed>0?false:fail("материалы не донесены");
         var plan=steps.peek();
         status="строит: "+Projects.label(project)+" "+v.town.built(project)+"/"+v.town.size(project);
         if(approach==null)approach=new Approach(plan.position(),4.2,false);
         var state=approach.tick();
         if(state==Approach.State.MOVING)return true;
-        if(state==Approach.State.FAILED){steps.poll();approach=null;return ++misses<6;}
+        if(state==Approach.State.FAILED){steps.poll();approach=null;if(++misses>=6)return placed>0?false:fail("не подойти к стройке");return true;}
         var step=Construction.available(bot(),plan.step());
         if(step!=null&&Construction.place(v,bot(),step)){placed++;v.chronicle.placed();}
-        else if(++misses>=6)return placed>0||fail("не удаётся поставить блоки");
+        else if(++misses>=6)return placed>0?false:fail("не удаётся поставить блоки");
         steps.poll();approach=null;
         return true;
     }

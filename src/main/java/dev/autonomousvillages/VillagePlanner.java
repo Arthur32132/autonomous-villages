@@ -63,14 +63,14 @@ final class VillagePlanner {
         // 1. Unload a heavy backpack.
         // Gathered goods only count once they are in the store, so even a modest load is carried home.
         boolean hauling=Set.of("chop","quarry","shaft","shear").contains(w.lastJob)&&w.surplusItems()>=4;
-        if((hauling||w.surplusItems()>=16||w.freeSlots()<=4&&w.hasSurplus())&&s.chests()>0&&s.freeSlots()>0)return new DepositJob(w);
+        if((hauling||w.surplusItems()>=16||w.freeSlots()<=4&&w.hasSurplus())&&s.chests()>0&&s.freeSlots()>0&&w.ready("deposit"))return new DepositJob(w);
         // 2. The store itself: a workbench and a chest at the meeting point, more chests when full.
         Job store=storeJob(w,s);if(store!=null)return store;
         // 3. Own tool for the role.
         Job tool=toolJob(w,s,role);if(tool!=null)return tool;
         // 4. Evening lights around homes.
         if((role==ResidentRoles.Role.GUARD||small||Math.floorMod(v.level.getOverworldClockTime(),24000)>8000)&&!s.dark().isEmpty()&&s.torches()+w.count(x->x.is(Items.TORCH))>0
-                &&v.activeJobs("light")==0)return new LightJob(w,s.dark());
+                &&v.activeJobs("light")==0&&w.ready("light"))return new LightJob(w,s.dark());
         // 5. The role's own work, then shared priorities.
         Job own=role==null?null:switch(role){
             case BUILDER->first(()->build(w,s),()->craftForProject(w,s),()->chop(w,s,true));
@@ -101,20 +101,19 @@ final class VillagePlanner {
         BlockPos hub=v.meetingPoint();
         boolean noChest=v.stock.chests().stream().noneMatch(c->c.getBlockPos().distSqr(hub)<=10*10),full=s.chests()>0&&s.freeSlots()<9&&s.chests()<48;
         if(s.table()==null&&!busy(w,VillageCrafting.TABLE,Blocks.CRAFTING_TABLE)){
-            if(w.has(x->x.is(Items.CRAFTING_TABLE))){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.CRAFTING_TABLE.defaultBlockState(),"верстак");}
-            if(w.count(VillageCrafting.PLANK)>=4||w.count(VillageCrafting.LOG)>=1||CraftJob.affordable(v,VillageCrafting.TABLE,1,w))return new CraftJob(w,VillageCrafting.TABLE,1);
+            if(w.has(x->x.is(Items.CRAFTING_TABLE))&&w.ready("place")){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.CRAFTING_TABLE.defaultBlockState(),"верстак");}
+            if(w.ready("craft")&&CraftJob.affordable(v,VillageCrafting.TABLE,1,w))return new CraftJob(w,VillageCrafting.TABLE,1);
             if(noChest)return chop(w,s,true);
         }
         if((noChest||full)&&!busy(w,VillageCrafting.CHEST,Blocks.CHEST)){
-            if(w.has(x->x.is(Items.CHEST))){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.CHEST.defaultBlockState(),"сундук");}
-            if(s.table()!=null&&(w.count(VillageCrafting.PLANK)>=8||w.count(VillageCrafting.LOG)>=2||CraftJob.affordable(v,VillageCrafting.CHEST,1,w)))
-                return new CraftJob(w,VillageCrafting.CHEST,1);
+            if(w.has(x->x.is(Items.CHEST))&&w.ready("place")){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.CHEST.defaultBlockState(),"сундук");}
+            if(s.table()!=null&&w.ready("craft")&&CraftJob.affordable(v,VillageCrafting.CHEST,1,w))return new CraftJob(w,VillageCrafting.CHEST,1);
             if(noChest&&s.chests()==0)return chop(w,s,true);
         }
         if(s.furnace()==null&&s.cobble()>=8&&s.table()!=null&&!busy(w,VillageCrafting.FURNACE,Blocks.FURNACE)){
-            if(w.has(x->x.is(Items.FURNACE))){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.FURNACE.defaultBlockState(),"печь");}
-            if(v.stock.count(x->x.is(Items.FURNACE))>0)return new FetchJob(w,new Job.Need(x->x.is(Items.FURNACE),1,"печь"));
-            return new CraftJob(w,VillageCrafting.FURNACE,1);
+            if(w.has(x->x.is(Items.FURNACE))&&w.ready("place")){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.FURNACE.defaultBlockState(),"печь");}
+            if(v.stock.count(x->x.is(Items.FURNACE))>0&&w.ready("fetch"))return new FetchJob(w,new Job.Need(x->x.is(Items.FURNACE),1,"печь"));
+            if(w.ready("craft")&&CraftJob.affordable(v,VillageCrafting.FURNACE,1,w))return new CraftJob(w,VillageCrafting.FURNACE,1);
         }
         // A notice board by the bell tells players what the building site is waiting for.
         if(s.chests()>0&&s.table()!=null&&v.noticeBoard()==null&&!busy(w,VillageCrafting.SIGN,Blocks.OAK_SIGN)&&w.ready("board")){
@@ -171,7 +170,7 @@ final class VillagePlanner {
             return null;
         }
         if(!w.ready("tool"))return null;
-        if(v.stock.count(x->x.is(tag)&&Supplies.usable(x))>0)return new FetchJob(w,new Job.Need(x->x.is(tag)&&Supplies.usable(x),1,"инструмент"));
+        if(v.stock.count(x->x.is(tag)&&Supplies.usable(x))>0&&w.ready("fetch"))return new FetchJob(w,new Job.Need(x->x.is(tag)&&Supplies.usable(x),1,"инструмент"));
         if(s.table()==null)return null;
         String tier=(family.equals("pick")||family.equals("sword"))&&s.iron()>=3?"iron":s.cobble()>=3?"stone":"wood";
         var recipe=VillageCrafting.tool(family,tier);
@@ -188,20 +187,29 @@ final class VillagePlanner {
         if(v.town.pendingCuts(project,1).isEmpty()&&job.affordable(1).isEmpty())return null;
         return job;
     }
+    /** Items in the store and in every worker's backpack: a crafted door waits in the crafter's bag first. */
+    private int owned(Predicate<ItemStack> test){
+        int n=v.stock.count(test);
+        for(var o:v.workers.values())if(o.active())n+=o.count(test);
+        return n;
+    }
+    /** Another worker is crafting this already; its output is not counted anywhere yet. */
+    private boolean crafting(Worker w,VillageCrafting.Recipe recipe){return busy(w,recipe,Blocks.AIR);}
     /** Doors, beds, torches and slabs a project waits for, crafted from store materials. */
     private Job craftForProject(Worker w,Snapshot s){
         if(s.table()==null||!w.ready("craft"))return null;
-        if(s.need("door")>s.doors()&&CraftJob.affordable(v,VillageCrafting.DOOR,1,w))return new CraftJob(w,VillageCrafting.DOOR,1);
-        if(s.need("bed")>s.bedItems()&&s.woolColour()!=null&&s.wool()>=3&&CraftJob.affordable(v,VillageCrafting.bed(s.woolColour()),1,w))
+        if(s.need("door")>owned(x->x.is(ItemTags.WOODEN_DOORS))&&!crafting(w,VillageCrafting.DOOR)&&CraftJob.affordable(v,VillageCrafting.DOOR,1,w))return new CraftJob(w,VillageCrafting.DOOR,1);
+        if(s.need("bed")>owned(x->x.is(ItemTags.BEDS))&&s.woolColour()!=null&&s.wool()>=3&&!crafting(w,VillageCrafting.bed(s.woolColour()))&&CraftJob.affordable(v,VillageCrafting.bed(s.woolColour()),1,w))
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
-        if(s.need("slab")>v.stock.count(x->x.is(ItemTags.WOODEN_SLABS))&&CraftJob.affordable(v,VillageCrafting.SLAB,2,w))return new CraftJob(w,VillageCrafting.SLAB,2);
-        if(s.need("stairs")>v.stock.count(x->x.is(ItemTags.WOODEN_STAIRS))&&CraftJob.affordable(v,VillageCrafting.STAIRS,2,w))return new CraftJob(w,VillageCrafting.STAIRS,2);
-        if(s.need("fence")>v.stock.count(x->x.is(ItemTags.WOODEN_FENCES))&&CraftJob.affordable(v,VillageCrafting.FENCE,1,w))return new CraftJob(w,VillageCrafting.FENCE,1);
-        if(s.need("chest")>v.stock.count(x->x.is(Items.CHEST))&&CraftJob.affordable(v,VillageCrafting.CHEST,1,w))return new CraftJob(w,VillageCrafting.CHEST,1);
-        if(s.need("crafting_table")>v.stock.count(x->x.is(Items.CRAFTING_TABLE))&&CraftJob.affordable(v,VillageCrafting.TABLE,1,w))return new CraftJob(w,VillageCrafting.TABLE,1);
-        if(s.need("furnace")>v.stock.count(x->x.is(Items.FURNACE))&&CraftJob.affordable(v,VillageCrafting.FURNACE,1,w))return new CraftJob(w,VillageCrafting.FURNACE,1);
-        if((s.need("torch")>s.torches()||!s.dark().isEmpty()&&s.torches()<8)&&s.fuel()>0&&CraftJob.affordable(v,VillageCrafting.TORCH,1,w))
-            return new CraftJob(w,VillageCrafting.TORCH,Math.min(4,s.fuel()));
+        if(s.need("slab")>owned(x->x.is(ItemTags.WOODEN_SLABS))&&!crafting(w,VillageCrafting.SLAB)&&CraftJob.affordable(v,VillageCrafting.SLAB,2,w))return new CraftJob(w,VillageCrafting.SLAB,2);
+        if(s.need("stairs")>owned(x->x.is(ItemTags.WOODEN_STAIRS))&&!crafting(w,VillageCrafting.STAIRS)&&CraftJob.affordable(v,VillageCrafting.STAIRS,2,w))return new CraftJob(w,VillageCrafting.STAIRS,2);
+        if(s.need("fence")>owned(x->x.is(ItemTags.WOODEN_FENCES))&&!crafting(w,VillageCrafting.FENCE)&&CraftJob.affordable(v,VillageCrafting.FENCE,1,w))return new CraftJob(w,VillageCrafting.FENCE,1);
+        if(s.need("chest")>owned(x->x.is(Items.CHEST))&&!crafting(w,VillageCrafting.CHEST)&&CraftJob.affordable(v,VillageCrafting.CHEST,1,w))return new CraftJob(w,VillageCrafting.CHEST,1);
+        if(s.need("crafting_table")>owned(x->x.is(Items.CRAFTING_TABLE))&&!crafting(w,VillageCrafting.TABLE)&&CraftJob.affordable(v,VillageCrafting.TABLE,1,w))return new CraftJob(w,VillageCrafting.TABLE,1);
+        if(s.need("furnace")>owned(x->x.is(Items.FURNACE))&&!crafting(w,VillageCrafting.FURNACE)&&CraftJob.affordable(v,VillageCrafting.FURNACE,1,w))return new CraftJob(w,VillageCrafting.FURNACE,1);
+        if((s.need("torch")>owned(x->x.is(Items.TORCH))||!s.dark().isEmpty()&&s.torches()<8)&&s.fuel()>0&&!crafting(w,VillageCrafting.TORCH)){
+            for(int n=Math.min(4,s.fuel());n>=1;n--)if(CraftJob.affordable(v,VillageCrafting.TORCH,n,w))return new CraftJob(w,VillageCrafting.TORCH,n);
+        }
         if(s.need("planks")>s.planks()&&s.logs()>=2)return new CraftJob(w,VillageCrafting.PLANKS,Math.min(8,s.logs()));
         // Fences turn the village lights into lamp posts once wood is plentiful.
         if(!s.dark().isEmpty()&&s.torches()>0&&s.wood()>=WOOD_RESERVE&&v.stock.count(x->x.is(ItemTags.WOODEN_FENCES))<4&&CraftJob.affordable(v,VillageCrafting.FENCE,2,w))

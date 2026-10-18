@@ -169,7 +169,7 @@ final class Worker {
     }
     /** Items a worker keeps instead of handing them to the store: the best tool of each kind and a little food. */
     Set<Integer> keptSlots(){
-        var bag=bag();var kept=new HashSet<Integer>();var bestByFamily=new HashMap<String,Integer>();int food=0;
+        var bag=bag();var kept=new HashSet<Integer>();var bestByFamily=new HashMap<String,Integer>();int food=0,seeds=0;
         for(int i=0;i<bag.size();i++){
             var s=bag.get(i);if(s.isEmpty())continue;
             String family=PersonalKit.family(s);
@@ -178,6 +178,8 @@ final class Worker {
                 if(best==null||PersonalKit.rank(s)>PersonalKit.rank(bag.get(best)))bestByFamily.put(family,i);
             }
             if(Supplies.food(s)&&food<8){kept.add(i);food+=s.getCount();}
+            // Planting stock stays with the worker, or it is fetched and handed straight back.
+            else if((s.is(Items.WHEAT_SEEDS)||s.is(Items.BEETROOT_SEEDS)||s.is(Items.CARROT)||s.is(Items.POTATO))&&seeds<32){kept.add(i);seeds+=s.getCount();}
             if(job!=null&&job.keeps(s))kept.add(i);
         }
         kept.addAll(bestByFamily.values());
@@ -248,7 +250,7 @@ final class Worker {
         if(!(enemy instanceof Creeper)&&armed()&&(e.getHealth()>=14||v.guard(id)&&e.getHealth()>=8)){defend(enemy);return true;}
         // Keep running along the current route: planning a new one makes the body stand still.
         if(fleeing&&flight!=null&&now()-fleeSince<300&&flight.tick()==Job.Approach.State.MOVING)return true;
-        if(job!=null){job.stop();job=null;}
+        if(job!=null){job.stop();job=null;v.reservations.release(id);}
         bot().stopAll();
         Vec3 away=e.position().subtract(enemy.position());double length=Math.max(.001,Math.hypot(away.x,away.z));
         BlockPos refuge=v.index.beds.stream().filter(bed->bed.distSqr(enemy.blockPosition())>e.blockPosition().distSqr(enemy.blockPosition())&&bed.distSqr(e.blockPosition())>4)
@@ -261,7 +263,7 @@ final class Worker {
     /** A guard fights with any sword; others only with stone or better. */
     boolean armed(){return v.guard(id)?VillageCrafting.hasSword(bot()):VillageCrafting.hasDefensiveSword(bot());}
     void defend(Monster enemy){
-        if(job!=null){job.stop();job=null;}
+        if(job!=null){job.stop();job=null;v.reservations.release(id);}
         combat=bot().combat().fight(enemy,new CombatPolicy(CombatSkill.EXPERT,16,3,24,false,true,false).swordOnly());
         fleeSince=now();released=false;status="защищает деревню";
     }

@@ -2,6 +2,7 @@ package dev.autonomousvillages;
 
 import java.util.*;
 import java.util.function.Predicate;
+import net.minecraft.world.item.Item;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.ItemStack;
@@ -21,8 +22,12 @@ final class CraftJob extends Job {
     CraftJob(Worker w,VillageCrafting.Recipe recipe,int times){super(w,"изготавливает: "+recipe.label());this.recipe=recipe;this.times=Math.max(1,times);}
     @Override String kind(){return "craft";}
     @Override boolean keeps(ItemStack s){return made<times&&(s.is(ItemTags.PLANKS)||s.is(Items.STICK)||s.is(ItemTags.LOGS_THAT_BURN)||recipe.material().test(s)||s.is(Items.IRON_INGOT));}
-    /** Ingredients as raw materials: sticks and planks are expressed in logs when the store has no planks. */
-    static List<Need> needs(Village v,VillageCrafting.Recipe recipe,int times){
+    /**
+     * Ingredients as raw materials, counting what the worker already carries. Sticks and planks are
+     * expressed in logs when there are too few planks. Doors, fences, stairs, slabs and signs need
+     * planks of one wood, so a single plank or log type is chosen for them.
+     */
+    static List<Need> needs(Village v,VillageCrafting.Recipe recipe,int times,Worker w){
         var out=new ArrayList<Need>();int planks=0,sticks=0;
         for(var e:recipe.symbols().entrySet()){
             int n=e.getValue()*times;
@@ -34,28 +39,51 @@ final class CraftJob extends Job {
             }
         }
         if(sticks>0){
-            int stored=v.stock.count(VillageCrafting.STICK);
-            if(stored>=sticks)out.add(new Need(VillageCrafting.STICK,sticks,"палки"));
+            int have=v.stock.count(VillageCrafting.STICK)+(w==null?0:w.count(VillageCrafting.STICK));
+            if(have>=sticks)out.add(new Need(VillageCrafting.STICK,sticks,"палки"));
             else planks+=(sticks+3)/4*2;
         }
         if(planks>0){
-            int stored=v.stock.count(VillageCrafting.PLANK);
-            if(stored>=planks)out.add(new Need(VillageCrafting.PLANK,planks,"доски"));
-            else out.add(new Need(VillageCrafting.LOG,(planks-stored+3)/4,"брёвна"));
-            if(stored>0&&stored<planks)out.add(new Need(VillageCrafting.PLANK,stored,"доски"));
+            Predicate<ItemStack> plank=VillageCrafting.PLANK,log=VillageCrafting.LOG;
+            if(recipe.coherent()){
+                Item wood=mostCommon(v,w,VillageCrafting.PLANK,planks);
+                if(wood!=null){Item chosen=wood;plank=s->s.is(chosen);}
+                else{
+                    Item trunk=mostCommon(v,w,VillageCrafting.LOG,1);
+                    if(trunk!=null){Item chosen=trunk;log=s->s.is(chosen);plank=s->false;}
+                }
+            }
+            int have=v.stock.count(plank)+(w==null?0:w.count(plank));
+            if(have>=planks)out.add(new Need(plank,planks,"доски"));
+            else{
+                out.add(new Need(log,(planks-have+3)/4,"брёвна"));
+                if(have>0)out.add(new Need(plank,have,"доски"));
+            }
         }
         return out;
     }
-    /** True when the store holds the raw materials for one craft. */
+    /** The item of a kind the village holds most of (store and bag), if at least {@code min}. */
+    private static Item mostCommon(Village v,Worker w,Predicate<ItemStack> kind,int min){
+        var counts=new HashMap<Item,Integer>();
+        for(var c:v.stock.chests())for(int i=0;i<c.getContainerSize();i++){var s=c.getItem(i);if(!s.isEmpty()&&kind.test(s))counts.merge(s.getItem(),s.getCount(),Integer::sum);}
+        if(w!=null)for(var s:w.bag())if(!s.isEmpty()&&kind.test(s))counts.merge(s.getItem(),s.getCount(),Integer::sum);
+        return counts.entrySet().stream().filter(e->e.getValue()>=min).max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+    }
+    /** True when the store and the bag hold the raw materials for the crafts. */
     static boolean affordable(Village v,VillageCrafting.Recipe recipe,int times,Worker w){
-        for(var n:needs(v,recipe,times))if(v.stock.count(n.test())+(w==null?0:w.count(n.test()))<n.amount())return false;
+        for(var n:needs(v,recipe,times,w))if(v.stock.count(n.test())+(w==null?0:w.count(n.test()))<n.amount())return false;
         return true;
     }
+    private boolean fetched;
     @Override boolean tick(){
-        if(fetch==null)fetch=new Fetch(needs(v,recipe,times-made));
-        var fetched=fetch.tick();
-        if(fetched==Approach.State.FAILED)return fail("нет на складе: "+fetch.missing);
-        if(fetched==Approach.State.MOVING)return true;
+        // Fetch once: crafting uses up what was fetched, and that must not send the worker back out.
+        if(!fetched){
+            if(fetch==null)fetch=new Fetch(needs(v,recipe,times-made,w));
+            var state=fetch.tick();
+            if(state==Approach.State.FAILED)return fail("нет на складе: "+fetch.missing);
+            if(state==Approach.State.MOVING)return true;
+            fetched=true;
+        }
         if(recipe.needsTable()&&v.index.tables.stream().noneMatch(p->VillageCrafting.nearTable(bot(),v,p))){
             BlockPos nearest=v.index.tables.stream().filter(p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE))
                     .min(Comparator.comparingDouble(p->p.distSqr(body().blockPosition()))).orElse(null);

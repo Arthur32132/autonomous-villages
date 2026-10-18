@@ -21,6 +21,8 @@ abstract class Job {
     final long started;
     String status;
     String failure="";
+    /** Why the last route ended without reaching its goal, as the library reported it. */
+    String navReason="";
     Job(Worker w,String status){this.w=w;this.v=w.v;this.started=v.level.getGameTime();this.status=status;}
 
     abstract String kind();
@@ -42,7 +44,11 @@ abstract class Job {
     BotHandle bot(){return w.bot();}
     Villager body(){return w.body();}
     long now(){return v.level.getGameTime();}
-    boolean fail(String reason){failure=reason;status=reason;return false;}
+    boolean fail(String reason){failure=navReason.isEmpty()?reason:reason+" ("+navReason+")";status=reason;return false;}
+    void noteRoute(NavigationTask nav){
+        if(nav!=null&&nav.completion().isDone()&&nav.status()!=NavigationStatus.SUCCESS)
+            try{navReason=nav.completion().join().reason();}catch(RuntimeException ignored){navReason="cancelled";}
+    }
 
     boolean lineOfSight(BlockPos p){
         var hit=v.level.clip(new ClipContext(body().getEyePosition(),Vec3.atCenterOf(p),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,body()));
@@ -85,7 +91,7 @@ abstract class Job {
                     if(!progress.stalled(v.feetPosition(stand),nav))return State.MOVING;
                     nav.cancel(); // no closer for a while: treat this stand as unreachable
                 }
-                boolean success=nav.status()==NavigationStatus.SUCCESS;nav=null;
+                boolean success=nav.status()==NavigationStatus.SUCCESS;noteRoute(nav);nav=null;
                 if(arrived())return State.ARRIVED;
                 if(stand!=null)rejected.add(stand);
                 if(!success&&++attempts>=4)return State.FAILED;
@@ -93,7 +99,7 @@ abstract class Job {
             if(arrived())return State.ARRIVED;
             if(attempts>=6)return State.FAILED;
             stand=v.stand(target,body().position(),reach,sight,rejected);
-            if(stand==null)return State.FAILED;
+            if(stand==null){if(navReason.isEmpty())navReason="no_stand";return State.FAILED;}
             attempts++;progress.reset();
             nav=bot().navigator().goTo(new NavigationGoal.PositionGoal(v.feetPosition(stand),.35),TRAVEL);
             return State.MOVING;
@@ -118,6 +124,7 @@ abstract class Job {
                 if(!progress.stalled(point,nav))return Approach.State.MOVING;
                 nav.cancel();
             }
+            noteRoute(nav);
             if(nav!=null&&nav.status()!=NavigationStatus.SUCCESS&&++attempts>=3)return Approach.State.FAILED;
             progress.reset();
             nav=bot().navigator().goTo(new NavigationGoal.PositionGoal(point,Math.max(.35,radius*.5)),policy);

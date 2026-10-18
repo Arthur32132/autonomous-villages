@@ -29,6 +29,8 @@ final class VillageCrafting {
     /** M is the recipe's main material, P planks, S sticks, I iron ingots. */
     record Recipe(String name,String[] pattern,Predicate<ItemStack> material,Predicate<ItemStack> output,String label){
         boolean needsTable(){return pattern.length>2||pattern[0].length()>2;}
+        /** Vanilla wants one kind of wood for these; tools, chests and tables take mixed planks. */
+        boolean coherent(){return Set.of("door","fence","stairs","slab","sign").contains(name);}
         Map<Character,Integer> symbols(){
             var out=new TreeMap<Character,Integer>();
             for(String row:pattern)for(char c:row.toCharArray())if(c!=' ')out.merge(c,1,Integer::sum);

@@ -27,7 +27,7 @@ final class LightJob extends Job {
                 fetch=new Fetch(needs);
             }
             var state=fetch.tick();
-            if(state==Approach.State.FAILED)return placed>0||fail("нет факелов");
+            if(state==Approach.State.FAILED)return placed>0?false:fail("нет факелов");
             if(state==Approach.State.MOVING)return true;
         }
         while(!spots.isEmpty()&&!Lighting.needsLight(v,spots.peek()))spots.poll();

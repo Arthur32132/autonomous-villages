@@ -35,7 +35,7 @@ final class ShearJob extends Job {
             if(fetched==Approach.State.FAILED)return fail("нет ножниц");
             return true;
         }
-        if(sheep==null||!sheep.isAlive()||!sheep.readyForShearing()){sheep=nearestSheep(v,body(),48);walk=null;if(sheep==null)return sheared>0||fail("рядом нет овец с шерстью");}
+        if(sheep==null||!sheep.isAlive()||!sheep.readyForShearing()){sheep=nearestSheep(v,body(),48);walk=null;if(sheep==null)return sheared>0?false:fail("рядом нет овец с шерстью");}
         if(body().distanceToSqr(sheep)>6.25||!body().hasLineOfSight(sheep)){
             if(walk==null||walk.point.distanceToSqr(sheep.position())>9)walk=new Walk(sheep.position(),1.8);
             if(walk.tick()==Approach.State.FAILED)sheep=null;

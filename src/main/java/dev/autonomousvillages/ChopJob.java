@@ -37,7 +37,8 @@ final class ChopJob extends Job {
             case APPROACH->{
                 BlockPos log=ForestWork.next(v,base);
                 if(log==null){ForestWork.complete(v,base);return false;}
-                if(approach==null||!approach.target.equals(log))approach=new Approach(log,4.5,false);
+                // The miner refuses a log it cannot see, so the standing spot must have a clear line to it.
+                if(approach==null||!approach.target.equals(log))approach=new Approach(log,4.5,true);
                 var state=approach.tick();
                 if(state==Approach.State.MOVING)return true;
                 if(state==Approach.State.FAILED){

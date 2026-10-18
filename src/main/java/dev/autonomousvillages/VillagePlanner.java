@@ -119,9 +119,11 @@ final class VillagePlanner {
         if(s.chests()>0&&s.table()!=null&&v.noticeBoard()==null&&!busy(w,VillageCrafting.SIGN,Blocks.OAK_SIGN)&&w.ready("board")){
             int slot=Supplies.find(w.bot(),x->x.is(ItemTags.SIGNS));
             if(slot>=0&&w.bag().get(slot).getItem() instanceof net.minecraft.world.item.BlockItem sign){
-                BlockPos spot=utilitySpot();if(spot!=null){w.cooldown("board",600);return new PlaceJob(w,spot,sign.getBlock().defaultBlockState(),"табличка");}
+                BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,sign.getBlock().defaultBlockState(),"табличка");
             }
-            if(s.planks()+s.logs()*4>=12&&CraftJob.affordable(v,VillageCrafting.SIGN,1,w)){w.cooldown("board",1200);return new CraftJob(w,VillageCrafting.SIGN,1);}
+            // One craft makes three signs: take one from the store or a neighbour's haul before making more.
+            if(v.stock.count(x->x.is(ItemTags.SIGNS))>0)return new FetchJob(w,new Job.Need(x->x.is(ItemTags.SIGNS),1,"табличка"));
+            if(owned(x->x.is(ItemTags.SIGNS))==0&&s.planks()+s.logs()*4>=12&&CraftJob.affordable(v,VillageCrafting.SIGN,1,w)){w.cooldown("board",600);return new CraftJob(w,VillageCrafting.SIGN,1);}
         }
         return null;
     }

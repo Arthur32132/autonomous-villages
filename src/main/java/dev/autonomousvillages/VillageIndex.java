@@ -32,14 +32,17 @@ final class VillageIndex {
                 x=r.getX()+offset.getX();z=r.getZ()+offset.getZ();
             }else cursor++;
             BlockPos column = new BlockPos(x, state.y, z);
-            if (!state.contains(column) || !level.hasChunkAt(column)) continue;
+            // Trees count in the outskirts too; everything else only inside the footprint.
+            boolean inside=state.contains(column);
+            if (!state.nearby(column) || !level.hasChunkAt(column)) continue;
             int surface = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
             for (int y = Math.max(level.getMinY(), surface - 24); y <= Math.min(level.getMaxY()-1, surface + 5); y++) {
-                BlockPos p = new BlockPos(x, y, z); if (!state.contains(p)) continue;
+                BlockPos p = new BlockPos(x, y, z);
                 BlockState b = level.getBlockState(p);
+                update(trees, p, state.fellingTrees.contains(p.asLong()) || VillageIndex.naturalSoil(level.getBlockState(p.below())) && naturalLog(level, p));
+                if (!inside || !state.contains(p)) continue;
                 update(crops, p, b.getBlock() instanceof CropBlock);
                 update(soil, p.above(), b.is(Blocks.FARMLAND));
-                update(trees, p, state.fellingTrees.contains(p.asLong()) || VillageIndex.naturalSoil(level.getBlockState(p.below())) && naturalLog(level, p));
                 update(stone, p, b.is(Blocks.STONE) && exposed(level, p));
                 update(sand,p,b.is(Blocks.SAND)&&exposed(level,p));
                 update(ore, p, oreResource(b) && exposed(level, p));

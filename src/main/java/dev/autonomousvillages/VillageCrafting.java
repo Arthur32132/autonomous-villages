@@ -48,6 +48,7 @@ final class VillageCrafting {
     static final Recipe FENCE=new Recipe("fence",new String[]{"PSP","PSP"},PLANK,s->s.is(ItemTags.WOODEN_FENCES),"забор");
     static final Recipe STAIRS=new Recipe("stairs",new String[]{"P  ","PP ","PPP"},PLANK,s->s.is(ItemTags.WOODEN_STAIRS),"ступени");
     static final Recipe SLAB=new Recipe("slab",new String[]{"PPP"},PLANK,s->s.is(ItemTags.WOODEN_SLABS),"плиты");
+    static final Recipe SIGN=new Recipe("sign",new String[]{"PPP","PPP"," S "},PLANK,s->s.is(ItemTags.SIGNS),"табличка");
     static Recipe tool(String family,String tier){
         Predicate<ItemStack> material=switch(tier){case "stone"->COBBLE;case "iron"->IRON;default->PLANK;};
         String[] pattern=switch(family){

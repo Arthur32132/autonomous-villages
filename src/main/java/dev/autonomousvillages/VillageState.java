@@ -59,16 +59,24 @@ public final class VillageState {
         residentNames.keySet().retainAll(residents);
         residentPositions.keySet().retainAll(residents);
         storage.removeIf(p->p==null||!contains(BlockPos.of(p)));furnaces.removeIf(p->p==null||!contains(BlockPos.of(p)));
-        for(Set<Long> positions:List.of(plantedTrees,plantedCrops,fellingTrees,reforestation,lights))positions.removeIf(p->p==null||!contains(BlockPos.of(p)));
-        treeWork.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||!contains(BlockPos.of(e.getKey())));
-        for(var tree:treeWork.values())tree.removeIf(p->p==null||!contains(BlockPos.of(p)));
+        for(Set<Long> positions:List.of(plantedCrops,lights))positions.removeIf(p->p==null||!contains(BlockPos.of(p)));
+        for(Set<Long> positions:List.of(plantedTrees,fellingTrees,reforestation))positions.removeIf(p->p==null||!nearby(BlockPos.of(p)));
+        treeWork.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||!nearby(BlockPos.of(e.getKey())));
+        for(var tree:treeWork.values())tree.removeIf(p->p==null||!nearby(BlockPos.of(p)));
         buildings.removeIf(b->b==null||!b.valid(this));
         if(mineEntrance!=null&&!contains(BlockPos.of(mineEntrance)))mineEntrance=null;
         mineDirection=Math.floorMod(mineDirection,4);mineLength=Math.clamp(mineLength,0,64);
     }
-    boolean recordedWork(BlockPos p){return contains(p);}
-    /** Chests, furnaces and saplings become village metadata only inside the footprint. */
-    boolean mayRecordPlacement(BlockPos p,boolean sapling){return contains(p);}
+    /** Woods and fields just outside the footprint where residents may still fell trees and walk. */
+    static final int OUTSKIRTS=48;
+    boolean nearby(BlockPos p){
+        if(p.getY()<-64||p.getY()>=320)return false;
+        if(bounds==null){long dx=(long)p.getX()-x,dz=(long)p.getZ()-z,r=radius+OUTSKIRTS;return dx*dx+dz*dz<=r*r;}
+        return p.getX()>=bounds.minX-OUTSKIRTS&&p.getX()<=bounds.maxX+OUTSKIRTS&&p.getZ()>=bounds.minZ-OUTSKIRTS&&p.getZ()<=bounds.maxZ+OUTSKIRTS;
+    }
+    boolean recordedWork(BlockPos p){return nearby(p);}
+    /** Chests and furnaces become village metadata only inside the footprint; saplings also in the outskirts. */
+    boolean mayRecordPlacement(BlockPos p,boolean sapling){return sapling?nearby(p):contains(p);}
     public static final class ResidentName {
         public String json="";
         public boolean visible;

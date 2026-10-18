@@ -144,7 +144,8 @@ final class Worker {
 
     /** An armed, healthy guard keeps watch at night instead of sleeping; two at most. */
     boolean watchman(){
-        return v.guard(id)&&body().getHealth()>=14&&armed()
+        // A wooden sword is enough to fight back, not to walk the dark streets.
+        return v.guard(id)&&body().getHealth()>=16&&VillageCrafting.hasDefensiveSword(bot())
                 &&v.activeJobs("patrol")<2&&!v.index.beds.isEmpty();
     }
     int socialStart(){return 9000+v.roleIndex(id)%3*1000;}

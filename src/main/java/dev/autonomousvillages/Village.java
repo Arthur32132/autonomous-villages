@@ -202,7 +202,8 @@ final class Village {
     boolean ready(BlockPos p,UUID worker){
         return canWork(p)&&rejected.getOrDefault(p.asLong(),0L)<=level.getGameTime()&&reservations.available(p.asLong(),worker,level.getGameTime());
     }
-    boolean canWork(BlockPos p){return state.contains(p);}
+    /** Residents may walk and fell trees in the outskirts; everything they own stays inside the footprint. */
+    boolean canWork(BlockPos p){return state.nearby(p);}
     ResidentRoles.Role primaryRole(UUID id){var a=state.residentRoles.get(id);return a==null?null:a.role;}
     boolean smallCrew(){return state.residentRoles.size()<3;}
     /** Stable social schedule slot. */
@@ -274,6 +275,17 @@ final class Village {
         return hub;
     }
     void moved(){hubTick=Long.MIN_VALUE;}
+    private BlockPos board;
+    private long boardTick=Long.MIN_VALUE;
+    /** The notice board: a sign near the bell, if the village has put one up. */
+    BlockPos noticeBoard(){
+        long now=level.getGameTime();
+        if(now-boardTick<200&&(board==null||level.getBlockEntity(board) instanceof net.minecraft.world.level.block.entity.SignBlockEntity))return board;
+        boardTick=now;board=null;BlockPos hub=meetingPoint();
+        for(BlockPos q:BlockPos.betweenClosed(hub.offset(-6,-2,-6),hub.offset(6,2,6)))
+            if(level.getBlockEntity(q) instanceof net.minecraft.world.level.block.entity.SignBlockEntity){board=q.immutable();break;}
+        return board;
+    }
     BlockPos stand(BlockPos target,Vec3 from){return stand(target,from,3.0,true,Set.of());}
     BlockPos stand(BlockPos target,Vec3 from,double reach,boolean sight,Set<BlockPos> rejectedPositions){
         BlockPos best=null;double distance=Double.MAX_VALUE;

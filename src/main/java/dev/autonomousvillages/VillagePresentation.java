@@ -22,6 +22,7 @@ final class VillagePresentation {
         for(long p:List.copyOf(opening.keySet()))if(opening.get(p)<=now){
             BlockPos pos=BlockPos.of(p);v.level.blockEvent(pos,v.level.getBlockState(pos).getBlock(),1,0);opening.remove(p);
         }
+        if(now%200==100)updateBoard();
         if(now%20!=0)return;
         long realNow=System.nanoTime();if(realNow<nextDisplayNanos)return;
         nextDisplayNanos=realNow+500_000_000L;
@@ -50,6 +51,31 @@ final class VillagePresentation {
             catch(RuntimeException ignored){}
         }
         return NAMES[Math.floorMod(id.getLeastSignificantBits()^id.getMostSignificantBits(),NAMES.length)];
+    }
+    private static final Map<String,String> NEEDS=Map.ofEntries(Map.entry("planks","доски"),Map.entry("logs","брёвна"),Map.entry("cobblestone","булыжник"),
+            Map.entry("stairs","ступени"),Map.entry("slab","плиты"),Map.entry("door","двери"),Map.entry("bed","кровати"),Map.entry("torch","факелы"),
+            Map.entry("fence","заборы"),Map.entry("chest","сундук"),Map.entry("crafting_table","верстак"),Map.entry("furnace","печь"));
+    private String boardText="";
+    /** Rewrites the notice board when the list of missing materials changes. */
+    private void updateBoard(){
+        BlockPos p=v.noticeBoard();
+        if(p==null||!(v.level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign))return;
+        var project=v.town.active();
+        var lines=new ArrayList<String>();
+        if(project==null)lines.add("всё построено");
+        else{
+            lines.add("нужно на стройку:");
+            v.town.missing(project).entrySet().stream().sorted(Map.Entry.<String,Integer>comparingByValue().reversed()).limit(2)
+                    .forEach(e->lines.add(NEEDS.getOrDefault(e.getKey(),e.getKey())+" "+e.getValue()));
+        }
+        while(lines.size()<3)lines.add("");
+        String joined=String.join("|",lines);
+        if(joined.equals(boardText))return;
+        boardText=joined;
+        var text=sign.getFrontText().setMessage(0,Component.literal(v.state.name));
+        for(int i=0;i<3;i++)text=text.setMessage(i+1,Component.literal(lines.get(i)));
+        sign.setText(text,true);sign.setChanged();
+        v.level.sendBlockUpdated(p,v.level.getBlockState(p),v.level.getBlockState(p),3);
     }
     void chest(ChestBlockEntity chest){
         BlockPos p=chest.getBlockPos();if(!opening.containsKey(p.asLong())){

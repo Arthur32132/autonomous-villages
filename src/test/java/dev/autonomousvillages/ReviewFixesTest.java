@@ -12,7 +12,9 @@ class ReviewFixesTest {
         var s=new VillageState("A",UUID.randomUUID(),new BlockPos(0,64,0),24);s.bounds=new VillageState.Bounds(-24,-24,24,24);
         var outside=new BlockPos(40,64,0);
         assertTrue(s.mayRecordPlacement(new BlockPos(0,64,0),false));
-        assertFalse(s.mayRecordPlacement(outside,false));assertFalse(s.mayRecordPlacement(outside,true));
+        assertFalse(s.mayRecordPlacement(outside,false));
+        // A sapling replanted where a tree in the outskirts was felled is remembered; far away it is not.
+        assertTrue(s.mayRecordPlacement(outside,true));assertFalse(s.mayRecordPlacement(new BlockPos(200,64,0),true));
     }
     @Test void releaseMarkerSurvivesSaveAndOldNamesStayRestorable(){
         var legacy=VillageRuntime.GSON.fromJson("{\"json\":\"\",\"visible\":false}",VillageState.ResidentName.class);

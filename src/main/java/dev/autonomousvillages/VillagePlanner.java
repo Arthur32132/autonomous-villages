@@ -116,11 +116,20 @@ final class VillagePlanner {
             if(v.stock.count(x->x.is(Items.FURNACE))>0)return new FetchJob(w,new Job.Need(x->x.is(Items.FURNACE),1,"печь"));
             return new CraftJob(w,VillageCrafting.FURNACE,1);
         }
+        // A notice board by the bell tells players what the building site is waiting for.
+        if(s.chests()>0&&s.table()!=null&&v.noticeBoard()==null&&!busy(w,VillageCrafting.SIGN,Blocks.OAK_SIGN)&&w.ready("board")){
+            int slot=Supplies.find(w.bot(),x->x.is(ItemTags.SIGNS));
+            if(slot>=0&&w.bag().get(slot).getItem() instanceof net.minecraft.world.item.BlockItem sign){
+                BlockPos spot=utilitySpot();if(spot!=null){w.cooldown("board",600);return new PlaceJob(w,spot,sign.getBlock().defaultBlockState(),"табличка");}
+            }
+            if(s.planks()+s.logs()*4>=12&&CraftJob.affordable(v,VillageCrafting.SIGN,1,w)){w.cooldown("board",1200);return new CraftJob(w,VillageCrafting.SIGN,1);}
+        }
         return null;
     }
     /** Another worker is already making or placing this store block. */
     private boolean busy(Worker w,VillageCrafting.Recipe recipe,Block block){
-        return v.workers.values().stream().anyMatch(o->o!=w&&(o.job instanceof CraftJob c&&c.recipe.name().equals(recipe.name())||o.job instanceof PlaceJob p&&p.state.is(block)));
+        return v.workers.values().stream().anyMatch(o->o!=w&&(o.job instanceof CraftJob c&&c.recipe.name().equals(recipe.name())
+                ||o.job instanceof PlaceJob p&&(p.state.is(block)||block==Blocks.OAK_SIGN&&p.state.is(net.minecraft.tags.BlockTags.STANDING_SIGNS))));
     }
     /** Free floor next to the meeting point for store blocks; existing chests and the workbench attract new ones. */
     BlockPos utilitySpot(){

@@ -88,6 +88,9 @@ final class ExpeditionManager {
         e.returnTrails.keySet().retainAll(e.team);
         e.unloadedMembers.retainAll(e.team);
         if(e.team.isEmpty()){finish(e,false,"no_living_members");return;}
+        long journeyBudget=routeBudget(Math.sqrt(BlockPos.of(e.target).distSqr(v.meetingPoint())));
+        // The absolute limit also covers a member that never loads again; finish() tolerates absent bodies.
+        if(now-e.started>24000+2*journeyBudget){finish(e,false,"outing_timeout");return;}
         if(e.team.stream().anyMatch(id->resident(id)==null))return;
         if(now%100==0&&Set.of("scout","prepare","rally","travel","work").contains(e.phase)
                 &&!v.expeditionCoverage(new HashSet<>(e.team))){
@@ -104,8 +107,6 @@ final class ExpeditionManager {
             e.woolCollected=Math.max(e.woolCollected,carriedWool(e)-e.woolCargoStart);
         }
         if(!e.cargoSnapshot&&!Set.of("scout","prepare","rally").contains(e.phase)){e.mineralDeliveryStart=mineralsDeposited(e);e.mineralCargoStart=carriedMinerals(e);e.cargoSnapshot=true;}
-        long journeyBudget=routeBudget(Math.sqrt(BlockPos.of(e.target).distSqr(v.meetingPoint())));
-        if(now-e.started>24000+2*journeyBudget){finish(e,false,"outing_timeout");return;}
         if(now-e.started>18000+journeyBudget&&!e.phase.equals("return")&&!e.phase.equals("unload"))phase(e,"return");
         if(now-e.phaseSince>Math.max(5000,e.phaseBudget)&&(e.phase.equals("return")||e.phase.equals("unload"))){finish(e,false,e.phase+"_timeout");return;}
         if(Set.of("travel","work").contains(e.phase)&&now%20==0)for(UUID id:e.team){
@@ -305,16 +306,13 @@ final class ExpeditionManager {
         e.brokenBlocks=excavation.brokenBlocks();
         if(!excavation.completion().isDone())return;
         int completed=excavation.completedSegments();
+        // record() keeps the persisted list within validate()'s 256-mine limit.
         if(completed<=e.completedSegments&&excavation.status()!=ExcavationStatus.SUCCESS){
-            var blocked=v.state.mines.stream().filter(m->m.entrance==e.target&&m.direction==e.direction).findFirst().orElse(null);
-            if(blocked==null){blocked=new ExpeditionState.Mine();blocked.entrance=e.target;blocked.direction=e.direction;v.state.mines.add(blocked);}
-            blocked.blocked=true;blocked.hazard=excavation.completion().join().reason().substring(0,Math.min(160,excavation.completion().join().reason().length()));v.event("Отмечен непроходимый участок шахты; выберут другой вход");
+            var blocked=MineKnowledge.record(v,e.target,e.direction);
+            if(blocked!=null){blocked.blocked=true;blocked.hazard=excavation.completion().join().reason().substring(0,Math.min(160,excavation.completion().join().reason().length()));}
+            v.event("Отмечен непроходимый участок шахты; выберут другой вход");
         }
-        if(completed>e.completedSegments){
-            var mine=v.state.mines.stream().filter(m->m.entrance==e.target&&m.direction==e.direction).findFirst().orElse(null);
-            if(mine==null){mine=new ExpeditionState.Mine();mine.entrance=e.target;mine.direction=e.direction;v.state.mines.add(mine);}
-            // Length and observed resources are recorded together below.
-        }
+        // Length and observed resources of a deeper mine are recorded together by MineKnowledge.observe() below.
         if(excavation.status()!=ExcavationStatus.SUCCESS)v.event("Шахтёры возвращаются: "+excavation.completion().join().reason());
         excavation=null;e.dug=true;e.workedSegments=completed;e.oreSince=v.level.getGameTime();discoverOres(e);MineKnowledge.observe(v,e);v.runtime.save();
     }

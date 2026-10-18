@@ -77,8 +77,9 @@ public final class VillageRuntime {
         var survey=VillageDiscovery.survey(level,origin);
         VillageState state = new VillageState(name, owner, origin, 48);VillageDiscovery.apply(state,survey);state.validate();
         if(VillageState.footprintChunks(state.bounds)>VillageState.MAX_TICKET_CHUNKS)throw new IllegalArgumentException("Территория превышает бюджет 1024 активных чанков.");
+        // Babies and NoAI members of another village have no library handle; load() rejects a resident listed twice.
         var residents = level.getEntitiesOfClass(Villager.class, VillageDiscovery.area(state,0),
-                v -> v.isAlive() && state.contains(v.blockPosition()));
+                v -> v.isAlive() && state.contains(v.blockPosition()) && villages.values().stream().noneMatch(other -> other.state.residents.contains(v.getUUID())));
         if (residents.isEmpty()) throw new IllegalArgumentException("У кроватей нет живых жителей.");
         if(residents.size()>1024)throw new IllegalArgumentException("Слишком много жителей (максимум 1024).");
         for (Village other : villages.values()) if (state.overlaps(other.state)) throw new IllegalArgumentException("Территория пересекает " + other.state.name);
@@ -98,9 +99,12 @@ public final class VillageRuntime {
             case "pause" -> { v.state.active = false; v.stop(false); }
             case "resume" -> { if(v.state.bounds!=null&&VillageState.footprintChunks(v.state.bounds)>VillageState.MAX_TICKET_CHUNKS)throw new IllegalArgumentException("Территория превышает бюджет 1024 активных чанков.");v.state.active = true; v.ticket(true); }
             case "release" -> {
-                var deferred=v.state.residents.stream().filter(id->bots.find(id).isEmpty()).toList();
+                // A loaded body without a handle (baby, NoAI) is released right here by stop(); deferring it would let a
+                // later reload detach the controller of a village that claimed it in the meantime.
+                var deferred=v.state.residents.stream().filter(id->bots.find(id).isEmpty()&&!(server.overworld().getEntity(id) instanceof Villager)).toList();
                 if(pendingReleases.size()+deferred.size()>16384)throw new IllegalStateException("Сначала загрузите жителей ранее освобождённых деревень (очередь 16384).");
-                for(UUID id:deferred)pendingReleases.put(id,v.state.residentNames.getOrDefault(id,new VillageState.ResidentName()));
+                // Without a recorded original the mod never renamed this body; an empty default would erase a name tag.
+                for(UUID id:deferred)pendingReleases.put(id,v.state.residentNames.getOrDefault(id,VillageState.ResidentName.untouched()));
                 v.state.active = false; v.stop(true); villages.remove(name.toLowerCase(Locale.ROOT));
             }
             default -> throw new IllegalArgumentException("Неизвестное действие");
@@ -132,7 +136,8 @@ public final class VillageRuntime {
         var ordered=List.copyOf(villages.values());
         for (int i=0;i<ordered.size();i++) {Village village=ordered.get(Math.floorMod(i+villageRotation,ordered.size()));if (village.state.active) try { village.tick(); }
             catch (RuntimeException error) { village.problem = "ошибка планирования: " + error.getClass().getSimpleName();
-                if (ticks % 200 == 0) AutonomousVillagesMod.LOG.error("Village {}", village.state.name, error); }}
+                // Rate-limit per village instead of logging only failures that happen to land on a multiple of 200.
+                if (ticks >= village.nextErrorLog) { village.nextErrorLog = ticks + 200; AutonomousVillagesMod.LOG.error("Village {}", village.state.name, error); } }}
         villageRotation++;
         var error=writer.takeFailure();if(error!=null){persistenceWriteFailed=true;AutonomousVillagesMod.LOG.error("Cannot save periodic villages snapshot",error);}
         if (ticks % 1200 == 0) writeSave(true);

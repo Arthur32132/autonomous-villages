@@ -31,6 +31,8 @@ final class Worker {
     final UUID id;
     final BreathingSafety breathing=new BreathingSafety(this);
     Job job;
+    /** Kind of the job that ended last; a gatherer carries its haul home right after. */
+    String lastJob="";
     String status="осматривается";
     String lastFailure="";
     CombatTask combat;
@@ -39,6 +41,13 @@ final class Worker {
     long fleeSince;
     long nextDecision;
     long lastRestHeal;
+    private long nextFailureLog;
+    private long stuckAt;
+    private int stuckCount;
+    boolean trapped(){
+        if(stuckCount<3||body().blockPosition().asLong()!=stuckAt||!ready("escape"))return false;
+        stuckCount=0;cooldown("escape",1200);return true;
+    }
     boolean released;
     final Map<String,Long> cooldowns=new HashMap<>();
     Worker(Village v,UUID id){this.v=v;this.id=id;}
@@ -71,6 +80,7 @@ final class Worker {
                 &&e.getBrain().getMemory(MemoryModuleType.JOB_SITE).filter(p->p.dimension().equals(v.level.dimension())).isPresent();
         if(night||social||profession){
             if(job!=null&&!nightJob(job)&&!job.atomic()){endJob();}
+            if(job==null&&trapped())start(new EscapeJob(this));
             if(job==null&&night&&watchman()&&ready("patrol"))start(new PatrolJob(this));
             if(job==null&&night&&!hasBed()&&ready("shelter")){var shelter=ShelterJob.find(this);if(shelter!=null)start(shelter);else cooldown("shelter",600);}
             if(job==null&&night&&!atHome()&&ready("home"))start(new HomeJob(this));
@@ -89,6 +99,7 @@ final class Worker {
         }
         if(!mayPlan||now()<nextDecision)return;
         nextDecision=now()+20;
+        if(trapped()){start(new EscapeJob(this));return;}
         pickup();
         Job next=v.planner.next(this);
         if(next!=null)start(next);
@@ -106,10 +117,20 @@ final class Worker {
             lastFailure=job.failure;
             if(job.target()!=null)v.rejected.put(job.target().asLong(),now()+600);
             cooldown(job.kind(),200);
+            // Repeated route failures from one spot mean the worker itself is stuck, not the target.
+            if(job.failure.startsWith("не подойти")||job.failure.startsWith("не нашёл дорогу")||job.failure.startsWith("не дойти")||job.failure.contains("уложился")){
+                long here=body().blockPosition().asLong();
+                stuckCount=here==stuckAt?stuckCount+1:1;stuckAt=here;
+            }
             v.failures.merge(job.kind()+": "+job.failure,1,Integer::sum);
-            AutonomousVillagesMod.LOG.debug("JOB_FAILED village={} worker={} job={} reason={}",v.state.name,id,job.kind(),job.failure);
+            if(now()>=nextFailureLog){
+                nextFailureLog=now()+600;
+                AutonomousVillagesMod.LOG.info("JOB_FAILED {} {} {} reason={} target={} at={} after={}t",v.state.name,v.presentation.personName(id),job.kind(),job.failure,
+                        job.target()==null?"-":job.target().toShortString(),body().blockPosition().toShortString(),now()-job.started);
+            }
         }
         v.reservations.release(id);
+        lastJob=job.kind();
         job=null;
         nextDecision=now();
     }
@@ -164,7 +185,7 @@ final class Worker {
     int surplusItems(){var bag=bag();var kept=keptSlots();int n=0;for(int i=0;i<bag.size();i++)if(!kept.contains(i))n+=bag.get(i).getCount();return n;}
 
     // --- home and rest -----------------------------------------------------------------------
-    static boolean nightJob(Job job){return job instanceof HomeJob||job instanceof PatrolJob||job instanceof ShelterJob;}
+    static boolean nightJob(Job job){return job instanceof HomeJob||job instanceof PatrolJob||job instanceof ShelterJob||job instanceof EscapeJob;}
     /** True when vanilla gave this villager a bed of its own. */
     boolean hasBed(){
         return body().getBrain().getMemory(MemoryModuleType.HOME).filter(p->p.dimension().equals(v.level.dimension()))
@@ -176,7 +197,7 @@ final class Worker {
         if(nativeHome.isPresent())return nativeHome.get();
         return v.index.beds.stream().min(Comparator.comparingDouble(p->p.distSqr(body().blockPosition()))).orElse(v.meetingPoint());
     }
-    boolean atHome(){return body().isSleeping()||body().blockPosition().distSqr(restHome())<=24*24;}
+    boolean atHome(){return body().isSleeping()||body().blockPosition().distSqr(restHome())<=6*6;}
     private void restRecovery(){
         var e=body();
         if(e.getHealth()>=e.getMaxHealth()||now()-lastRestHeal<400||job!=null&&!(job instanceof HomeJob)&&!(job instanceof PatrolJob))return;
@@ -224,11 +245,12 @@ final class Worker {
         if(!(enemy instanceof Creeper))v.raiseAlarm(this,enemy);
         boolean armed=VillageCrafting.hasDefensiveSword(bot());
         if(!(enemy instanceof Creeper)&&armed&&(e.getHealth()>=14||v.guard(id))){defend(enemy);return true;}
-        if(fleeing&&flight!=null&&now()-fleeSince<300&&e.distanceToSqr(enemy)>16){flight.tick();return true;}
+        // Keep running along the current route: planning a new one makes the body stand still.
+        if(fleeing&&flight!=null&&now()-fleeSince<300&&flight.tick()==Job.Approach.State.MOVING)return true;
         if(job!=null){job.stop();job=null;}
         bot().stopAll();
         Vec3 away=e.position().subtract(enemy.position());double length=Math.max(.001,Math.hypot(away.x,away.z));
-        BlockPos refuge=v.index.beds.stream().filter(bed->bed.distSqr(enemy.blockPosition())>e.blockPosition().distSqr(enemy.blockPosition()))
+        BlockPos refuge=v.index.beds.stream().filter(bed->bed.distSqr(enemy.blockPosition())>e.blockPosition().distSqr(enemy.blockPosition())&&bed.distSqr(e.blockPosition())>4)
                 .min(Comparator.comparingDouble(bed->bed.distSqr(e.blockPosition()))).orElse(null);
         Vec3 point=refuge!=null?Vec3.atBottomCenterOf(refuge):e.position().add(away.x/length*12,0,away.z/length*12);
         flight=new HomeJob(this).new Walk(point,1.5);fleeing=true;fleeSince=now();released=false;

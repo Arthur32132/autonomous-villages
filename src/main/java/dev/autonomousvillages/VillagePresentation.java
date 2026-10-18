@@ -31,13 +31,25 @@ final class VillagePresentation {
         }
         var current=v.town.active();
         bar.setName(Component.literal(v.state.name+" • "+(v.level.isDarkOutside()?"ночной отдых • ":"")+v.town.stage+" • жителей "+v.state.residents.size()+" • еда "+v.stock.count(Supplies::food)));
-        bar.setProgress(current==null?1f:Math.clamp((float)v.town.built(current)/Math.max(1,current.blocks.size()),0f,1f));
+        bar.setProgress(current==null?1f:Math.clamp((float)v.town.built(current)/Math.max(1,v.town.size(current)),0f,1f));
         for(Worker w:v.workers.values()){
             if(w.bot()==null||!(w.bot().entity() instanceof Villager resident))continue;
             v.state.residentNames.computeIfAbsent(w.id,id->{var n=new VillageState.ResidentName();n.visible=resident.isCustomNameVisible();
                 if(resident.getCustomName()!=null)n.json=ComponentSerialization.CODEC.encodeStart(JsonOps.INSTANCE,resident.getCustomName()).getOrThrow().toString();return n;});
-            resident.setCustomName(Component.literal(v.role(w.id)+" • "+w.status));resident.setCustomNameVisible(true);
+            resident.setCustomName(Component.literal(personName(w.id)+", "+v.role(w.id)+" • "+w.status));resident.setCustomNameVisible(true);
         }
+    }
+    private static final String[] NAMES={"Иван","Пётр","Мария","Анна","Борис","Глеб","Дарья","Елена","Фёдор","Злата","Игорь","Ксения",
+            "Лев","Мирон","Ника","Остап","Полина","Роман","Савва","Тимофей","Ульяна","Фрол","Степан","Вера","Любава","Милана","Добрыня",
+            "Тихон","Агафья","Ефим","Прохор","Василиса","Ярослава","Демид","Есения","Захар","Илья","Матвей","Нина","Олеся"};
+    /** A name tag the player gave wins; otherwise every resident gets a stable name from its UUID. */
+    String personName(UUID id){
+        var original=v.state.residentNames.get(id);
+        if(original!=null&&!original.untouched&&!original.json.isEmpty()){
+            try{return ComponentSerialization.CODEC.parse(JsonOps.INSTANCE,JsonParser.parseString(original.json)).getOrThrow().getString();}
+            catch(RuntimeException ignored){}
+        }
+        return NAMES[Math.floorMod(id.getLeastSignificantBits()^id.getMostSignificantBits(),NAMES.length)];
     }
     void chest(ChestBlockEntity chest){
         BlockPos p=chest.getBlockPos();if(!opening.containsKey(p.asLong())){

@@ -52,6 +52,6 @@ final class Breeding {
         first.setAge(6000);second.setAge(6000);
         v.level.broadcastEntityEvent(first,(byte)12);v.level.broadcastEntityEvent(second,(byte)12);v.level.broadcastEntityEvent(baby,(byte)12);
         v.state.residents.add(baby.getUUID());v.state.lastBirth=now;
-        v.chronicle.born();v.runtime.save();
+        v.chronicle.born(v.presentation.personName(baby.getUUID()));v.runtime.save();
     }
 }

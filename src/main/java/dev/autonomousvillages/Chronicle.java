@@ -28,8 +28,8 @@ final class Chronicle {
     void harvested(){add("harvested",1);}
     void deposited(int items){add("deposited",items);}
     void lit(){add("torches",1);}
-    void born(){add("births",1);event("Родился новый житель!");}
-    void died(String cause){add("deaths",1);event("Погиб житель: "+cause);}
+    void born(String name){add("births",1);event("Родился "+name+"!");}
+    void died(String who,String cause){add("deaths",1);event("Погиб "+who+": "+cause);}
     String render(int page){
         var lines=new ArrayList<String>();
         lines.add(v.state.name+" — летопись ("+day()+")");

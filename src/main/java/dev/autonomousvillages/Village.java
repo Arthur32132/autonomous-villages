@@ -146,7 +146,7 @@ final class Village {
         state.residentRoles.keySet().retainAll(state.residents);
         if(ResidentRoles.assign(state.residentRoles,adults)){
             for(UUID id:adults.keySet())if(state.residentRoles.containsKey(id)&&announcedRoles.add(id)){
-                var a=state.residentRoles.get(id);chronicle.event(a.role.label+": "+a.reason);
+                var a=state.residentRoles.get(id);chronicle.event(presentation.personName(id)+" — "+a.role.label+" ("+a.reason+")");
             }
             runtime.save();
         }
@@ -219,7 +219,7 @@ final class Village {
         double offset=!feet.isEmpty()&&feet.max(Direction.Axis.Y)<1?feet.max(Direction.Axis.Y):!below.isEmpty()?below.max(Direction.Axis.Y)-1:0;
         return Vec3.atBottomCenterOf(p).add(0,offset,0);
     }
-    /** The village hub: the store next to the bell, else the bell, else the middle of the homes. Cached briefly. */
+    /** The village hub: the bell, else the middle of the homes. The store is built next to it. Cached briefly. */
     BlockPos meetingPoint(){
         long now=level.getGameTime();
         if(hub!=null&&now-hubTick<100)return hub;
@@ -232,11 +232,12 @@ final class Village {
             int[] heights=index.beds.stream().mapToInt(BlockPos::getY).sorted().toArray();int height=heights.length==0?state.y:heights[heights.length/2];
             anchor=new BlockPos(state.x,height,state.z);
         }
-        final BlockPos from=anchor;
-        var chest=chests().stream().min(Comparator.comparingDouble(c->{double dy=c.getBlockPos().getY()-from.getY();return c.getBlockPos().distSqr(from)+15*dy*dy;})).orElse(null);
-        if(chest!=null&&chest.getBlockPos().distSqr(from)<48*48)hub=chest.getBlockPos();
-        else if(bell!=null)hub=bell;
-        else hub=new BlockPos(state.x,level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,state.x,state.z),state.z);
+        if(bell!=null)hub=bell;
+        else{
+            // The column above the median home height, on the ground.
+            int y=level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,state.x,state.z);
+            hub=new BlockPos(state.x,Math.abs(y-anchor.getY())<12?y:anchor.getY(),state.z);
+        }
         return hub;
     }
     void moved(){hubTick=Long.MIN_VALUE;}

@@ -17,9 +17,13 @@ public final class TownBuilding {
     public boolean completed;
     public List<Plan> blocks=new ArrayList<>();
     public List<Long> cuts=new ArrayList<>();
+    /** Vanilla template the plan was made from, e.g. "plains_small_house_1"; empty for the mod's own designs. */
+    public String design="";
     public static final class Plan {
         public long pos;
         public String state;
+        /** Decoration: placed only when the store holds the exact item; never holds up completion. */
+        public boolean optional;
         private transient BlockState decoded;
         public Plan() { }
         Plan(BlockPos p,BlockState b){pos=p.asLong();state=BlockState.CODEC.encodeStart(JsonOps.INSTANCE,b).getOrThrow().toString();decoded=b;}
@@ -37,10 +41,12 @@ public final class TownBuilding {
     public TownBuilding() { }
     TownBuilding(String kind,BlockPos origin){this.kind=kind;this.origin=origin.asLong();}
     void add(BlockPos p,BlockState state){if(state.getBlock().asItem()!=Items.AIR)blocks.add(new Plan(p,state));}
+    void decorate(BlockPos p,BlockState state){if(state.getBlock().asItem()!=Items.AIR){var plan=new Plan(p,state);plan.optional=true;blocks.add(plan);}}
     int built(Village v){return (int)blocks.stream().filter(p->p.matches(v)).count();}
     /** A building with a broken record is dropped on load rather than blocking the whole save. */
     boolean valid(VillageState village){
-        if(kind==null||!KINDS.contains(kind)||blocks==null||blocks.size()>4096||cuts==null||cuts.size()>512||!village.contains(BlockPos.of(origin)))return false;
+        if(design==null)design="";
+        if(kind==null||!KINDS.contains(kind)||blocks==null||blocks.size()>4096||cuts==null||cuts.size()>4096||design.length()>128||!village.contains(BlockPos.of(origin)))return false;
         cuts.removeIf(p->p==null||!village.contains(BlockPos.of(p)));
         try{
             for(Plan p:blocks)if(p==null||p.state==null||p.state.length()>2048||!village.contains(p.position())||p.block().getBlock().asItem()==Items.AIR)return false;

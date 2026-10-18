@@ -40,13 +40,15 @@ public final class AutonomousVillagesMod implements ModInitializer {
         });
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             if (runtime != null) for (Village village : runtime.villages.values()) {
-                if (village.state.residents.remove(entity.getUUID())) {
+                if (village.state.residents.contains(entity.getUUID())) {
+                    String who=village.presentation.personName(entity.getUUID())+", "+village.role(entity.getUUID());
+                    village.state.residents.remove(entity.getUUID());
                     var worker=village.workers.remove(entity.getUUID());
                     if(worker!=null&&worker.job!=null)worker.job.stop();
                     village.reservations.release(entity.getUUID());
                     village.residentLost(entity.getUUID());
                     var killer=source.getEntity();
-                    village.chronicle.died(killer!=null?killer.getType().getDescription().getString():source.getMsgId());
+                    village.chronicle.died(who,killer!=null?killer.getType().getDescription().getString():source.getMsgId());
                     runtime.save();
                 }
             }

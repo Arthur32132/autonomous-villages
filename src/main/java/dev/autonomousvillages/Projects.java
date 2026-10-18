@@ -106,26 +106,34 @@ final class Projects {
             b.completed=true;v.chronicle.event("Построено: "+label(b));v.runtime.save();
         }
         var active=active();
-        if(active!=null){stage="строят "+label(active)+" "+built(active)+"/"+active.blocks.size();return;}
+        if(active!=null){stage="строят "+label(active)+" "+built(active)+"/"+size(active);return;}
         if(v.state.buildings.size()>=256||v.state.completedShelters>=64){stage="все проекты завершены";return;}
         int beds=v.index.beds.size();
         if(beds<v.state.residents.size()+2){
-            BlockPos site=findSite(HOUSE_W,HOUSE_D);
-            if(site==null){stage="ищут место для нового дома";return;}
-            var house=cottage(site);
+            var house=templateHouse();
+            if(house==null){
+                BlockPos site=findSite(HOUSE_W,HOUSE_D);
+                if(site==null){stage="ищут место для нового дома";return;}
+                house=cottage(site);
+            }
             v.state.buildings.add(house);v.state.completedShelters++;invalidate();
-            v.chronicle.event("Заложен новый дом у "+site.toShortString());v.runtime.save();
-            stage="заложен новый дом";
+            v.chronicle.event("Заложен "+label(house)+" у "+BlockPos.of(house.origin).toShortString());v.runtime.save();
+            stage="заложен "+label(house);
         }else stage="жилья хватает; копят запасы";
     }
     TownBuilding active(){
         return v.state.buildings.stream().filter(b->!b.completed&&!b.kind.equals("native_house")).findFirst().orElse(null);
     }
-    static String label(TownBuilding b){return switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";default->b.kind;};}
-    int built(TownBuilding b){return (int)b.blocks.stream().filter(p->p.matches(v)).count();}
+    static String label(TownBuilding b){
+        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";default->b.kind;};
+        return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";
+    }
+    /** Structural blocks of the plan; decoration does not count toward progress. */
+    int size(TownBuilding b){return (int)b.blocks.stream().filter(p->!p.optional).count();}
+    int built(TownBuilding b){return (int)b.blocks.stream().filter(p->!p.optional&&p.matches(v)).count();}
     int remaining(TownBuilding b){
-        int n=0;for(long cut:b.cuts)if(!Construction.clear(v.level.getBlockState(BlockPos.of(cut)))&&!planned(b,cut))n++;
-        for(var p:b.blocks)if(!p.matches(v)&&!blockedForever(p))n++;
+        int n=0;for(long cut:b.cuts)if(!Construction.clear(v.level.getBlockState(BlockPos.of(cut)))&&removable(v.level.getBlockState(BlockPos.of(cut)))&&!planned(b,cut))n++;
+        for(var p:b.blocks)if(!p.optional&&!p.matches(v)&&!blockedForever(p))n++;
         return n;
     }
     private boolean planned(TownBuilding b,long pos){return b.blocks.stream().anyMatch(p->p.pos==pos&&p.matches(v));}
@@ -142,12 +150,14 @@ final class Projects {
     List<BlockPos> pendingCuts(TownBuilding b,int limit){
         var out=new ArrayList<BlockPos>();
         for(long cut:b.cuts){BlockPos p=BlockPos.of(cut);var s=v.level.getBlockState(p);if(!Construction.clear(s)&&removable(s)&&!planned(b,cut))out.add(p);if(out.size()>=limit)break;}
-        for(var plan:b.blocks){if(out.size()>=limit)break;var s=v.level.getBlockState(plan.position());if(!plan.matches(v)&&!Construction.clear(s)&&removable(s)&&!out.contains(plan.position()))out.add(plan.position());}
+        for(var plan:b.blocks){if(out.size()>=limit)break;var s=v.level.getBlockState(plan.position());if(!plan.optional&&!plan.matches(v)&&!Construction.clear(s)&&removable(s)&&!out.contains(plan.position()))out.add(plan.position());}
         return out;
     }
+    /** Missing structural blocks bottom-up, then decoration the store happens to hold. */
     List<TownBuilding.Plan> nextSteps(TownBuilding b,int limit){
-        return b.blocks.stream().filter(p->!p.matches(v)&&!blockedForever(p)&&Construction.clear(v.level.getBlockState(p.position())))
-                .sorted(Comparator.<TownBuilding.Plan>comparingInt(p->p.position().getY()).thenComparingInt(Projects::stepOrder))
+        return b.blocks.stream().filter(p->!p.matches(v)&&!blockedForever(p)&&Construction.clear(v.level.getBlockState(p.position()))
+                        &&(!p.optional||v.stock.count(s->s.is(p.step().item()))>0))
+                .sorted(Comparator.<TownBuilding.Plan>comparingInt(p->p.optional?1:0).thenComparingInt(p->p.position().getY()).thenComparingInt(Projects::stepOrder))
                 .limit(limit).toList();
     }
     /** Doors and beds after the walls around them; torches last. */
@@ -161,7 +171,7 @@ final class Projects {
     /** Missing blocks of a project grouped by the item that pays for them. */
     Map<String,Integer> missing(TownBuilding b){
         var out=new TreeMap<String,Integer>();
-        for(var p:b.blocks)if(!p.matches(v)&&!blockedForever(p))out.merge(materialKey(p.block()),Construction.cost(p.step()),Integer::sum);
+        for(var p:b.blocks)if(!p.optional&&!p.matches(v)&&!blockedForever(p))out.merge(materialKey(p.block()),Construction.cost(p.step()),Integer::sum);
         return out;
     }
     static String materialKey(BlockState s){
@@ -214,6 +224,57 @@ final class Projects {
         }
         if(v.state.buildings.stream().filter(b->!b.kind.equals("road")).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
         return base;
+    }
+    /** Vanilla style of the village, by the most common villager type among residents. */
+    String style(){
+        var counts=new HashMap<String,Integer>();
+        for(UUID id:v.state.residents)if(v.level.getEntity(id) instanceof net.minecraft.world.entity.npc.villager.Villager body)
+            counts.merge(body.getVillagerData().type().unwrapKey().map(k->k.identifier().getPath()).orElse("plains"),1,Integer::sum);
+        return Blueprints.style(counts.entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse("plains"));
+    }
+    /** A vanilla house of the village's style, its entrance turned toward the meeting point. */
+    TownBuilding templateHouse(){
+        var designs=Blueprints.houses(v.level,style());
+        if(designs.isEmpty()||v.state.bounds==null)return null;
+        // The three houses with the most beds for the work, in turn, so the street does not repeat itself.
+        var best=designs.stream().sorted(Comparator.comparingDouble(Blueprints.Template::value).reversed()).limit(3).toList();
+        BlockPos hub=v.meetingPoint();
+        // A big house needs a bigger flat site; when none is found the next design gets its turn.
+        for(int turn=0;turn<best.size();turn++){
+            var design=best.get(Math.floorMod(v.state.completedShelters+turn,best.size()));
+            var house=place(design,hub);
+            if(house!=null)return house;
+        }
+        return null;
+    }
+    private TownBuilding place(Blueprints.Template design,BlockPos hub){
+        for(int attempt=0;attempt<16;attempt++){
+            int n=siteCursor++;int ring=8+(n/16%12)*4;double angle=(n%16)*Math.PI/8+(n/16)*0.37;
+            int cx=hub.getX()+(int)Math.round(Math.cos(angle)*ring),cz=hub.getZ()+(int)Math.round(Math.sin(angle)*ring);
+            Direction toHub=Math.abs(hub.getX()-cx)>=Math.abs(hub.getZ()-cz)?(hub.getX()>cx?Direction.EAST:Direction.WEST):(hub.getZ()>cz?Direction.SOUTH:Direction.NORTH);
+            var rotation=Blueprints.facing(design.front(),toHub);
+            var footprint=Blueprints.footprint(design.size(),rotation);
+            BlockPos base=siteAt(cx-footprint.getX()/2,cz-footprint.getZ()/2,footprint.getX(),footprint.getZ());
+            if(base!=null)return fromTemplate(design,base,rotation);
+        }
+        return null;
+    }
+    TownBuilding fromTemplate(Blueprints.Template t,BlockPos base,Rotation rotation){
+        var b=new TownBuilding("house",base);
+        String path=t.id().getPath();b.design=path.substring(path.lastIndexOf('/')+1);
+        for(var entry:t.blocks()){
+            BlockState s=entry.state().rotate(rotation);
+            if(s.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)&&s.getValue(BlockStateProperties.DOUBLE_BLOCK_HALF)==DoubleBlockHalf.UPPER
+                    ||s.getBlock() instanceof BedBlock&&s.getValue(BedBlock.PART)==BedPart.HEAD)continue;
+            BlockPos p=base.offset(Blueprints.turn(entry.pos(),t.size(),rotation));
+            if(Blueprints.structural(s))b.add(p,Blueprints.buildable(s));else b.decorate(p,s);
+            // The floor rests on a cobblestone footing where the ground is lower.
+            if(entry.pos().getY()==0&&Blueprints.structural(s))
+                for(int y=1;y<=3&&v.level.getBlockState(p.below(y)).isAir();y++)b.add(p.below(y),Blocks.COBBLESTONE.defaultBlockState());
+        }
+        for(BlockPos rel:t.clear()){BlockPos p=base.offset(Blueprints.turn(rel,t.size(),rotation));if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());}
+        b.blocks.removeIf(p->!v.state.contains(p.position()));b.cuts.removeIf(p->!v.state.contains(BlockPos.of(p)));
+        return b;
     }
     /** A small timber cottage: log corners, plank walls with window gaps, flat roof, two beds, door and lights. */
     TownBuilding cottage(BlockPos base){

@@ -155,7 +155,7 @@ def main():
     parser.add_argument('--days', type=float, default=3)
     parser.add_argument('--seeds', default='8675309')
     parser.add_argument('--difficulty', default='normal', help='comma list: peaceful,easy,normal,hard')
-    parser.add_argument('--tick-rate', type=int, default=400)
+    parser.add_argument('--tick-rate', type=int, default=100, help='above ~100 the navigation planning budget (a share of real tick time) shrinks and villagers wait for routes far longer than in real play')
     parser.add_argument('--parallel', type=int, default=1)
     parser.add_argument('--max-real-seconds', type=int, default=3600)
     parser.add_argument('--radius', type=int, default=112)

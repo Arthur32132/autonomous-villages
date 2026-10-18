@@ -62,7 +62,8 @@ final class VillagePlanner {
         var role=small?null:w.role();
         // 1. Unload a heavy backpack.
         // Gathered goods only count once they are in the store, so even a modest load is carried home.
-        if((w.surplusItems()>=16||w.freeSlots()<=4&&w.hasSurplus())&&s.chests()>0&&s.freeSlots()>0)return new DepositJob(w);
+        boolean hauling=Set.of("chop","quarry","shaft","shear").contains(w.lastJob)&&w.surplusItems()>=4;
+        if((hauling||w.surplusItems()>=16||w.freeSlots()<=4&&w.hasSurplus())&&s.chests()>0&&s.freeSlots()>0)return new DepositJob(w);
         // 2. The store itself: a workbench and a chest at the meeting point, more chests when full.
         Job store=storeJob(w,s);if(store!=null)return store;
         // 3. Own tool for the role.
@@ -96,7 +97,9 @@ final class VillagePlanner {
 
     // --- store ----------------------------------------------------------------------------------
     private Job storeJob(Worker w,Snapshot s){
-        boolean noChest=s.chests()==0,full=s.chests()>0&&s.freeSlots()<9&&s.chests()<48;
+        // Chests found in houses are shared too, but the store itself stands in the open by the bell.
+        BlockPos hub=v.meetingPoint();
+        boolean noChest=v.stock.chests().stream().noneMatch(c->c.getBlockPos().distSqr(hub)<=10*10),full=s.chests()>0&&s.freeSlots()<9&&s.chests()<48;
         if(s.table()==null){
             if(w.has(x->x.is(Items.CRAFTING_TABLE))){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.CRAFTING_TABLE.defaultBlockState(),"верстак");}
             if(w.count(VillageCrafting.PLANK)>=4||w.count(VillageCrafting.LOG)>=1||CraftJob.affordable(v,VillageCrafting.TABLE,1,w))return new CraftJob(w,VillageCrafting.TABLE,1);
@@ -172,9 +175,17 @@ final class VillagePlanner {
         if(s.need("bed")>s.bedItems()&&s.woolColour()!=null&&s.wool()>=3&&CraftJob.affordable(v,VillageCrafting.bed(s.woolColour()),1,w))
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
         if(s.need("slab")>v.stock.count(x->x.is(ItemTags.WOODEN_SLABS))&&CraftJob.affordable(v,VillageCrafting.SLAB,2,w))return new CraftJob(w,VillageCrafting.SLAB,2);
+        if(s.need("stairs")>v.stock.count(x->x.is(ItemTags.WOODEN_STAIRS))&&CraftJob.affordable(v,VillageCrafting.STAIRS,2,w))return new CraftJob(w,VillageCrafting.STAIRS,2);
+        if(s.need("fence")>v.stock.count(x->x.is(ItemTags.WOODEN_FENCES))&&CraftJob.affordable(v,VillageCrafting.FENCE,1,w))return new CraftJob(w,VillageCrafting.FENCE,1);
+        if(s.need("chest")>v.stock.count(x->x.is(Items.CHEST))&&CraftJob.affordable(v,VillageCrafting.CHEST,1,w))return new CraftJob(w,VillageCrafting.CHEST,1);
+        if(s.need("crafting_table")>v.stock.count(x->x.is(Items.CRAFTING_TABLE))&&CraftJob.affordable(v,VillageCrafting.TABLE,1,w))return new CraftJob(w,VillageCrafting.TABLE,1);
+        if(s.need("furnace")>v.stock.count(x->x.is(Items.FURNACE))&&CraftJob.affordable(v,VillageCrafting.FURNACE,1,w))return new CraftJob(w,VillageCrafting.FURNACE,1);
         if((s.need("torch")>s.torches()||!s.dark().isEmpty()&&s.torches()<8)&&s.fuel()>0&&CraftJob.affordable(v,VillageCrafting.TORCH,1,w))
             return new CraftJob(w,VillageCrafting.TORCH,Math.min(4,s.fuel()));
         if(s.need("planks")>s.planks()&&s.logs()>=2)return new CraftJob(w,VillageCrafting.PLANKS,Math.min(8,s.logs()));
+        // Fences turn the village lights into lamp posts once wood is plentiful.
+        if(!s.dark().isEmpty()&&s.torches()>0&&s.wood()>=WOOD_RESERVE&&v.stock.count(x->x.is(ItemTags.WOODEN_FENCES))<4&&CraftJob.affordable(v,VillageCrafting.FENCE,2,w))
+            return new CraftJob(w,VillageCrafting.FENCE,2);
         return null;
     }
     /** Furnace work and village supplies that no project asks for yet. */
@@ -221,13 +232,15 @@ final class VillagePlanner {
         if(s.cobble()>=wanted&&!ironWanted)return null;
         if(!w.ready("mine")||!w.hasTool(ItemTags.PICKAXES))return null;
         BlockPos from=w.body().blockPosition();
+        // Cave walls far below are seen by the survey but not reachable on foot: stay near the worker's level.
         Predicate<BlockPos> usable=p->v.ready(p,w.id)&&v.state.policy.allows("mine",p)&&!v.town.protects(p)&&VillageIndex.exposed(v.level,p)
-                &&VillageCrafting.hasPickFor(w.bot(),v.level.getBlockState(p))&&p.distSqr(from)<64*64;
+                &&Math.abs(p.getY()-from.getY())<=8&&VillageCrafting.hasPickFor(w.bot(),v.level.getBlockState(p))&&p.distSqr(from)<64*64;
+        Comparator<BlockPos> near=Comparator.comparingDouble(p->{double dy=p.getY()-from.getY();return p.distSqr(from)+15*dy*dy;});
         var ores=v.index.ore.stream().filter(p->MineKnowledge.iron(v,p)||v.level.getBlockState(p).is(Blocks.COAL_ORE)||v.level.getBlockState(p).is(Blocks.DEEPSLATE_COAL_ORE))
-                .filter(usable).sorted(Comparator.comparingDouble(p->p.distSqr(from))).limit(6).toList();
+                .filter(usable).sorted(near).limit(6).toList();
         if(!ores.isEmpty())return new MineJob(w,ores);
         if(s.cobble()<wanted){
-            var stone=v.index.stone.stream().filter(p->v.level.getBlockState(p).is(Blocks.STONE)).filter(usable).sorted(Comparator.comparingDouble(p->p.distSqr(from))).limit(12).toList();
+            var stone=v.index.stone.stream().filter(p->v.level.getBlockState(p).is(Blocks.STONE)).filter(usable).sorted(near).limit(12).toList();
             if(stone.size()>=4)return new MineJob(w,stone);
         }
         if(helping&&v.activeJobs("shaft")>0)return null;
@@ -285,7 +298,7 @@ final class VillagePlanner {
         lines.add("Склад: сундуков "+s.chests()+", свободно ячеек "+s.freeSlots()+(s.table()==null?", нет верстака":"")+(s.furnace()==null?", нет печи":""));
         lines.add("Запасы: доски "+s.planks()+", брёвна "+s.logs()+", булыжник "+s.cobble()+", хлеб "+s.bread()+", пшеница "+s.wheat()+", шерсть "+s.wool()
                 +", железо "+s.iron()+"+"+s.rawIron()+" руды, уголь "+s.fuel()+", факелы "+s.torches()+", двери "+s.doors()+", кровати "+s.bedItems());
-        if(s.project()!=null)lines.add("Стройка: "+Projects.label(s.project())+" "+v.town.built(s.project())+"/"+s.project().blocks.size()+"; не хватает "+s.missing());
+        if(s.project()!=null)lines.add("Стройка: "+Projects.label(s.project())+" "+v.town.built(s.project())+"/"+v.town.size(s.project())+"; не хватает "+s.missing());
         else lines.add("Стройка: нет активной ("+v.town.stage+")");
         lines.add("Тёмных мест рядом с домами: "+s.dark().size()+(s.dark().isEmpty()?"":", ближайшее "+s.dark().getFirst().toShortString()));
         lines.add("Рост: свободных кроватей "+v.breeding.freeBeds()+(v.breeding.blocker().isEmpty()?", ждут пару":", "+v.breeding.blocker()));

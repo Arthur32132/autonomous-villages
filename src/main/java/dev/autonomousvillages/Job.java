@@ -50,6 +50,21 @@ abstract class Job {
     }
     boolean within(BlockPos p,double reach){return body().getEyePosition().distanceToSqr(Vec3.atCenterOf(p))<=reach*reach;}
 
+    /**
+     * Watchdog for a route: stalled once the body has not come closer to the goal for 300 ticks of
+     * walking. Path search runs on a real-time budget, so at a high tick rate it may take many game
+     * ticks; that time is bounded separately.
+     */
+    final class Progress {
+        double best=Double.MAX_VALUE;long since=Long.MIN_VALUE;int computing;
+        void reset(){best=Double.MAX_VALUE;since=now();computing=0;}
+        boolean stalled(Vec3 goal,NavigationTask nav){
+            if(nav.status()==NavigationStatus.COMPUTING){since=now();return ++computing>2000;}
+            double d=body().position().distanceToSqr(goal);
+            if(d<best-1){best=d;since=now();}
+            return now()-since>300;
+        }
+    }
     /** Walks to a safe standing cell from which a block is in reach; tries other cells after a failed route. */
     final class Approach {
         enum State { ARRIVED, MOVING, FAILED }
@@ -60,11 +75,16 @@ abstract class Job {
         NavigationTask nav;
         BlockPos stand;
         int attempts;
+        final Progress progress=new Progress();
         Approach(BlockPos target,double reach,boolean sight){this.target=target;this.reach=reach;this.sight=sight;}
         boolean arrived(){return within(target,reach)&&(!sight||lineOfSight(target));}
         State tick(){
             if(nav!=null){
-                if(!nav.completion().isDone())return arrived()&&nav.status()!=NavigationStatus.COMPUTING?finishEarly():State.MOVING;
+                if(!nav.completion().isDone()){
+                    if(arrived()&&nav.status()!=NavigationStatus.COMPUTING)return finishEarly();
+                    if(!progress.stalled(v.feetPosition(stand),nav))return State.MOVING;
+                    nav.cancel(); // no closer for a while: treat this stand as unreachable
+                }
                 boolean success=nav.status()==NavigationStatus.SUCCESS;nav=null;
                 if(arrived())return State.ARRIVED;
                 if(stand!=null)rejected.add(stand);
@@ -74,7 +94,7 @@ abstract class Job {
             if(attempts>=6)return State.FAILED;
             stand=v.stand(target,body().position(),reach,sight,rejected);
             if(stand==null)return State.FAILED;
-            attempts++;
+            attempts++;progress.reset();
             nav=bot().navigator().goTo(new NavigationGoal.PositionGoal(v.feetPosition(stand),.35),TRAVEL);
             return State.MOVING;
         }
@@ -88,12 +108,19 @@ abstract class Job {
         final double radius;
         NavigationTask nav;
         int attempts;
-        Walk(Vec3 point,double radius){this.point=point;this.radius=radius;}
+        final Progress progress=new Progress();
+        final NavigationPolicy policy;
+        Walk(Vec3 point,double radius){this(point,radius,TRAVEL);}
+        Walk(Vec3 point,double radius,NavigationPolicy policy){this.point=point;this.radius=radius;this.policy=policy;}
         Approach.State tick(){
             if(body().position().distanceToSqr(point)<=radius*radius){cancel();return Approach.State.ARRIVED;}
-            if(nav!=null&&!nav.completion().isDone())return Approach.State.MOVING;
+            if(nav!=null&&!nav.completion().isDone()){
+                if(!progress.stalled(point,nav))return Approach.State.MOVING;
+                nav.cancel();
+            }
             if(nav!=null&&nav.status()!=NavigationStatus.SUCCESS&&++attempts>=3)return Approach.State.FAILED;
-            nav=bot().navigator().goTo(new NavigationGoal.PositionGoal(point,Math.max(.35,radius*.5)),TRAVEL);
+            progress.reset();
+            nav=bot().navigator().goTo(new NavigationGoal.PositionGoal(point,Math.max(.35,radius*.5)),policy);
             return Approach.State.MOVING;
         }
         void cancel(){if(nav!=null&&!nav.completion().isDone())nav.cancel();nav=null;}

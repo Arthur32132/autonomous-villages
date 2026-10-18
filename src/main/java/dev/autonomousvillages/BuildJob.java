@@ -67,7 +67,7 @@ final class BuildJob extends Job {
         while(!steps.isEmpty()&&(steps.peek().matches(v)||Construction.available(bot(),steps.peek().step())==null||!Construction.clear(v.level.getBlockState(steps.peek().position())))){steps.poll();approach=null;}
         if(steps.isEmpty())return placed>0||fail("материалы не донесены");
         var plan=steps.peek();
-        status="строит: "+Projects.label(project)+" "+v.town.built(project)+"/"+project.blocks.size();
+        status="строит: "+Projects.label(project)+" "+v.town.built(project)+"/"+v.town.size(project);
         if(approach==null)approach=new Approach(plan.position(),4.2,false);
         var state=approach.tick();
         if(state==Approach.State.MOVING)return true;

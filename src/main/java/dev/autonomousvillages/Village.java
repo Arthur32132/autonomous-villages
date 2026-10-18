@@ -280,7 +280,9 @@ final class Village {
     /** The notice board: a sign near the bell, if the village has put one up. */
     BlockPos noticeBoard(){
         long now=level.getGameTime();
-        if(now-boardTick<200&&(board==null||level.getBlockEntity(board) instanceof net.minecraft.world.level.block.entity.SignBlockEntity))return board;
+        // A found board is trusted for a while; "no board" is rechecked soon, a sign may have just been put up.
+        if(board!=null&&now-boardTick<200&&level.getBlockEntity(board) instanceof net.minecraft.world.level.block.entity.SignBlockEntity)return board;
+        if(board==null&&now-boardTick<20)return null;
         boardTick=now;board=null;BlockPos hub=meetingPoint();
         for(BlockPos q:BlockPos.betweenClosed(hub.offset(-6,-2,-6),hub.offset(6,2,6)))
             if(level.getBlockEntity(q) instanceof net.minecraft.world.level.block.entity.SignBlockEntity){board=q.immutable();break;}

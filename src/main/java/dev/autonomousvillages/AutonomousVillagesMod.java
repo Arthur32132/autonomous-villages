@@ -50,6 +50,7 @@ public final class AutonomousVillagesMod implements ModInitializer {
                     if(CONFIG.graves)village.state.graves.add(new VillageState.Grave(name,role,village.level.getGameTime()/24000+1));
                     village.state.residents.remove(entity.getUUID());
                     var worker=village.workers.remove(entity.getUUID());
+                    LOG.info("DEATH {} {}: {}",village.state.name,who,deathContext(village,entity,worker));
                     if(worker!=null&&worker.job!=null)worker.job.stop();
                     village.reservations.release(entity.getUUID());
                     village.residentLost(entity.getUUID());
@@ -92,5 +93,19 @@ public final class AutonomousVillagesMod implements ModInitializer {
                 + "chronicle <имя> [стр] — летопись; storage <имя> <x y z> — сделать сундук общим; private <имя> <x y z>; "
                 + "protect <имя> <wood|mine|build|farm|all> <от> <до>; unprotect <имя> <номер>; expansion <имя> <north|south|east|west|none|all>; "
                 + "pause|resume|release <имя>."), false); return 1;
+    }
+
+    /** Where and how a resident died, for the logs: light, doors nearby, what it was doing. */
+    static String deathContext(Village village,net.minecraft.world.entity.LivingEntity body,Worker worker){
+        var level=village.level;var at=body.blockPosition();
+        var doors=new StringBuilder();
+        for(var q:net.minecraft.core.BlockPos.betweenClosed(at.offset(-6,-2,-6),at.offset(6,2,6))){
+            var s=level.getBlockState(q);
+            if(s.getBlock() instanceof net.minecraft.world.level.block.DoorBlock&&s.getValue(net.minecraft.world.level.block.DoorBlock.HALF)==net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER)
+                doors.append(q.toShortString()).append(s.getValue(net.minecraft.world.level.block.DoorBlock.OPEN)?" open":" closed").append(String.format(" %.1f; ",Math.sqrt(q.distSqr(at))));
+        }
+        return "pos="+at.toShortString()+" blockLight="+level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK,at)+" sky="+level.canSeeSky(at)
+                +" sleeping="+body.isSleeping()+" job="+(worker==null||worker.job==null?"none":worker.job.kind())+" status="+(worker==null?"":worker.status)
+                +" doors=["+doors+"] clock="+Math.floorMod(level.getOverworldClockTime(),24000);
     }
 }

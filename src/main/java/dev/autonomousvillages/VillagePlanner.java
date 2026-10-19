@@ -105,7 +105,7 @@ final class VillagePlanner {
             default->null;
         };
         if(own!=null)return own;
-        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->shear(w,s),()->chop(w,s,true),
+        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->grave(w,s),()->shear(w,s),()->chop(w,s,true),
                 ()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
         if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0&&w.ready("deposit"))return new DepositJob(w);
         return shared;
@@ -264,6 +264,16 @@ final class VillagePlanner {
         if(s.woolColour()!=null&&s.wool()>=3&&w.ready("craft")&&CraftJob.affordable(v,VillageCrafting.bed(s.woolColour()),1,w))
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
         return null;
+    }
+    /** A sign at the cemetery for each resident lost; one craft makes three. */
+    private Job grave(Worker w,Snapshot s){
+        if(!AutonomousVillagesMod.CONFIG.graves||v.state.graves.isEmpty()||v.activeJobs("grave")>0||!w.ready("grave"))return null;
+        BlockPos spot=GraveJob.spot(v);
+        if(spot==null){w.cooldown("grave",2400);return null;}
+        if(v.stock.count(x->x.is(ItemTags.SIGNS))+w.count(x->x.is(ItemTags.SIGNS))>0)return new GraveJob(w,v.state.graves.getFirst(),spot);
+        if(owned(x->x.is(ItemTags.SIGNS))==0&&s.table()!=null&&s.wood()>=12&&!crafting(w,VillageCrafting.SIGN)&&w.ready("craft")
+                &&CraftJob.affordable(v,VillageCrafting.SIGN,1,w))return new CraftJob(w,VillageCrafting.SIGN,1);
+        w.cooldown("grave",1200);return null;
     }
     /** Doors, beds, torches and slabs a project waits for, crafted from store materials. */
     private Job craftForProject(Worker w,Snapshot s){

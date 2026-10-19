@@ -44,7 +44,10 @@ public final class AutonomousVillagesMod implements ModInitializer {
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             if (runtime != null) for (Village village : runtime.villages.values()) {
                 if (village.state.residents.contains(entity.getUUID())) {
-                    String who=village.presentation.personName(entity.getUUID())+", "+village.role(entity.getUUID());
+                    String name=village.presentation.personName(entity.getUUID());
+                    String role=entity.isBaby()?"малыш":village.role(entity.getUUID());
+                    String who=name+", "+role;
+                    if(CONFIG.graves)village.state.graves.add(new VillageState.Grave(name,role,village.level.getGameTime()/24000+1));
                     village.state.residents.remove(entity.getUUID());
                     var worker=village.workers.remove(entity.getUUID());
                     if(worker!=null&&worker.job!=null)worker.job.stop();

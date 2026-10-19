@@ -32,6 +32,8 @@ public final class ModConfig {
     public boolean morningNews=true;
     /** While every bed is taken, a single bed in a home gets a second one beside it. */
     public boolean spareBeds=true;
+    /** A sign with the name of each resident lost, at a cemetery on the edge of the village. */
+    public boolean graves=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

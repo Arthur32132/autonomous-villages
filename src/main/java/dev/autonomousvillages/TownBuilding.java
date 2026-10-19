@@ -11,7 +11,7 @@ import net.minecraft.world.level.block.state.properties.*;
 
 /** Persistent architectural intent. Inventories and building progress remain in the actual world. */
 public final class TownBuilding {
-    static final Set<String> KINDS=Set.of("house","native_house","doors","well","lamp","path","workshop","farm_plot","tower","civic","storehouse","forge","market","tavern","mill","dock");
+    static final Set<String> KINDS=Set.of("house","native_house","doors","well","lamp","path","workshop","farm_plot","tower","civic","storehouse","forge","market","tavern","mill","dock","pen");
     public String kind="house";
     public long origin;
     public boolean completed;

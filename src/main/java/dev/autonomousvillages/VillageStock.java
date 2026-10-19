@@ -53,10 +53,14 @@ final class VillageStock {
         for(int i=0;i<c.getContainerSize();i++){var s=c.getItem(i);if(!s.isEmpty()&&test.test(s))return true;}
         return false;
     }
-    /** Puts items straight into the shared chests; returns what did not fit. */
+    /**
+     * Puts items straight into the shared chests, the ones by the bell first: a chest in a far house
+     * may be one nobody reaches (rc11: a fletcher's sticks sat there and 19 crafts failed fetching them).
+     * Returns what did not fit.
+     */
     ItemStack put(ItemStack stack){
-        var left=stack.copy();
-        for(var c:chests()){
+        var left=stack.copy();BlockPos hub=v.meetingPoint();
+        for(var c:chests().stream().sorted(java.util.Comparator.comparingDouble(c->c.getBlockPos().distSqr(hub))).toList()){
             if(left.isEmpty())break;
             var slots=new ArrayList<ItemStack>(c.getContainerSize());for(int i=0;i<c.getContainerSize();i++)slots.add(c.getItem(i).copy());
             int moved=Supplies.insertPartial(slots,left);

@@ -282,7 +282,7 @@ final class VillagePlanner {
     private Job flowers(Worker w){
         if(!AutonomousVillagesMod.CONFIG.flowers||v.activeJobs("flowers")>0||!w.ready("flowers"))return null;
         w.cooldown("flowers",1200);
-        if(v.stock.count(x->x.is(ItemTags.SMALL_FLOWERS))+w.count(x->x.is(ItemTags.SMALL_FLOWERS))<2)return null;
+        if(v.stock.count(FlowerJob.FLOWER)+w.count(FlowerJob.FLOWER)<2)return null;
         var spots=FlowerJob.spots(v);
         return spots.isEmpty()?null:new FlowerJob(w,spots);
     }

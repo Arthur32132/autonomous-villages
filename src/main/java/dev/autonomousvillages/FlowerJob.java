@@ -4,7 +4,6 @@ import java.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
@@ -15,6 +14,8 @@ import net.minecraft.world.level.block.Blocks;
  */
 final class FlowerJob extends Job {
     static final int PER_HOME=6;
+    /** A flower item: one whose block is a small flower (there is no item tag for them). */
+    static final java.util.function.Predicate<ItemStack> FLOWER=s->s.getItem() instanceof BlockItem b&&b.getBlock().defaultBlockState().is(BlockTags.SMALL_FLOWERS);
     private final ArrayDeque<BlockPos> beds;
     private Fetch fetch;
     private Approach approach;
@@ -22,11 +23,11 @@ final class FlowerJob extends Job {
     FlowerJob(Worker w,List<BlockPos> beds){super(w,"сажает цветы у дома");this.beds=new ArrayDeque<>(beds);}
     @Override String kind(){return "flowers";}
     @Override BlockPos target(){return beds.peek();}
-    @Override boolean keeps(ItemStack s){return s.is(ItemTags.SMALL_FLOWERS);}
+    @Override boolean keeps(ItemStack s){return FLOWER.test(s);}
     @Override boolean tick(){
-        if(!w.has(s->s.is(ItemTags.SMALL_FLOWERS))){
+        if(!w.has(FLOWER)){
             if(planted>0)return finish();
-            if(fetch==null)fetch=new Fetch(List.of(new Need(s->s.is(ItemTags.SMALL_FLOWERS),beds.size(),"цветы")));
+            if(fetch==null)fetch=new Fetch(List.of(new Need(FLOWER,beds.size(),"цветы")));
             var fetched=fetch.tick();
             if(fetched==Approach.State.FAILED)return fail("нет цветов");
             if(fetched==Approach.State.MOVING)return true;
@@ -38,7 +39,7 @@ final class FlowerJob extends Job {
         if(reach==Approach.State.MOVING)return true;
         BlockPos spot=beds.poll();approach=null;
         if(reach==Approach.State.FAILED){v.rejected.put(spot.asLong(),now()+2400);return true;}
-        int slot=Supplies.find(bot(),s->s.is(ItemTags.SMALL_FLOWERS));
+        int slot=Supplies.find(bot(),FLOWER);
         if(slot>=0&&w.bag().get(slot).getItem() instanceof BlockItem flower
                 &&Construction.place(v,bot(),new Construction.Step(spot,flower.getBlock().defaultBlockState(),flower)))planted++;
         return true;

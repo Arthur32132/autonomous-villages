@@ -62,6 +62,9 @@ final class BuildJob extends Job {
             var needs=new LinkedHashMap<String,Need>();
             for(var p:steps)needs.merge(Projects.materialKey(p.block()),new Need(Construction.material(p.step()),Construction.cost(p.step()),Projects.materialKey(p.block())),
                     (a,b)->new Need(a.test(),a.amount()+b.amount(),a.label()));
+            // Plain rubble goes into the walls first: cobblestone also makes the furnace (charcoal,
+            // torches, glass), tools and stone shapes (rc10: a house ate it all and no furnace came).
+            needs.computeIfPresent("cobblestone",(k,n)->v.stock.count(VillageCrafting.RUBBLE)>=n.amount()?new Need(VillageCrafting.RUBBLE,n.amount(),n.label()):n);
             fetch=new Fetch(List.copyOf(needs.values()));
         }
         if(!fetched){

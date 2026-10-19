@@ -43,7 +43,11 @@ final class Construction {
     static Step available(BotHandle b, Step step) {
         var accepts=material(step);
         int cost=cost(step);
-        int slot=Supplies.find(b,s->s.is(step.item())&&b.inventory().count(s.getItem())>=cost);if(slot<0)slot=Supplies.find(b,s->accepts.test(s)&&b.inventory().count(s.getItem())>=cost);
+        int slot=-1;
+        // Rubble before cobblestone in a cobblestone plan: cobblestone is the one stone for furnaces and tools.
+        if(step.state().is(Blocks.COBBLESTONE)||masonry(step.state()))slot=Supplies.find(b,s->VillageCrafting.RUBBLE.test(s)&&accepts.test(s)&&b.inventory().count(s.getItem())>=cost);
+        if(slot<0)slot=Supplies.find(b,s->s.is(step.item())&&b.inventory().count(s.getItem())>=cost);
+        if(slot<0)slot=Supplies.find(b,s->accepts.test(s)&&b.inventory().count(s.getItem())>=cost);
         if(slot<0)return null;
         Item item=b.inventory().snapshot().slots().get(slot).getItem();
         BlockState state=step.state();

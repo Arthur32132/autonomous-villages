@@ -240,7 +240,11 @@ final class VillagePlanner {
         var projects=v.town.unfinished().stream().sorted(Comparator.comparing(b->!b.kind.equals("house"))).toList();
         for(var project:projects){
             var job=new BuildJob(w,project);
-            if(v.town.pendingCuts(project,1).isEmpty()&&job.affordable(1).isEmpty()){v.town.unpaid(project);continue;}
+            boolean payable=!job.affordable(1).isEmpty();
+            if(v.town.pendingCuts(project,1).isEmpty()&&!payable){v.town.unpaid(project);continue;}
+            // With nothing to place, clearing the site is one resident's work: half the village went
+            // there and failed on materials (rc13, seed 1337: 19 residents, sand short).
+            if(!payable&&v.activeJobs("build")>0){v.town.unpaid(project);continue;}
             v.town.paid(project);
             return job;
         }

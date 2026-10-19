@@ -26,6 +26,8 @@ public final class ModConfig {
     public boolean compost=true;
     /** A housed village builds a watchtower by the bell. */
     public boolean watchtower=true;
+    /** A torch in every dark bedroom, so that zombies do not spawn beside the sleepers. */
+    public boolean lightHomes=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

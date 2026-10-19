@@ -42,7 +42,11 @@ final class VillagePlanner {
         var missing=new TreeMap<String,Integer>();
         for(var b:v.town.unfinished())v.town.missing(b).forEach((k,n)->missing.merge(k,n,Integer::sum));
         boolean night=v.level.isDarkOutside()||Math.floorMod(v.level.getOverworldClockTime(),24000)>9000;
-        var dark=v.state.lights.size()<160&&(night||now%1200<600)?Lighting.darkSpots(v,8):List.<BlockPos>of();
+        var dark=new ArrayList<BlockPos>();
+        if(v.state.lights.size()<160&&(night||now%1200<600)){
+            if(AutonomousVillagesMod.CONFIG.lightHomes)dark.addAll(Lighting.darkRooms(v,4));
+            for(var p:Lighting.darkSpots(v,8))if(dark.size()<8)dark.add(p);
+        }
         BlockPos hub=v.meetingPoint();
         // The workbench nearest the bell that a route reaches; none such and the village makes its own by the bell.
         BlockPos table=v.index.tables.stream().filter(p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)&&p.distSqr(hub)<32*32&&v.rejected.getOrDefault(p.asLong(),0L)<=now)

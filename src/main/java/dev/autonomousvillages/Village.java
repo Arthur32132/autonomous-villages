@@ -109,6 +109,7 @@ final class Village {
             finally{if(idle&&mayPlan)runtime.residentDecisionRemainingNanos-=System.nanoTime()-start;}
         }
         rotation++;
+        if(time%5==0)rescueFromPowderSnow();
         presentation.tick();
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){
@@ -118,6 +119,26 @@ final class Village {
             state.lights.removeIf(p->level.hasChunkAt(BlockPos.of(p))&&!level.getBlockState(BlockPos.of(p)).is(net.minecraft.world.level.block.Blocks.TORCH));
             rejected.values().removeIf(expiry->expiry<=time);
             problem=workers.isEmpty()?"нет загруженных взрослых жителей":town.stage;
+        }
+    }
+    /**
+     * A resident (child or adult) sinking in powder snow is dug out at once: the snow at its feet and
+     * head clears and the cell below packs into a snow block, so it stands in a shallow pit and climbs
+     * out instead of freezing to death on the edge of a path.
+     */
+    void rescueFromPowderSnow(){
+        for(UUID id:state.residents){
+            if(!(level.getEntity(id) instanceof Villager v)||!v.isAlive()||!v.isInPowderSnow&&v.getTicksFrozen()==0)continue;
+            BlockPos feet=v.blockPosition();boolean dug=false;
+            for(BlockPos p:List.of(feet,feet.above()))
+                if(level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.POWDER_SNOW)){level.setBlock(p,net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(),3);dug=true;}
+            if(level.getBlockState(feet.below()).is(net.minecraft.world.level.block.Blocks.POWDER_SNOW))
+                {level.setBlock(feet.below(),net.minecraft.world.level.block.Blocks.SNOW_BLOCK.defaultBlockState(),3);dug=true;}
+            if(dug){
+                index.hazards.remove(feet);index.hazards.remove(feet.above());index.hazards.remove(feet.below());
+                level.playSound(null,feet,net.minecraft.sounds.SoundEvents.POWDER_SNOW_BREAK,net.minecraft.sounds.SoundSource.BLOCKS,1f,1f);
+                chronicle.add("rescued",1);
+            }
         }
     }
     void sync(){

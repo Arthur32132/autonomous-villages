@@ -77,7 +77,9 @@ final class VillagePlanner {
         // 4b. Powder snow in the village freezes children and anyone walking home in the dark.
         if(!v.index.hazards.isEmpty()&&v.activeJobs("hazard")==0&&w.ready("hazard")){
             BlockPos from=w.body().blockPosition();
-            var cells=v.index.hazards.stream().filter(p->v.ready(p,w.id)&&v.state.contains(p)).sorted(Comparator.comparingDouble(p->p.distSqr(from))).limit(12).toList();
+            // Drifts along paths and doorways first: that is where people slip in.
+            var cells=v.index.hazards.stream().filter(p->v.ready(p,w.id)&&v.state.contains(p)).sorted(Comparator.comparingDouble(p->p.distSqr(from))).limit(48)
+                    .sorted(Comparator.comparing(p->!besideWalkway(p))).limit(12).toList();
             if(!cells.isEmpty())return new HazardJob(w,cells);
         }
         // 5. The role's own work, then shared priorities.
@@ -135,6 +137,13 @@ final class VillagePlanner {
             if(owned(x->x.is(ItemTags.SIGNS))==0&&s.planks()+s.logs()*4>=12&&CraftJob.affordable(v,VillageCrafting.SIGN,1,w)){w.cooldown("board",600);return new CraftJob(w,VillageCrafting.SIGN,1);}
         }
         return null;
+    }
+    private boolean besideWalkway(BlockPos p){
+        for(Direction d:Direction.Plane.HORIZONTAL)for(int dy=-1;dy<=1;dy++){
+            var s=v.level.getBlockState(p.relative(d).above(dy));
+            if(s.is(Blocks.DIRT_PATH)||s.getBlock() instanceof DoorBlock||s.getBlock() instanceof BedBlock||s.is(Blocks.SNOW_BLOCK))return true;
+        }
+        return false;
     }
     /** One resident puts up the board: nobody else fetches or makes a sign while another carries one. */
     private boolean boardCarried(Worker w){

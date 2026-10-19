@@ -48,7 +48,8 @@ final class VillageIndex {
                 update(soil, p.above(), b.is(Blocks.FARMLAND));
                 update(stone, p, b.is(Blocks.STONE) && exposed(level, p));
                 update(sand,p,b.is(Blocks.SAND)&&exposed(level,p));
-                update(hazards,p,b.is(Blocks.POWDER_SNOW));
+                // Only the top of a powder snow drift is a trap; what lies under it is covered once the top is packed.
+                update(hazards,p,b.is(Blocks.POWDER_SNOW)&&!level.getBlockState(p.above()).is(Blocks.POWDER_SNOW)&&!level.getBlockState(p.above()).isRedstoneConductor(level,p.above()));
                 update(ore, p, oreResource(b) && exposed(level, p));
                 update(tables, p, b.is(Blocks.CRAFTING_TABLE));
                 update(grass, p, b.is(Blocks.SHORT_GRASS) || b.is(Blocks.TALL_GRASS));

@@ -87,7 +87,8 @@ final class PlayerGoods {
                 .append(Component.translatable(item.getDescriptionId()).withStyle(net.minecraft.ChatFormatting.YELLOW))
                 .append(Component.literal(" ×"+given+". Спасибо!").withStyle(net.minecraft.ChatFormatting.YELLOW)));
         v.chronicle.add("donated",given);
-        v.chronicle.event(player.getGameProfile().name()+" принёс на склад "+given+" "+BuiltInRegistries.ITEM.getKey(item).getPath());
+        // Only sizeable gifts go into the chronicle: a handful at a time must not push out its history.
+        if(given>=16)v.chronicle.event(player.getGameProfile().name()+" принёс на склад "+given+" "+BuiltInRegistries.ITEM.getKey(item).getPath());
         if(before<HONOUR&&total>=HONOUR&&v.state.honoured.add(id)){
             for(UUID r:v.state.residents)if(v.level.getEntity(r) instanceof Villager villager)villager.getGossips().add(id,GossipType.MAJOR_POSITIVE,20);
             var honour=certificate(v,player.getGameProfile().name());

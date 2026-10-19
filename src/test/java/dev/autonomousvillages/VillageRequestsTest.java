@@ -24,4 +24,27 @@ class VillageRequestsTest {
         s.request=request(null,4,0);s.compactMetadata();assertNull(s.request);
         assertTrue(new ModConfig().requests);
     }
+
+    @Test void playerRecordsSurviveASaveAndReload(){
+        var s=new VillageState("Дубки",UUID.randomUUID(),BlockPos.ZERO,48);
+        var donor=UUID.randomUUID();
+        s.donations.put(donor,140L);s.donorNames.put(donor,"Mars");s.honoured.add(donor);
+        s.goodsDays.put("tavern",12L);s.fairDay=14;s.nextRequest=5000;s.request=request("planks",20,7);
+        var loaded=VillageRuntime.GSON.fromJson(VillageRuntime.GSON.toJson(s),VillageState.class);
+        loaded.compactMetadata();loaded.validate();
+        assertEquals(140L,loaded.donations.get(donor));
+        assertEquals("Mars",loaded.donorNames.get(donor));
+        assertTrue(loaded.honoured.contains(donor));
+        assertEquals(12L,loaded.goodsDays.get("tavern"));
+        assertEquals(14,loaded.fairDay);assertEquals(5000,loaded.nextRequest);
+        assertEquals("planks",loaded.request.key);assertEquals(13,VillageRequests.left(loaded.request));
+    }
+    @Test void anOldSaveWithoutTheNewFieldsLoads(){
+        var s=new VillageState("Old",UUID.randomUUID(),BlockPos.ZERO,48);
+        var json=VillageRuntime.GSON.toJsonTree(s).getAsJsonObject();
+        for(String f:List.of("donations","donorNames","honoured","goodsDays","fairDay","request","nextRequest"))json.remove(f);
+        var loaded=VillageRuntime.GSON.fromJson(json,VillageState.class);
+        loaded.compactMetadata();loaded.validate();
+        assertTrue(loaded.donations.isEmpty());assertNull(loaded.request);assertEquals(-1,loaded.fairDay);
+    }
 }

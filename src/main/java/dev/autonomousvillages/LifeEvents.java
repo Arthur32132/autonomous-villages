@@ -56,7 +56,7 @@ final class LifeEvents {
         for(int i=0;i<3;i++)music.add(new Note(v.level.getGameTime()+i*30L,v.meetingPoint(),SoundEvents.BELL_BLOCK,1f));
         tune(square,SoundEvents.NOTE_BLOCK_FLUTE.value());
         // The stalls are set out once more for the fair.
-        LandmarkGoods.market(v,market);
+        if(AutonomousVillagesMod.CONFIG.landmarkGoods)LandmarkGoods.market(v,market);
         // A travelling merchant comes for the day, unless one is about already.
         if(v.level.getEntitiesOfClass(WanderingTrader.class,new net.minecraft.world.phys.AABB(square).inflate(48)).isEmpty()){
             int y=v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,square.getX(),square.getZ());
@@ -77,12 +77,10 @@ final class LifeEvents {
     // --- the feast --------------------------------------------------------------------------------
     /** A building finished since the last look is celebrated at the tavern that evening. */
     private void watchCompletions(){
-        var done=v.state.buildings.stream().filter(b->b.completed).toList();
-        if(completed>=0&&done.size()>completed&&!done.isEmpty()){
-            var last=done.getLast();
-            if(!last.kind.equals("tavern"))feastFor=Projects.label(last);
-        }
-        completed=done.size();
+        int done=0;TownBuilding last=null;
+        for(var b:v.state.buildings)if(b.completed){done++;last=b;}
+        if(completed>=0&&done>completed&&last!=null&&!last.kind.equals("tavern"))feastFor=Projects.label(last);
+        completed=done;
     }
     private void feast(){
         String reason=feastFor;feastFor=null;

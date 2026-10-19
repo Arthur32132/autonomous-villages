@@ -22,21 +22,28 @@ final class VillageRequests {
 
     /** Every ten seconds: drop a request the build no longer needs, post a new one when there is none. */
     static void tick(Village v){
-        if(!AutonomousVillagesMod.CONFIG.requests)return;
+        // Switched off: an open request is withdrawn, so the board and the ledger stop showing it.
+        if(!AutonomousVillagesMod.CONFIG.requests){v.state.request=null;return;}
         var request=v.state.request;
         var project=v.town.active();
         var missing=project==null?Map.<String,Integer>of():v.town.missing(project);
         if(request!=null){
-            if(!missing.containsKey(request.key)){v.state.request=null;v.state.nextRequest=v.level.getGameTime()+2400;v.chronicle.event("Заказ снят: "+label(request.key)+" уже не нужен");}
+            if(!missing.containsKey(request.key)){v.state.request=null;v.state.nextRequest=v.level.getGameTime()+2400;}
             return;
         }
-        if(project==null||v.level.getGameTime()<v.state.nextRequest)return;
+        // Requests are for players: none is posted (or kept in the chronicle) while nobody is about.
+        if(project==null||v.level.getGameTime()<v.state.nextRequest||!playerNear(v))return;
         String best=null;int short_=0;
         for(var e:missing.entrySet()){int lacking=e.getValue()-stored(v,e.getKey());if(lacking>short_){short_=lacking;best=e.getKey();}}
         if(best==null)return;
         var r=new VillageState.Request();r.key=best;r.amount=Math.min(MAX_AMOUNT,short_);r.posted=v.level.getGameTime();
         v.state.request=r;
         v.chronicle.announce("Заказ на доске у колокола: "+label(best)+" ×"+r.amount+". Принеси жителю (присев) — деревня отблагодарит.");
+    }
+    static boolean playerNear(Village v){
+        var area=VillageDiscovery.area(v.state,64);
+        for(var player:v.runtime.server.getPlayerList().getPlayers())if(player.level()==v.level&&!player.isSpectator()&&area.contains(player.position()))return true;
+        return false;
     }
     static String label(String key){return VillagePresentation.NEEDS.getOrDefault(key,key.replace("minecraft:",""));}
     /** The request key an item answers, or null for an item that is not a building block. */

@@ -307,7 +307,9 @@ final class Projects {
             var rotation=Blueprints.facing(design.front(),toHub);
             var footprint=Blueprints.footprint(design.size(),rotation);
             BlockPos base=siteAt(cx-footprint.getX()/2,cz-footprint.getZ()/2,footprint.getX(),footprint.getZ());
-            if(base!=null)return fromTemplate(design,base,rotation);
+            if(base==null)continue;
+            var house=fromTemplate(design,base,rotation);
+            if(doorwayOpen(house))return house;
         }
         return null;
     }
@@ -327,6 +329,34 @@ final class Projects {
         for(BlockPos rel:t.clear()){BlockPos p=base.offset(Blueprints.turn(rel,t.size(),rotation));if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());}
         b.blocks.removeIf(p->!v.state.contains(p.position()));b.cuts.removeIf(p->!v.state.contains(BlockPos.of(p)));
         return b;
+    }
+    /**
+     * The front door opens onto two walkable cells outside the house, at the door's level or a step
+     * up or down. A door facing a lamp post or a well traps whoever stands in the doorway.
+     */
+    boolean doorwayOpen(TownBuilding b){
+        var footprint=new HashSet<Long>();for(var p:b.blocks)footprint.add(BlockPos.asLong(p.position().getX(),0,p.position().getZ()));
+        boolean anyDoor=false;
+        for(var plan:b.blocks){
+            if(!(plan.block().getBlock() instanceof DoorBlock))continue;
+            anyDoor=true;BlockPos door=plan.position();
+            for(Direction d:Direction.Plane.HORIZONTAL){
+                BlockPos out=door.relative(d);
+                if(footprint.contains(BlockPos.asLong(out.getX(),0,out.getZ())))continue;
+                if(walkable(out)&&walkable(out.relative(d)))return true;
+            }
+        }
+        return !anyDoor;
+    }
+    private boolean walkable(BlockPos feet){
+        for(int dy:new int[]{0,1,-1}){
+            BlockPos f=feet.above(dy);
+            if(!v.level.hasChunkAt(f)||protects(f)||protects(f.above()))continue;
+            var at=v.level.getBlockState(f);var head=v.level.getBlockState(f.above());var ground=v.level.getBlockState(f.below());
+            if(at.getCollisionShape(v.level,f).isEmpty()&&at.getFluidState().isEmpty()&&head.getCollisionShape(v.level,f.above()).isEmpty()
+                    &&!ground.getCollisionShape(v.level,f.below()).isEmpty()&&!VillageIndex.hazard(ground))return true;
+        }
+        return false;
     }
     /**
      * Ground cells from the door of a building toward the bell: grass and dirt on the way become a

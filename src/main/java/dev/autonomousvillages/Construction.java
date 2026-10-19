@@ -29,9 +29,9 @@ final class Construction {
         if(step.state().is(BlockTags.WOODEN_FENCES))return actual.is(BlockTags.WOODEN_FENCES);
         if(step.state().is(BlockTags.LOGS))return actual.is(BlockTags.LOGS);
         if((step.state().is(Blocks.COBBLESTONE)||masonry(step.state()))&&rubble(actual))return true;
-        if(stoneStairs(step.state())&&actual.is(Blocks.COBBLESTONE_STAIRS))return true;
-        if(stoneSlab(step.state())&&actual.is(Blocks.COBBLESTONE_SLAB))return true;
-        if(step.state().is(BlockTags.WALLS)&&actual.is(Blocks.COBBLESTONE_WALL))return true;
+        if(stoneStairs(step.state())&&(actual.is(Blocks.COBBLESTONE_STAIRS)||actual.is(Blocks.SANDSTONE_STAIRS)))return true;
+        if(stoneSlab(step.state())&&(actual.is(Blocks.COBBLESTONE_SLAB)||actual.is(Blocks.SANDSTONE_SLAB)))return true;
+        if(step.state().is(BlockTags.WALLS)&&(actual.is(Blocks.COBBLESTONE_WALL)||actual.is(Blocks.SANDSTONE_WALL)))return true;
         if(step.state().is(BlockTags.WOODEN_TRAPDOORS))return actual.is(BlockTags.WOODEN_TRAPDOORS);
         if(step.state().is(BlockTags.WOODEN_PRESSURE_PLATES))return actual.is(BlockTags.WOODEN_PRESSURE_PLATES);
         if(step.state().is(BlockTags.WOODEN_BUTTONS))return actual.is(BlockTags.WOODEN_BUTTONS);
@@ -66,9 +66,9 @@ final class Construction {
                 :step.state().is(BlockTags.WOODEN_FENCES)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_FENCES)
                 :step.state().is(BlockTags.LOGS)?s->s.is(net.minecraft.tags.ItemTags.LOGS)
                 :step.state().is(Blocks.COBBLESTONE)||masonry(step.state())?s->s.is(step.item())||VillageCrafting.COBBLE.test(s)||VillageCrafting.RUBBLE.test(s)
-                :stoneStairs(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE_STAIRS)
-                :stoneSlab(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE_SLAB)
-                :step.state().is(BlockTags.WALLS)?s->s.is(step.item())||s.is(Items.COBBLESTONE_WALL)
+                :stoneStairs(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE_STAIRS)||s.is(Items.SANDSTONE_STAIRS)
+                :stoneSlab(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE_SLAB)||s.is(Items.SANDSTONE_SLAB)
+                :step.state().is(BlockTags.WALLS)?s->s.is(step.item())||s.is(Items.COBBLESTONE_WALL)||s.is(Items.SANDSTONE_WALL)
                 :step.state().is(BlockTags.WOODEN_TRAPDOORS)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_TRAPDOORS)
                 :step.state().is(BlockTags.WOODEN_PRESSURE_PLATES)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_PRESSURE_PLATES)
                 :step.state().is(BlockTags.WOODEN_BUTTONS)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_BUTTONS)
@@ -82,7 +82,8 @@ final class Construction {
             ||s.is(Blocks.RED_SANDSTONE)||s.is(Blocks.CUT_RED_SANDSTONE)||s.is(Blocks.SMOOTH_RED_SANDSTONE)||s.is(Blocks.SNOW_BLOCK);}
     /** Any plain stone a cobblestone plan accepts: mixed rubble makes a rustic foundation. */
     static boolean rubble(BlockState s){return s.is(Blocks.COBBLESTONE)||s.is(Blocks.COBBLED_DEEPSLATE)||s.is(Blocks.BLACKSTONE)||s.is(Blocks.ANDESITE)
-            ||s.is(Blocks.DIORITE)||s.is(Blocks.GRANITE)||s.is(Blocks.TUFF)||s.is(Blocks.STONE)||s.is(Blocks.MOSSY_COBBLESTONE)||s.is(Blocks.DEEPSLATE);}
+            ||s.is(Blocks.DIORITE)||s.is(Blocks.GRANITE)||s.is(Blocks.TUFF)||s.is(Blocks.STONE)||s.is(Blocks.MOSSY_COBBLESTONE)||s.is(Blocks.DEEPSLATE)
+            ||s.is(Blocks.SANDSTONE)||s.is(Blocks.RED_SANDSTONE)||s.is(Blocks.SMOOTH_SANDSTONE)||s.is(Blocks.CUT_SANDSTONE);}
     static boolean stoneStairs(BlockState s){return s.is(BlockTags.STAIRS)&&!s.is(BlockTags.WOODEN_STAIRS);}
     static boolean stoneSlab(BlockState s){return s.is(BlockTags.SLABS)&&!s.is(BlockTags.WOODEN_SLABS);}
     @SuppressWarnings({"rawtypes","unchecked"})

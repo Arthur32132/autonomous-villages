@@ -247,9 +247,24 @@ final class VillagePlanner {
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
         if(s.need("slab")>owned(x->x.is(ItemTags.WOODEN_SLABS))&&!crafting(w,VillageCrafting.SLAB)&&CraftJob.affordable(v,VillageCrafting.SLAB,2,w))return new CraftJob(w,VillageCrafting.SLAB,2);
         if(s.need("stairs")>owned(x->x.is(ItemTags.WOODEN_STAIRS))&&!crafting(w,VillageCrafting.STAIRS)&&CraftJob.affordable(v,VillageCrafting.STAIRS,2,w))return new CraftJob(w,VillageCrafting.STAIRS,2);
-        if(s.need("stone_stairs")>owned(x->x.is(Items.COBBLESTONE_STAIRS))&&!crafting(w,VillageCrafting.COBBLE_STAIRS)&&CraftJob.affordable(v,VillageCrafting.COBBLE_STAIRS,2,w))return new CraftJob(w,VillageCrafting.COBBLE_STAIRS,2);
-        if(s.need("stone_slab")>owned(x->x.is(Items.COBBLESTONE_SLAB))&&!crafting(w,VillageCrafting.COBBLE_SLAB)&&CraftJob.affordable(v,VillageCrafting.COBBLE_SLAB,2,w))return new CraftJob(w,VillageCrafting.COBBLE_SLAB,2);
-        if(s.need("stone_wall")>owned(x->x.is(Items.COBBLESTONE_WALL))&&!crafting(w,VillageCrafting.COBBLE_WALL)&&CraftJob.affordable(v,VillageCrafting.COBBLE_WALL,1,w))return new CraftJob(w,VillageCrafting.COBBLE_WALL,1);
+        // Stone shapes from cobblestone, or from sandstone where the village builds from sand.
+        if(s.need("stone_stairs")>owned(x->x.is(Items.COBBLESTONE_STAIRS)||x.is(Items.SANDSTONE_STAIRS))){
+            if(!crafting(w,VillageCrafting.COBBLE_STAIRS)&&CraftJob.affordable(v,VillageCrafting.COBBLE_STAIRS,2,w))return new CraftJob(w,VillageCrafting.COBBLE_STAIRS,2);
+            if(!crafting(w,VillageCrafting.SANDSTONE_STAIRS)&&CraftJob.affordable(v,VillageCrafting.SANDSTONE_STAIRS,2,w))return new CraftJob(w,VillageCrafting.SANDSTONE_STAIRS,2);
+        }
+        if(s.need("stone_slab")>owned(x->x.is(Items.COBBLESTONE_SLAB)||x.is(Items.SANDSTONE_SLAB))){
+            if(!crafting(w,VillageCrafting.COBBLE_SLAB)&&CraftJob.affordable(v,VillageCrafting.COBBLE_SLAB,2,w))return new CraftJob(w,VillageCrafting.COBBLE_SLAB,2);
+            if(!crafting(w,VillageCrafting.SANDSTONE_SLAB)&&CraftJob.affordable(v,VillageCrafting.SANDSTONE_SLAB,2,w))return new CraftJob(w,VillageCrafting.SANDSTONE_SLAB,2);
+        }
+        if(s.need("stone_wall")>owned(x->x.is(Items.COBBLESTONE_WALL)||x.is(Items.SANDSTONE_WALL))){
+            if(!crafting(w,VillageCrafting.COBBLE_WALL)&&CraftJob.affordable(v,VillageCrafting.COBBLE_WALL,1,w))return new CraftJob(w,VillageCrafting.COBBLE_WALL,1);
+            if(!crafting(w,VillageCrafting.SANDSTONE_WALL)&&CraftJob.affordable(v,VillageCrafting.SANDSTONE_WALL,1,w))return new CraftJob(w,VillageCrafting.SANDSTONE_WALL,1);
+        }
+        // Sand into sandstone while the stone the plan wants is short.
+        if(stoneShort(s)>0&&!crafting(w,VillageCrafting.SANDSTONE_BLOCK)){
+            int sand=v.stock.count(VillageCrafting.PLAIN_SAND)+w.count(VillageCrafting.PLAIN_SAND);
+            if(sand>=4)return new CraftJob(w,VillageCrafting.SANDSTONE_BLOCK,Math.min(8,sand/4));
+        }
         if(s.need("trapdoor")>owned(x->x.is(ItemTags.WOODEN_TRAPDOORS))&&!crafting(w,VillageCrafting.TRAPDOOR)&&CraftJob.affordable(v,VillageCrafting.TRAPDOOR,1,w))return new CraftJob(w,VillageCrafting.TRAPDOOR,1);
         if(s.need("ladder")>owned(x->x.is(Items.LADDER))&&!crafting(w,VillageCrafting.LADDER)&&CraftJob.affordable(v,VillageCrafting.LADDER,1,w))return new CraftJob(w,VillageCrafting.LADDER,1);
         if(s.need("glass_pane")>owned(x->x.is(Items.GLASS_PANE))&&!crafting(w,VillageCrafting.GLASS_PANE)&&CraftJob.affordable(v,VillageCrafting.GLASS_PANE,1,w))return new CraftJob(w,VillageCrafting.GLASS_PANE,1);
@@ -360,11 +375,26 @@ final class VillagePlanner {
         return new MineJob(w,entrance);
     }
     /** Sand for window glass, dug by hand. */
+    /**
+     * Stone blocks the projects still lack, counted in cobblestone: rubble and sandstone fill
+     * plain blocks, shapes take stone too (6 make 4 stairs, 3 make 6 slabs, 6 make 6 walls).
+     */
+    private int stoneShort(Snapshot s){
+        return s.need("cobblestone")+(s.need("stone_stairs")*3+1)/2+(s.need("stone_slab")+1)/2+s.need("stone_wall")-s.cobble()-s.rubble();
+    }
     private Job sand(Worker w,Snapshot s){
-        if(!w.ready("mine")||s.need("glass_pane")<=owned(x->x.is(Items.GLASS_PANE))||owned(VillageCrafting.GLASS)+owned(VillageCrafting.SAND)>=6)return null;
-        BlockPos from=w.body().blockPosition();
-        var sand=v.index.sand.stream().filter(p->v.level.getBlockState(p).is(Blocks.SAND)||v.level.getBlockState(p).is(Blocks.RED_SAND))
+        boolean glass=s.need("glass_pane")>owned(x->x.is(Items.GLASS_PANE))&&owned(VillageCrafting.GLASS)+owned(VillageCrafting.SAND)<6;
+        // Without a pickaxe (no wood in a desert) the village builds from sand turned into sandstone.
+        int short_=stoneShort(s);
+        boolean sandstone=short_>0&&!w.hasTool(ItemTags.PICKAXES)&&owned(VillageCrafting.PLAIN_SAND)<Math.min(64,4*short_);
+        if(!w.ready("mine")||!glass&&!sandstone)return null;
+        BlockPos from=w.body().blockPosition(),hub=v.meetingPoint();
+        // Sand for sandstone comes in bulk: a shallow pit away from homes and the bell, never a deep hole.
+        Predicate<BlockPos> quarry=p->glass||p.getY()>=v.state.y-1&&p.distSqr(hub)>=12*12&&v.index.beds.stream().noneMatch(b->b.distSqr(p)<6*6)
+                &&v.town.doors().stream().noneMatch(d->d.distSqr(p)<6*6)&&!v.town.protects(p.above());
+        var sand=v.index.sand.stream().filter(p->v.level.getBlockState(p).is(Blocks.SAND)||v.level.getBlockState(p).is(Blocks.RED_SAND)&&glass)
                 .filter(p->v.ready(p,w.id)&&v.state.policy.allows("mine",p)&&!v.town.protects(p)&&Math.abs(p.getY()-from.getY())<=8&&p.distSqr(from)<64*64)
+                .filter(quarry)
                 .sorted(Comparator.comparingDouble(p->{double dy=p.getY()-from.getY();return p.distSqr(from)+15*dy*dy;})).limit(8).toList();
         return sand.size()>=2?new MineJob(w,sand):null;
     }

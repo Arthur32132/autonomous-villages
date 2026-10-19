@@ -23,7 +23,7 @@ final class VillageCrafting {
     static final Predicate<ItemStack> COBBLE=s->s.is(ItemTags.STONE_TOOL_MATERIALS);
     /** Stone the mine brings up besides cobblestone; it builds foundations and walls just as well. */
     static final Predicate<ItemStack> RUBBLE=s->s.is(Items.ANDESITE)||s.is(Items.DIORITE)||s.is(Items.GRANITE)||s.is(Items.TUFF)||s.is(Items.STONE)
-            ||s.is(Items.MOSSY_COBBLESTONE)||s.is(Items.DEEPSLATE);
+            ||s.is(Items.MOSSY_COBBLESTONE)||s.is(Items.DEEPSLATE)||s.is(Items.SANDSTONE)||s.is(Items.RED_SANDSTONE)||s.is(Items.SMOOTH_SANDSTONE)||s.is(Items.CUT_SANDSTONE);
     static final Predicate<ItemStack> IRON=s->s.is(Items.IRON_INGOT);
     static final Predicate<ItemStack> FUEL=s->s.is(Items.COAL)||s.is(Items.CHARCOAL);
     static final Predicate<ItemStack> WHEAT=s->s.is(Items.WHEAT);
@@ -62,6 +62,13 @@ final class VillageCrafting {
     static final Recipe COBBLE_WALL=new Recipe("cobblestone_wall",new String[]{"MMM","MMM"},COBBLESTONE,s->s.is(Items.COBBLESTONE_WALL),"каменная ограда");
     static final Recipe TRAPDOOR=new Recipe("trapdoor",new String[]{"PPP","PPP"},PLANK,s->s.is(ItemTags.WOODEN_TRAPDOORS),"ставни");
     static final Recipe LADDER=new Recipe("ladder",new String[]{"S S","SSS","S S"},STICK,s->s.is(Items.LADDER),"лестница");
+    /** A desert village without wood for a pickaxe builds from sand: four make a block of sandstone, by hand. */
+    static final Predicate<ItemStack> PLAIN_SAND=s->s.is(Items.SAND);
+    static final Predicate<ItemStack> SANDSTONE=s->s.is(Items.SANDSTONE);
+    static final Recipe SANDSTONE_BLOCK=new Recipe("sandstone",new String[]{"MM","MM"},PLAIN_SAND,SANDSTONE,"песчаник");
+    static final Recipe SANDSTONE_STAIRS=new Recipe("sandstone_stairs",new String[]{"M  ","MM ","MMM"},SANDSTONE,s->s.is(Items.SANDSTONE_STAIRS),"ступени из песчаника");
+    static final Recipe SANDSTONE_SLAB=new Recipe("sandstone_slab",new String[]{"MMM"},SANDSTONE,s->s.is(Items.SANDSTONE_SLAB),"плиты из песчаника");
+    static final Recipe SANDSTONE_WALL=new Recipe("sandstone_wall",new String[]{"MMM","MMM"},SANDSTONE,s->s.is(Items.SANDSTONE_WALL),"ограда из песчаника");
     static final Recipe GLASS_PANE=new Recipe("glass_pane",new String[]{"MMM","MMM"},GLASS,s->s.is(Items.GLASS_PANE),"оконное стекло");
     static Recipe tool(String family,String tier){
         Predicate<ItemStack> material=switch(tier){case "stone"->COBBLE;case "iron"->IRON;default->PLANK;};

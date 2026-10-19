@@ -273,7 +273,9 @@ final class Projects {
             if(protects(p)||s.getBlock() instanceof BedBlock||s.is(Blocks.FARMLAND)||s.getBlock() instanceof CropBlock||!s.getFluidState().isEmpty()
                     ||s.is(BlockTags.LOGS)||s.getBlock() instanceof net.minecraft.world.level.block.ChestBlock||!v.state.policy.allows("build",p))return null;
             boolean inside=dx>=0&&dx<width&&dz>=0&&dz<depth;
-            if(inside&&!Construction.clear(s)&&!removable(s))return null;
+            // Above ground the cells must be clearable; in the ground layer a foreign block (a cobblestone
+            // street tile) simply stays as a tile of the floor.
+            if(inside&&dy>=1&&!Construction.clear(s)&&!removable(s))return null;
             if(inside&&dy==0&&s.isAir()&&!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP))return null;
         }
         if(v.state.buildings.stream().filter(b->b.kind.equals("house")||b.kind.equals("native_house")).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;

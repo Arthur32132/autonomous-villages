@@ -48,7 +48,7 @@ final class VillagePlanner {
         if(v.state.lights.size()<160&&(night||now%1200<600)){
             if(AutonomousVillagesMod.CONFIG.lightHomes){
                 // Rooms are scanned block by block, so only every ten seconds; the list is checked again before each torch.
-                if(now-roomsScanned>=200){rooms=Lighting.darkRooms(v,4);roomsScanned=now;}
+                if(now-roomsScanned>=200){rooms=new ArrayList<>(Lighting.darkDoorsteps(v,4));rooms.addAll(Lighting.darkRooms(v,4));roomsScanned=now;}
                 for(var p:rooms)if(Lighting.needsLight(v,p)&&!Lighting.unreachable(v,p))dark.add(p);
             }
             for(var p:Lighting.darkSpots(v,8))if(dark.size()<8)dark.add(p);

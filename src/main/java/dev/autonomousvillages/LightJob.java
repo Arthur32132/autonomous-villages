@@ -41,8 +41,8 @@ final class LightJob extends Job {
         if(state==Approach.State.ARRIVED){
             int fence=Supplies.find(bot(),s->s.is(net.minecraft.tags.ItemTags.WOODEN_FENCES));
             BlockPos torch=spot;
-            // A lamp post outside; indoors the torch stands on the floor.
-            if(fence>=0&&!Lighting.indoors(v,spot)&&Construction.clear(v.level.getBlockState(spot.above()))&&v.state.contains(spot.above())
+            // A lamp post outside; indoors and by a door the torch stands on the ground.
+            if(fence>=0&&!Lighting.indoors(v,spot)&&!Lighting.byDoor(v,spot)&&Construction.clear(v.level.getBlockState(spot.above()))&&v.state.contains(spot.above())
                     &&bot().inventory().snapshot().slots().get(fence).getItem() instanceof net.minecraft.world.item.BlockItem post
                     &&Construction.place(v,bot(),new Construction.Step(spot,post.getBlock().defaultBlockState(),post)))torch=spot.above();
             if(Construction.place(v,bot(),new Construction.Step(torch,Blocks.TORCH.defaultBlockState(),Items.TORCH))){

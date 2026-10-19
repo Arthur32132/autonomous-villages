@@ -49,7 +49,35 @@ final class Lighting {
         }
         return out;
     }
+    /**
+     * The ground beside every door, on both sides: residents come home there at dusk, and a porch roof
+     * keeps it dark while the heightmap grid only sees the roof (seed 8675309: deaths at one doorstep
+     * under an awning in nearly every version). The torch goes beside the step, not on it.
+     */
+    static List<BlockPos> darkDoorsteps(Village v,int limit){
+        var out=new ArrayList<BlockPos>();
+        for(BlockPos door:v.town.doors()){
+            if(out.size()>=limit)break;
+            var state=v.level.getBlockState(door);
+            if(!v.level.hasChunkAt(door)||!(state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock))continue;
+            Direction facing=state.getValue(net.minecraft.world.level.block.DoorBlock.FACING);
+            for(Direction side:new Direction[]{facing,facing.getOpposite()}){
+                BlockPos step=door.relative(side);
+                for(Direction d:new Direction[]{side.getClockWise(),side.getCounterClockWise()}){
+                    BlockPos p=step.relative(d);
+                    if(needsLight(v,p)&&!unreachable(v,p)&&!besideBed(v,p)&&!out.contains(p)){out.add(p);break;}
+                }
+            }
+        }
+        return out.size()>limit?out.subList(0,limit):out;
+    }
     static boolean indoors(Village v,BlockPos p){return !v.level.canSeeSky(p);}
+    /** No lamp post right by a door: a fence there narrows the way in. */
+    static boolean byDoor(Village v,BlockPos p){
+        for(BlockPos q:BlockPos.betweenClosed(p.offset(-1,0,-1),p.offset(1,1,1)))
+            if(v.level.getBlockState(q).getBlock() instanceof net.minecraft.world.level.block.DoorBlock)return true;
+        return false;
+    }
     /** The floor beside a bed stays free for a second bed and for whoever gets up. */
     private static boolean besideBed(Village v,BlockPos p){
         for(var d:Direction.Plane.HORIZONTAL)if(v.level.getBlockState(p.relative(d)).getBlock() instanceof net.minecraft.world.level.block.BedBlock)return true;

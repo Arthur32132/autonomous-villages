@@ -52,7 +52,7 @@ final class VillagePresentation {
         }
         return NAMES[Math.floorMod(id.getLeastSignificantBits()^id.getMostSignificantBits(),NAMES.length)];
     }
-    private static final Map<String,String> NEEDS=Map.ofEntries(Map.entry("planks","доски"),Map.entry("logs","брёвна"),Map.entry("cobblestone","булыжник"),
+    static final Map<String,String> NEEDS=Map.ofEntries(Map.entry("planks","доски"),Map.entry("logs","брёвна"),Map.entry("cobblestone","булыжник"),
             Map.entry("stairs","ступени"),Map.entry("slab","плиты"),Map.entry("door","двери"),Map.entry("bed","кровати"),Map.entry("torch","факелы"),
             Map.entry("fence","заборы"),Map.entry("chest","сундук"),Map.entry("crafting_table","верстак"),Map.entry("furnace","печь"));
     private String boardText="";
@@ -62,7 +62,8 @@ final class VillagePresentation {
         if(p==null||!(v.level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign))return;
         var project=v.town.active();
         var lines=new ArrayList<String>();
-        if(project==null)lines.add("всё построено");
+        if(v.state.request!=null&&AutonomousVillagesMod.CONFIG.requests)lines.addAll(VillageRequests.board(v.state.request));
+        else if(project==null)lines.add("всё построено");
         else{
             lines.add("нужно на стройку:");
             v.town.missing(project).entrySet().stream().sorted(Map.Entry.<String,Integer>comparingByValue().reversed()).limit(2)

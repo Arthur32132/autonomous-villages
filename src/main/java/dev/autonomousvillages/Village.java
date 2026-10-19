@@ -58,6 +58,8 @@ final class Village {
     final VillagePlanner planner;
     final Breeding breeding;
     final VillagePresentation presentation;
+    final Ambience ambience;
+    final LifeEvents lifeEvents;
     boolean ticketed;
     String problem="осмотр территории";
     private int rotation;
@@ -75,7 +77,7 @@ final class Village {
 
     Village(VillageRuntime runtime,VillageState state){
         this.runtime=runtime;this.state=state;this.level=runtime.server.overworld();
-        this.town=new Projects(this);this.planner=new VillagePlanner(this);this.breeding=new Breeding(this);this.presentation=new VillagePresentation(this);
+        this.town=new Projects(this);this.planner=new VillagePlanner(this);this.breeding=new Breeding(this);this.presentation=new VillagePresentation(this);this.ambience=new Ambience(this);this.lifeEvents=new LifeEvents(this);
     }
 
     // --- chunk loading ------------------------------------------------------------------------
@@ -142,13 +144,18 @@ final class Village {
         if(time%20==3)dayBells(time);
         if(time%600==311&&AutonomousVillagesMod.CONFIG.nameplates)NameplateJob.refresh(this);
         presentation.tick();
+        ambience.tick(time);
+        if(time%200==77)LandmarkGoods.tick(this);
+        if(time%200==137)VillageRequests.tick(this);
+        lifeEvents.tick(time);
         if(time%10==4)clearDoorways();
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){
             state.plantedTrees.removeIf(p->{var pos=BlockPos.of(p);return level.hasChunkAt(pos)&&!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.SaplingBlock)
                     &&!level.getBlockState(pos).is(net.minecraft.tags.BlockTags.LOGS)&&!state.fellingTrees.contains(p);});
             state.furnaces.removeIf(p->level.hasChunkAt(BlockPos.of(p))&&!(level.getBlockEntity(BlockPos.of(p)) instanceof net.minecraft.world.level.block.entity.FurnaceBlockEntity));
-            state.lights.removeIf(p->level.hasChunkAt(BlockPos.of(p))&&!level.getBlockState(BlockPos.of(p)).is(net.minecraft.world.level.block.Blocks.TORCH));
+            state.lights.removeIf(p->level.hasChunkAt(BlockPos.of(p))&&!level.getBlockState(BlockPos.of(p)).is(net.minecraft.world.level.block.Blocks.TORCH)
+                    &&!level.getBlockState(BlockPos.of(p)).is(net.minecraft.world.level.block.Blocks.LANTERN));
             rejected.values().removeIf(expiry->expiry<=time);
             problem=workers.isEmpty()?"нет загруженных взрослых жителей":town.stage;
         }
@@ -299,6 +306,16 @@ final class Village {
                     e->e.isAlive()&&!e.isSleeping()&&e.getDeltaMovement().horizontalDistanceSqr()>1.0E-4
                             &&(e instanceof Villager||e instanceof net.minecraft.world.entity.player.Player)).isEmpty())continue;
             door.setOpen(null,level,s,p,false);
+        }
+        // Gates of the palisade likewise: residents open them on their way and nobody shuts them.
+        for(BlockPos p:town.gates()){
+            if(!level.hasChunkAt(p))continue;
+            var s=level.getBlockState(p);
+            if(!(s.getBlock() instanceof net.minecraft.world.level.block.FenceGateBlock)||!s.getValue(net.minecraft.world.level.block.FenceGateBlock.OPEN))continue;
+            if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new AABB(p).inflate(2.5),
+                    e->e.isAlive()&&(e instanceof Villager||e instanceof net.minecraft.world.entity.player.Player)).isEmpty())continue;
+            level.setBlock(p,s.setValue(net.minecraft.world.level.block.FenceGateBlock.OPEN,false),10);
+            level.playSound(null,p,net.minecraft.sounds.SoundEvents.FENCE_GATE_CLOSE,net.minecraft.sounds.SoundSource.BLOCKS,.6f,1f);
         }
     }
 

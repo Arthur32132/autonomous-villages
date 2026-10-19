@@ -85,12 +85,12 @@ final class CraftJob extends Job {
             fetched=true;
         }
         if(recipe.needsTable()&&v.index.tables.stream().noneMatch(p->VillageCrafting.nearTable(bot(),v,p))){
-            BlockPos nearest=v.index.tables.stream().filter(p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE))
+            BlockPos nearest=v.index.tables.stream().filter(p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)&&reachable(p))
                     .min(Comparator.comparingDouble(p->p.distSqr(body().blockPosition()))).orElse(null);
             if(nearest==null)return fail("нет верстака");
             if(table==null||!table.target.equals(nearest))table=new Approach(nearest,3.5,true);
             var state=table.tick();
-            if(state==Approach.State.FAILED)return fail("верстак недоступен");
+            if(state==Approach.State.FAILED){unreachable(table.target);return fail("верстак недоступен");}
             if(state==Approach.State.MOVING)return true;
         }
         status="изготавливает: "+recipe.label();

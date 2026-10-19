@@ -44,7 +44,9 @@ final class VillagePlanner {
         boolean night=v.level.isDarkOutside()||Math.floorMod(v.level.getOverworldClockTime(),24000)>9000;
         var dark=v.state.lights.size()<160&&(night||now%1200<600)?Lighting.darkSpots(v,8):List.<BlockPos>of();
         BlockPos hub=v.meetingPoint();
-        BlockPos table=v.index.tables.stream().filter(p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)&&p.distSqr(hub)<32*32).findFirst().orElse(null);
+        // The workbench nearest the bell that a route reaches; none such and the village makes its own by the bell.
+        BlockPos table=v.index.tables.stream().filter(p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)&&p.distSqr(hub)<32*32&&v.rejected.getOrDefault(p.asLong(),0L)<=now)
+                .min(Comparator.comparingDouble(p->p.distSqr(hub))).orElse(null);
         BlockPos furnace=null;boolean output=false;
         for(long packed:v.state.furnaces)if(v.level.getBlockEntity(BlockPos.of(packed)) instanceof FurnaceBlockEntity f&&!f.isLocked()){
             if(furnace==null)furnace=f.getBlockPos();if(!f.getItem(2).isEmpty()){output=true;furnace=f.getBlockPos();}

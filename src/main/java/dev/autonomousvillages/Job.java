@@ -50,6 +50,15 @@ abstract class Job {
             try{navReason=nav.completion().join().reason();}catch(RuntimeException ignored){navReason="cancelled";}
     }
 
+    /**
+     * A store block no route reaches (a chest or workbench behind a house wall) is skipped by everyone
+     * for two minutes, so jobs stop walking there one after another.
+     */
+    void unreachable(BlockPos p){if(navReason.equals("unreachable")||navReason.equals("no_stand"))v.rejected.put(p.asLong(),now()+2400);}
+    boolean reachable(BlockPos p){return v.rejected.getOrDefault(p.asLong(),0L)<=now();}
+    /** Chests no route reaches are left out of the search as if they had been tried. */
+    private void skipUnreachable(Set<BlockPos> tried){for(var c:v.stock.chests())if(!reachable(c.getBlockPos()))tried.add(c.getBlockPos());}
+
     boolean lineOfSight(BlockPos p){
         var hit=v.level.clip(new ClipContext(body().getEyePosition(),Vec3.atCenterOf(p),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,body()));
         return hit.getType()==HitResult.Type.MISS||hit.getBlockPos().equals(p);
@@ -169,12 +178,13 @@ abstract class Job {
             Need first=needs.stream().filter(n->outstanding(n)>0).findFirst().orElse(null);
             if(first==null){cancel();return Approach.State.ARRIVED;}
             if(chest==null||!v.stock.chests().contains(chest)){
+                skipUnreachable(tried);
                 chest=v.stock.nearest(body().blockPosition(),first.test(),tried);
                 if(chest==null){missing=first.label();return Approach.State.FAILED;}
                 approach=new Approach(chest.getBlockPos(),4.0,true);
             }
             var state=approach.tick();
-            if(state==Approach.State.FAILED){tried.add(chest.getBlockPos());chest=null;return Approach.State.MOVING;}
+            if(state==Approach.State.FAILED){unreachable(chest.getBlockPos());tried.add(chest.getBlockPos());chest=null;return Approach.State.MOVING;}
             if(state==Approach.State.MOVING)return state;
             for(Need n:needs){int want=outstanding(n);if(want>0)Supplies.transfer(bot(),chest,false,n.test(),want);}
             v.stock.changed(chest);tried.add(chest.getBlockPos());chest=null;approach=null;
@@ -190,12 +200,13 @@ abstract class Job {
         Approach.State tick(){
             if(!w.hasSurplus()){cancel();return Approach.State.ARRIVED;}
             if(chest==null||!v.stock.chests().contains(chest)){
+                skipUnreachable(tried);
                 chest=v.stock.nearestWithRoom(body().blockPosition(),tried);
                 if(chest==null)return Approach.State.FAILED;
                 approach=new Approach(chest.getBlockPos(),4.0,true);
             }
             var state=approach.tick();
-            if(state==Approach.State.FAILED){tried.add(chest.getBlockPos());chest=null;return Approach.State.MOVING;}
+            if(state==Approach.State.FAILED){unreachable(chest.getBlockPos());tried.add(chest.getBlockPos());chest=null;return Approach.State.MOVING;}
             if(state==Approach.State.MOVING)return state;
             var bag=w.bag();var kept=w.keptSlots();int moved=0;
             for(int i=0;i<bag.size();i++)if(!bag.get(i).isEmpty()&&!kept.contains(i)){

@@ -45,7 +45,9 @@ final class Village {
     long nextErrorLog;
     private long nextWorkerErrorLog;
     private BlockPos hub;
-    private long hubTick=Long.MIN_VALUE;
+    /** "Never" for cache ticks; now minus Long.MIN_VALUE would overflow and read as "just now". */
+    static final long LONG_AGO=-1_000_000L;
+    private long hubTick=LONG_AGO;
     private final Set<UUID> announcedRoles=new HashSet<>();
 
     Village(VillageRuntime runtime,VillageState state){
@@ -274,9 +276,9 @@ final class Village {
         }
         return hub;
     }
-    void moved(){hubTick=Long.MIN_VALUE;}
+    void moved(){hubTick=LONG_AGO;}
     private BlockPos board;
-    private long boardTick=Long.MIN_VALUE;
+    private long boardTick=LONG_AGO;
     /** The notice board: a sign near the bell, if the village has put one up. */
     BlockPos noticeBoard(){
         long now=level.getGameTime();

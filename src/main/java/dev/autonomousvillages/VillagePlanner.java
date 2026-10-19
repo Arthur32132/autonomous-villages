@@ -48,7 +48,7 @@ final class VillagePlanner {
         if(v.state.lights.size()<160&&(night||now%1200<600)){
             if(AutonomousVillagesMod.CONFIG.lightHomes){
                 // Rooms are scanned block by block, so only every ten seconds; the list is checked again before each torch.
-                if(now-roomsScanned>=200){rooms=new ArrayList<>(Lighting.darkDoorsteps(v,4));rooms.addAll(Lighting.darkRooms(v,4));roomsScanned=now;}
+                if(now-roomsScanned>=200){rooms=new ArrayList<>(Lighting.darkDoorsteps(v,3));rooms.addAll(Lighting.darkRooms(v,2));roomsScanned=now;}
                 for(var p:rooms)if(Lighting.needsLight(v,p)&&!Lighting.unreachable(v,p))dark.add(p);
             }
             for(var p:Lighting.darkSpots(v,8))if(dark.size()<8)dark.add(p);
@@ -244,7 +244,7 @@ final class VillagePlanner {
             if(v.town.pendingCuts(project,1).isEmpty()&&!payable){v.town.unpaid(project);continue;}
             // With nothing to place, clearing the site is one resident's work: half the village went
             // there and failed on materials (rc13, seed 1337: 19 residents, sand short).
-            if(!payable&&v.activeJobs("build")>0){v.town.unpaid(project);continue;}
+            if(!payable&&v.workers.values().stream().anyMatch(o->o!=w&&o.job instanceof BuildJob b&&b.project==project))continue;
             v.town.paid(project);
             return job;
         }
@@ -458,11 +458,14 @@ final class VillagePlanner {
     private Job helperPick(Worker w,Snapshot s){
         if(w.hasTool(ItemTags.PICKAXES)||stoneShort(s)<=0||s.table()==null||!w.ready("tool")||sandstoneVillage(s))return null;
         Predicate<ItemStack> pick=x->x.is(ItemTags.PICKAXES)&&Supplies.usable(x);
-        if(v.workers.values().stream().filter(o->o.active()&&o.has(pick)).count()>=3)return null;
+        long picks=v.workers.values().stream().filter(o->o.active()&&(o.has(pick)||o.job instanceof CraftJob c&&c.recipe.name().contains("pick")
+                ||o.job instanceof FetchJob&&o.job.status.endsWith("кирка"))).count();
+        if(picks>=3)return null;
+        if(v.stock.count(pick)>0&&w.ready("fetch")){w.cooldown("tool",600);return new FetchJob(w,new Job.Need(pick,1,"кирка"));}
+        // A wooden pick: stone is what the building is short of.
+        var recipe=VillageCrafting.tool("pick","wood");
+        if(!CraftJob.affordable(v,recipe,1,w))return null;
         w.cooldown("tool",600);
-        if(v.stock.count(pick)>0&&w.ready("fetch"))return new FetchJob(w,new Job.Need(pick,1,"кирка"));
-        var recipe=VillageCrafting.tool("pick",s.cobble()>=3?"stone":"wood");
-        if(!CraftJob.affordable(v,recipe,1,w)){recipe=VillageCrafting.tool("pick","wood");if(!CraftJob.affordable(v,recipe,1,w))return null;}
         return new CraftJob(w,recipe,1);
     }
     private int stoneShort(Snapshot s){

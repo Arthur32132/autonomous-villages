@@ -347,15 +347,16 @@ final class Village {
         long now=level.getGameTime();
         hunted.values().removeIf(until->until<=now);
         for(var lurker:level.getEntitiesOfClass(net.minecraft.world.entity.monster.zombie.Zombie.class,VillageDiscovery.area(state,0),
-                m->m.isAlive()&&state.contains(m.blockPosition())&&!m.isOnFire())){
+                m->m.isAlive()&&state.contains(m.blockPosition())&&!m.isOnFire()&&!m.isInWater()&&Math.abs(m.getY()-state.y)<=6
+                        &&!(m instanceof net.minecraft.world.entity.monster.zombie.ZombifiedPiglin)&&!(m instanceof net.minecraft.world.entity.monster.zombie.Drowned))){
             if(hunted.containsKey(lurker.getUUID())||workers.values().stream().anyMatch(w->w.fighting(lurker)))continue;
             Worker hunter=workers.values().stream().filter(w->w.active()&&w.armed()&&w.body().getHealth()>=16&&!w.body().isSleeping()&&!w.body().isTrading()
-                    &&!w.fighting(null)&&w.body().distanceToSqr(lurker)<24*24&&Math.abs(w.body().getY()-lurker.getY())<=4)
+                    &&!w.fighting(null)&&w.ready("hunt")&&w.body().distanceToSqr(lurker)<16*16&&Math.abs(w.body().getY()-lurker.getY())<=4&&w.body().hasLineOfSight(lurker))
                     .min(Comparator.comparingDouble(w->w.body().distanceToSqr(lurker))).orElse(null);
             if(hunter==null)continue;
             // One go per zombie in two minutes: one the hunter could not reach was chosen again every
             // five seconds and kept a resident from work all day (rc14: over a hundred hunts a run).
-            hunted.put(lurker.getUUID(),now+2400);
+            hunted.put(lurker.getUUID(),now+2400);hunter.cooldown("hunt",600);
             AutonomousVillagesMod.LOG.info("HUNT {} {} -> {} at {}",state.name,presentation.personName(hunter.id),lurker.getType().getDescription().getString(),lurker.blockPosition().toShortString());
             hunter.defend(lurker);
             return;

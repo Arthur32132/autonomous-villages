@@ -119,7 +119,7 @@ final class Worker {
             if(job==null&&night&&!atHome()&&ready("home"))start(new HomeJob(this));
             // No way home tonight: any roof is better than a doorstep (rc13: residents stood all night
             // at a door after "не нашёл дорогу домой" and were killed there).
-            if(job==null&&night&&!atHome()&&!ready("home")&&!e.isSleeping()&&v.level.canSeeSky(e.blockPosition())&&ready("shelter")){
+            if(job==null&&night&&!atHome()&&!ready("home")&&!e.isSleeping()&&!ShelterJob.indoor(v,e.blockPosition())&&ready("shelter")){
                 var shelter=ShelterJob.find(this);if(shelter!=null)start(shelter);else cooldown("shelter",600);
             }
             if(job==null){
@@ -303,7 +303,8 @@ final class Worker {
         if(combat!=null&&!combat.completion().isDone())return true;
         // Asleep, or under a roof at night: running out into the dark is worse than staying put
         // (rc13, seed 42: three residents killed outdoors at night while fleeing).
-        if((e.isSleeping()||(job instanceof ShelterJob||nightRest())&&!e.level().canSeeSky(e.blockPosition()))&&e.distanceToSqr(enemy)>36){
+        // The armed still go for a monster that is indoors with them.
+        if((e.isSleeping()||(job instanceof ShelterJob||nightRest()&&(!armed()||enemy.level().canSeeSky(enemy.blockPosition())))&&!e.level().canSeeSky(e.blockPosition()))&&e.distanceToSqr(enemy)>36){
             if(!(enemy instanceof Creeper))v.raiseAlarm(this,enemy);
             return false;
         }

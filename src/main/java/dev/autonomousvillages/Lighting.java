@@ -29,7 +29,7 @@ final class Lighting {
             for(BlockPos q:BlockPos.betweenClosed(bed.offset(-3,-1,-3),bed.offset(3,1,3))){
                 if(!Construction.clear(v.level.getBlockState(q))||!Construction.clear(v.level.getBlockState(q.above()))||v.level.canSeeSky(q))continue;
                 int light=v.level.getBrightness(LightLayer.BLOCK,q);
-                if(best!=null&&(light>bestLight||light==bestLight&&q.distSqr(bed)>=best.distSqr(bed))||!needsLight(v,q))continue;
+                if(best!=null&&(light>bestLight||light==bestLight&&q.distSqr(bed)>=best.distSqr(bed))||!needsLight(v,q)||unreachable(v,q))continue;
                 best=q.immutable();bestLight=light;
             }
             if(best!=null&&!out.contains(best))out.add(best);
@@ -37,6 +37,8 @@ final class Lighting {
         return out;
     }
     static boolean indoors(Village v,BlockPos p){return !v.level.canSeeSky(p);}
+    /** A spot nobody could walk to lately (a locked room, a roof). */
+    static boolean unreachable(Village v,BlockPos p){return v.rejected.getOrDefault(p.asLong(),0L)>v.level.getGameTime();}
     /** Grid samples around beds and buildings, nearest to the meeting point first. */
     static List<BlockPos> darkSpots(Village v,int limit){
         var anchors=new ArrayList<BlockPos>(v.index.beds);anchors.add(v.meetingPoint());
@@ -46,7 +48,7 @@ final class Lighting {
             int x=Math.floorDiv(anchor.getX()+dx,6)*6+3,z=Math.floorDiv(anchor.getZ()+dz,6)*6+3;
             if(!seen.add(BlockPos.asLong(x,0,z))||!v.level.hasChunkAt(new BlockPos(x,v.state.y,z)))continue;
             var p=new BlockPos(x,v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x,z),z);
-            if(needsLight(v,p))out.add(p);
+            if(needsLight(v,p)&&!unreachable(v,p))out.add(p);
         }
         out.sort(Comparator.comparingDouble(p->p.distSqr(hub)));
         return out.size()>limit?out.subList(0,limit):out;

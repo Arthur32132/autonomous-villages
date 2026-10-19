@@ -37,6 +37,7 @@ final class LightJob extends Job {
         var state=approach.tick();
         if(state==Approach.State.MOVING)return true;
         BlockPos spot=spots.poll();approach=null;
+        if(state==Approach.State.FAILED)v.rejected.put(spot.asLong(),now()+2400);
         if(state==Approach.State.ARRIVED){
             int fence=Supplies.find(bot(),s->s.is(net.minecraft.tags.ItemTags.WOODEN_FENCES));
             BlockPos torch=spot;

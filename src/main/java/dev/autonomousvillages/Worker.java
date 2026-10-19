@@ -48,6 +48,14 @@ final class Worker {
         if(stuckCount<3||!nearStuckSpot()||!ready("escape"))return false;
         stuckCount=0;cooldown("escape",1200);return true;
     }
+    /** The blocks around the feet and head, for the log when a resident seems trapped. */
+    private String surroundings(){
+        BlockPos feet=body().blockPosition();var out=new StringBuilder("below="+name(feet.below())+" feet="+name(feet)+" head="+name(feet.above()));
+        for(var d:net.minecraft.core.Direction.Plane.HORIZONTAL)out.append(' ').append(d.getName()).append('=').append(name(feet.relative(d))).append('/').append(name(feet.relative(d).above()));
+        return out.toString();
+    }
+    private String name(BlockPos p){var s=v.level.getBlockState(p);var id=net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
+        return s.hasProperty(net.minecraft.world.level.block.DoorBlock.OPEN)?id+(s.getValue(net.minecraft.world.level.block.DoorBlock.OPEN)?"(open)":"(closed)"):id;}
     private boolean nearStuckSpot(){return BlockPos.of(stuckAt).distSqr(body().blockPosition())<=9;}
     boolean released;
     final Map<String,Long> cooldowns=new HashMap<>();
@@ -125,6 +133,7 @@ final class Worker {
             if(job.failure.startsWith("не подойти")||job.failure.startsWith("не нашёл дорогу")||job.failure.startsWith("не дойти")||job.failure.contains("уложился")
                     ||job.failure.endsWith("(unreachable)")||job.failure.contains("(stuck")){
                 stuckCount=nearStuckSpot()?stuckCount+1:1;if(stuckCount==1)stuckAt=body().blockPosition().asLong();
+                if(stuckCount==3)AutonomousVillagesMod.LOG.info("TRAPPED {} {} at {}: {}",v.state.name,v.presentation.personName(id),body().position(),surroundings());
             }
             v.failures.merge(job.kind()+": "+job.failure,1,Integer::sum);
             if(now()>=nextFailureLog){

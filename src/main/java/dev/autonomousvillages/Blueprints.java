@@ -28,6 +28,11 @@ final class Blueprints {
         int work(){return (int)blocks.stream().filter(e->structural(e.state())).count();}
         /** Beds per hundred structural blocks: how much growth the house buys. */
         double value(){return beds*100.0/Math.max(1,work());}
+        /** Height of the lowest door above the template's floor layer; 1 for a door standing on the floor. */
+        int doorLevel(){
+            return blocks.stream().filter(e->e.state().getBlock() instanceof net.minecraft.world.level.block.DoorBlock)
+                    .mapToInt(e->e.pos().getY()).min().orElse(1);
+        }
     }
     private static final Map<Identifier,Optional<Template>> CACHE=new HashMap<>();
 

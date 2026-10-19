@@ -264,15 +264,17 @@ final class Projects {
             if(dx>=0&&dx<width&&dz>=0&&dz<depth){low=Math.min(low,h);high=Math.max(high,h);heights.add(h);}
         }
         if(high-low>1)return null;
-        heights.sort(null);int y=heights.get(heights.size()/2);
+        // The floor (layer 0) replaces the top layer of ground, as in a generated village: the door
+        // then opens level with the street instead of a block above it.
+        heights.sort(null);int y=heights.get(heights.size()/2)-1;
         BlockPos base=new BlockPos(x,y,z);
-        for(int dx=-2;dx<=width+1;dx++)for(int dz=-3;dz<=depth+1;dz++)for(int dy=-1;dy<=5;dy++){
+        for(int dx=-2;dx<=width+1;dx++)for(int dz=-3;dz<=depth+1;dz++)for(int dy=0;dy<=6;dy++){
             BlockPos p=base.offset(dx,dy,dz);var s=v.level.getBlockState(p);
             if(protects(p)||s.getBlock() instanceof BedBlock||s.is(Blocks.FARMLAND)||s.getBlock() instanceof CropBlock||!s.getFluidState().isEmpty()
                     ||s.is(BlockTags.LOGS)||s.getBlock() instanceof net.minecraft.world.level.block.ChestBlock||!v.state.policy.allows("build",p))return null;
             boolean inside=dx>=0&&dx<width&&dz>=0&&dz<depth;
-            if(inside&&dy>=0&&!Construction.clear(s)&&!removable(s))return null;
-            if(inside&&dy==-1&&s.isAir()&&!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP))return null;
+            if(inside&&!Construction.clear(s)&&!removable(s))return null;
+            if(inside&&dy==0&&s.isAir()&&!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP))return null;
         }
         if(v.state.buildings.stream().filter(b->b.kind.equals("house")||b.kind.equals("native_house")).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
         return base;
@@ -308,7 +310,8 @@ final class Projects {
             var footprint=Blueprints.footprint(design.size(),rotation);
             BlockPos base=siteAt(cx-footprint.getX()/2,cz-footprint.getZ()/2,footprint.getX(),footprint.getZ());
             if(base==null)continue;
-            var house=fromTemplate(design,base,rotation);
+            // A template whose door stands higher than layer 1 sinks further, so the door is at street level.
+            var house=fromTemplate(design,base.below(design.doorLevel()-1),rotation);
             if(doorwayOpen(house))return house;
         }
         return null;

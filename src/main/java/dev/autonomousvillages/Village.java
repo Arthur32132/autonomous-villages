@@ -139,6 +139,7 @@ final class Village {
         if(time%200==13&&Math.floorMod(level.getOverworldClockTime(),24000)>=11500&&Math.floorMod(level.getOverworldClockTime(),24000)<13000)summonGolem(time);
         if(time%6000==1234)writeChronicleBook();
         if(time%100==61)MorningNews.tick(this);
+        if(time%600==311&&AutonomousVillagesMod.CONFIG.nameplates)NameplateJob.refresh(this);
         presentation.tick();
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){
@@ -450,7 +451,7 @@ final class Village {
         if(board==null&&now-boardTick<20)return null;
         boardTick=now;board=null;BlockPos hub=meetingPoint();
         for(BlockPos q:BlockPos.betweenClosed(hub.offset(-6,-2,-6),hub.offset(6,2,6)))
-            if(level.getBlockEntity(q) instanceof net.minecraft.world.level.block.entity.SignBlockEntity){board=q.immutable();break;}
+            if(level.getBlockEntity(q) instanceof net.minecraft.world.level.block.entity.SignBlockEntity&&!state.nameplates.containsKey(q.asLong())){board=q.immutable();break;}
         return board;
     }
     BlockPos stand(BlockPos target,Vec3 from){return stand(target,from,3.0,true,Set.of());}

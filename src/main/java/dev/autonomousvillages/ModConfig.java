@@ -34,6 +34,8 @@ public final class ModConfig {
     public boolean spareBeds=true;
     /** A sign with the name of each resident lost, at a cemetery on the edge of the village. */
     public boolean graves=true;
+    /** A sign beside each home's door naming who lives there. */
+    public boolean nameplates=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

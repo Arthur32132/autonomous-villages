@@ -42,6 +42,8 @@ public final class VillageState {
     /** Residents lost and still without a sign at the cemetery; the cemetery's corner once chosen. */
     public List<Grave> graves=new ArrayList<>();
     public Long cemetery;
+    /** Signs beside home doors (position) and the building each names (origin). */
+    public Map<Long,Long> nameplates=new LinkedHashMap<>();
     static final int MAX_TICKET_CHUNKS=1024;
     static long footprintChunks(Bounds b){return ((long)(b.maxX>>4)-(b.minX>>4)+1)*((long)(b.maxZ>>4)-(b.minZ>>4)+1);}
     static <T> void trimOldest(Set<T> values,int limit){while(values.size()>limit)values.remove(values.iterator().next());}
@@ -66,6 +68,9 @@ public final class VillageState {
         if(productDays==null)productDays=new LinkedHashMap<>();
         if(newsTotals!=null)newsTotals.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null);
         if(graves==null)graves=new ArrayList<>();
+        if(nameplates==null)nameplates=new LinkedHashMap<>();
+        nameplates.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||!contains(BlockPos.of(e.getKey())));
+        while(nameplates.size()>256)nameplates.remove(nameplates.keySet().iterator().next());
         graves.removeIf(g->g==null||g.name==null);
         while(graves.size()>16)graves.removeFirst();
         if(cemetery!=null&&!contains(BlockPos.of(cemetery)))cemetery=null;

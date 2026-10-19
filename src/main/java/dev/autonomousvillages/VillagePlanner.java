@@ -111,7 +111,7 @@ final class VillagePlanner {
             default->null;
         };
         if(own!=null)return own;
-        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->grave(w,s),()->shear(w,s),()->chop(w,s,true),
+        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->grave(w,s),()->nameplate(w,s),()->shear(w,s),()->chop(w,s,true),
                 ()->helperPick(w,s),()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
         if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0&&w.ready("deposit"))return new DepositJob(w);
         return shared;
@@ -277,6 +277,16 @@ final class VillagePlanner {
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
         w.cooldown("sparebed",600);
         return null;
+    }
+    /** A sign beside each home's door naming who lives there; one craft makes three. */
+    private Job nameplate(Worker w,Snapshot s){
+        if(!AutonomousVillagesMod.CONFIG.nameplates||v.activeJobs("nameplate")>0||!w.ready("nameplate"))return null;
+        var spot=NameplateJob.next(v);
+        if(spot==null){w.cooldown("nameplate",2400);return null;}
+        if(v.stock.count(x->x.is(ItemTags.SIGNS))+w.count(x->x.is(ItemTags.SIGNS))>0)return new NameplateJob(w,spot);
+        if(owned(x->x.is(ItemTags.SIGNS))==0&&s.table()!=null&&s.wood()>=24&&s.need("planks")==0&&!crafting(w,VillageCrafting.SIGN)&&w.ready("craft")
+                &&CraftJob.affordable(v,VillageCrafting.SIGN,1,w))return new CraftJob(w,VillageCrafting.SIGN,1);
+        w.cooldown("nameplate",1200);return null;
     }
     /** A sign at the cemetery for each resident lost; one craft makes three. */
     private Job grave(Worker w,Snapshot s){

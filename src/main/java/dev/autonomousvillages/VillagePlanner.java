@@ -103,7 +103,7 @@ final class VillagePlanner {
         if(own!=null)return own;
         Job shared=first(()->build(w,s),()->craftForProject(w,s),()->workshop(w,s),()->shear(w,s),()->chop(w,s,true),
                 ()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
-        if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0)return new DepositJob(w);
+        if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0&&w.ready("deposit"))return new DepositJob(w);
         return shared;
     }
     String idleReason(Worker w){

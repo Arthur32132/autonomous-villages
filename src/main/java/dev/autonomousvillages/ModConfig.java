@@ -44,6 +44,8 @@ public final class ModConfig {
     public boolean civicBuildings=true;
     /** A timber barn by the bell with the store's chests inside. */
     public boolean storehouse=true;
+    /** A fenced sheep pen with a gate; the guild brings the first two sheep. */
+    public boolean pen=true;
     /** Spare iron becomes lanterns that replace the torches on the lamp posts. */
     public boolean lanterns=true;
     /** Once the footpaths are done, the ground around the bell is trodden into a small square. */

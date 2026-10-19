@@ -114,9 +114,11 @@ final class Projects {
             if(b.kind.equals("civic")||Landmarks.kind(b.kind))furnish(b);
             if(Landmarks.kind(b.kind))signboard(b);
             if(b.kind.equals("well"))fillWell(b);
+            if(b.kind.equals("pen")){furnish(b);stockPen(b);}
             if(b.path.isEmpty())b.path.addAll(footpath(b));
             v.runtime.save();
         }
+        closePenGate();
         var unfinished=unfinished();
         var active=unfinished.isEmpty()?null:unfinished.getFirst();
         if(active!=null){
@@ -167,13 +169,20 @@ final class Projects {
             var built=tower(site);v.state.buildings.add(built);invalidate();
             v.chronicle.announce("Заложена "+label(built)+" у "+site.toShortString());v.runtime.save();
             stage="заложена "+label(built);
+        }else if(AutonomousVillagesMod.CONFIG.pen&&unfinished.isEmpty()&&tower()!=null&&v.state.residents.size()>=6&&pen()==null){
+            // A sheep pen keeps the flock, and the wool for new beds, within the village.
+            BlockPos site=findSite(PEN,PEN);
+            if(site==null){stage="жилья хватает; ищут место для загона";return;}
+            var built=pen(site);v.state.buildings.add(built);invalidate();
+            v.chronicle.announce("Заложен "+label(built)+" у "+site.toShortString());v.runtime.save();
+            stage="заложен "+label(built);
         }else if(landmark!=null&&(planned=landmark(landmark))!=null){
             // Then the village's own big buildings, one at a time as it grows: forge, market, tavern.
             v.state.buildings.add(planned);invalidate();
             String laid=(Landmarks.feminine(landmark)?"Заложена ":"Заложен ")+label(planned);
             v.chronicle.announce(laid+" у "+BlockPos.of(planned.origin).toShortString());v.runtime.save();
             stage=laid.toLowerCase(Locale.ROOT);
-        }else if(AutonomousVillagesMod.CONFIG.civicBuildings&&unfinished.isEmpty()&&tower()!=null&&civic().size()<Math.min(6,v.state.residents.size()/4)){
+        }else if(AutonomousVillagesMod.CONFIG.civicBuildings&&unfinished.isEmpty()&&tower()!=null&&(pen()!=null||!AutonomousVillagesMod.CONFIG.pen||v.state.residents.size()<6)&&civic().size()<Math.min(6,v.state.residents.size()/4)){
             // Then the workplaces of a real village, one of each trade, as the village grows.
             var built=civicBuilding();
             if(built==null){stage="жилья хватает; ищут место для мастерской";return;}
@@ -350,6 +359,52 @@ final class Projects {
         b.blocks.removeIf(p->!v.state.contains(p.position()));
         return b;
     }
+    TownBuilding pen(){return v.state.buildings.stream().filter(b->b.kind.equals("pen")).findFirst().orElse(null);}
+    static final int PEN=7;
+    /**
+     * A sheep pen: a fence ring on log posts with torches on the posts so nothing spawns inside. The
+     * village cannot craft a gate yet, so the guild brings it on the housewarming with a hay bale and a
+     * water trough.
+     */
+    TownBuilding pen(BlockPos base){
+        var b=new TownBuilding("pen",base);
+        var log=Blocks.OAK_LOG.defaultBlockState();var fence=Blocks.OAK_FENCE.defaultBlockState();
+        for(int x=0;x<PEN;x++)for(int z=0;z<PEN;z++){
+            BlockPos ground=base.offset(x,0,z);
+            for(int y=1;y<=3;y++)if(!Construction.clear(v.level.getBlockState(ground.above(y))))b.cuts.add(ground.above(y).asLong());
+            boolean edge=x==0||z==0||x==PEN-1||z==PEN-1;
+            if(!edge)continue;
+            // The ring stands on solid ground: a hollow under it is filled, the grass inside stays.
+            for(int y=-2;y<=0;y++){BlockPos fill=ground.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,Blocks.COBBLESTONE.defaultBlockState());}
+            boolean corner=(x==0||x==PEN-1)&&(z==0||z==PEN-1);
+            if(x==PEN/2&&z==0){b.decorate(ground.above(),Blocks.OAK_FENCE_GATE.defaultBlockState().setValue(FenceGateBlock.FACING,Direction.SOUTH));continue;}
+            b.add(ground.above(),corner?log:fence);
+            if(corner)b.add(ground.above(2),Blocks.TORCH.defaultBlockState());
+        }
+        b.decorate(base.offset(1,1,PEN-2),Blocks.HAY_BLOCK.defaultBlockState());
+        b.decorate(base.offset(PEN-2,1,PEN-2),Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL,3));
+        b.blocks.removeIf(p->!v.state.contains(p.position()));
+        return b;
+    }
+    /** The guild brings the first pair of sheep on the housewarming; farmers breed them from then on. */
+    void stockPen(TownBuilding b){
+        BlockPos base=BlockPos.of(b.origin);
+        for(int i=0;i<2;i++){
+            BlockPos at=base.offset(2+i*2,1,3);
+            if(!Construction.clear(v.level.getBlockState(at)))continue;
+            if(net.minecraft.world.entity.EntityTypes.SHEEP.spawn(v.level,at,net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED)!=null)v.chronicle.add("pen_sheep",1);
+        }
+    }
+    /** The pen's gate is shut again once nobody stands in it, so the flock stays inside. */
+    void closePenGate(){
+        var pen=pen();if(pen==null||!pen.completed)return;
+        BlockPos gate=BlockPos.of(pen.origin).offset(PEN/2,1,0);
+        if(!v.level.hasChunkAt(gate))return;
+        var s=v.level.getBlockState(gate);
+        if(!(s.getBlock() instanceof FenceGateBlock)||!s.getValue(FenceGateBlock.OPEN))return;
+        if(!v.level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new net.minecraft.world.phys.AABB(gate).inflate(1.2,0,1.2),e->e.isAlive()&&!(e instanceof net.minecraft.world.entity.animal.sheep.Sheep)).isEmpty())return;
+        v.level.setBlock(gate,s.setValue(FenceGateBlock.OPEN,false),3);
+    }
     TownBuilding tower(){return v.state.buildings.stream().filter(b->b.kind.equals("tower")).findFirst().orElse(null);}
     /** Where a guard stands on the finished watchtower's lookout, if there is one. */
     BlockPos lookout(){
@@ -378,7 +433,7 @@ final class Projects {
         return idle>24000||idle>3000&&missing(b).keySet().stream().noneMatch(EVERYDAY::contains);
     }
     static String label(TownBuilding b){
-        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";case "civic"->trade(b.design);case "storehouse"->"амбар";case "well"->"колодец";
+        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";case "civic"->trade(b.design);case "storehouse"->"амбар";case "well"->"колодец";case "pen"->"загон для овец";
             case "forge","market","tavern","mill","dock"->Landmarks.label(b.kind);default->b.kind;};
         if(b.kind.equals("civic"))return base;
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";

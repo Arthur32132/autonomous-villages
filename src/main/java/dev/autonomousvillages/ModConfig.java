@@ -30,6 +30,8 @@ public final class ModConfig {
     public boolean lightHomes=true;
     /** At sunrise, players near the village hear what it did since the last morning. */
     public boolean morningNews=true;
+    /** While every bed is taken, a single bed in a home gets a second one beside it. */
+    public boolean spareBeds=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

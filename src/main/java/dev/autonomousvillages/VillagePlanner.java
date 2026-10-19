@@ -97,7 +97,7 @@ final class VillagePlanner {
         // 5. The role's own work, then shared priorities.
         Job own=role==null?null:switch(role){
             case BUILDER->first(()->build(w,s),()->craftForProject(w,s),()->chop(w,s,true));
-            case STEWARD->first(()->craftForProject(w,s),()->workshop(w,s),()->build(w,s));
+            case STEWARD->first(()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->build(w,s));
             case LOGGER->chop(w,s,false);
             case MINER->first(()->mine(w,s,false),()->sand(w,s));
             case FARMER->first(()->farm(w),()->bread(w,s),()->compost(w),()->shear(w,s),()->herd(w,s));
@@ -105,7 +105,7 @@ final class VillagePlanner {
             default->null;
         };
         if(own!=null)return own;
-        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->workshop(w,s),()->shear(w,s),()->chop(w,s,true),
+        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->shear(w,s),()->chop(w,s,true),
                 ()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
         if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0&&w.ready("deposit"))return new DepositJob(w);
         return shared;
@@ -248,6 +248,23 @@ final class VillagePlanner {
     }
     /** Another worker is crafting this already; its output is not counted anywhere yet. */
     private boolean crafting(Worker w,VillageCrafting.Recipe recipe){return busy(w,recipe,Blocks.AIR);}
+    /** Every bed taken and no building waiting for one: a second bed beside a single one in a home. */
+    private Job spareBed(Worker w,Snapshot s){
+        if(!AutonomousVillagesMod.CONFIG.spareBeds||s.table()==null||s.need("bed")>0||!w.ready("sparebed")
+                ||v.state.residents.size()>=Breeding.MAX_RESIDENTS||v.breeding.freeBeds()>0)return null;
+        if(v.workers.values().stream().anyMatch(o->o!=w&&(o.job instanceof PlaceJob p&&p.state.getBlock() instanceof BedBlock
+                ||o.job instanceof CraftJob c&&c.recipe.name().equals("bed"))))return null;
+        var spot=SpareBeds.spot(v);
+        if(spot==null){w.cooldown("sparebed",1200);return null;}
+        Item bed=SpareBeds.bedItem(v,w);
+        if(bed instanceof net.minecraft.world.item.BlockItem item&&item.getBlock() instanceof BedBlock){
+            w.cooldown("sparebed",600);
+            return new PlaceJob(w,spot.foot(),item.getBlock().defaultBlockState().setValue(BedBlock.FACING,spot.facing()),"вторая кровать");
+        }
+        if(s.woolColour()!=null&&s.wool()>=3&&w.ready("craft")&&CraftJob.affordable(v,VillageCrafting.bed(s.woolColour()),1,w))
+            return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
+        return null;
+    }
     /** Doors, beds, torches and slabs a project waits for, crafted from store materials. */
     private Job craftForProject(Worker w,Snapshot s){
         if(!w.ready("craft"))return null;

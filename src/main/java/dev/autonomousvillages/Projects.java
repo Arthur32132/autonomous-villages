@@ -141,8 +141,19 @@ final class Projects {
     private final Map<Long,Long> unpaidSince=new HashMap<>();
     void unpaid(TownBuilding b){unpaidSince.putIfAbsent(b.origin,v.level.getGameTime());}
     void paid(TownBuilding b){unpaidSince.remove(b.origin);}
-    /** A house waiting for something the village cannot make yet (a bed without wool) does not block the next one. */
-    boolean waiting(TownBuilding b){Long since=unpaidSince.get(b.origin);return since!=null&&v.level.getGameTime()-since>3000;}
+    /** Materials the village makes from wood, stone and sand; a shortage of these is only a matter of time. */
+    static final Set<String> EVERYDAY=Set.of("planks","logs","door","torch","cobblestone","stairs","slab","fence","trapdoor","stone_stairs",
+            "stone_slab","stone_wall","glass_pane","ladder","chest","crafting_table","furnace");
+    /**
+     * A house waiting for something the village cannot make yet (a bed without wool) does not block the
+     * next one. Short of planks or cobble it does: a second site would only split the same wood. After a
+     * whole day without progress the next house may start anyway.
+     */
+    boolean waiting(TownBuilding b){
+        Long since=unpaidSince.get(b.origin);if(since==null)return false;
+        long idle=v.level.getGameTime()-since;
+        return idle>24000||idle>3000&&missing(b).keySet().stream().noneMatch(EVERYDAY::contains);
+    }
     static String label(TownBuilding b){
         String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";default->b.kind;};
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";

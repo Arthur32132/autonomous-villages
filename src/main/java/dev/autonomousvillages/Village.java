@@ -148,6 +148,7 @@ final class Village {
         if(time%200==77)LandmarkGoods.tick(this);
         if(time%200==137)VillageRequests.tick(this);
         lifeEvents.tick(time);
+        if(time%10==4)clearDoorways();
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){
             state.plantedTrees.removeIf(p->{var pos=BlockPos.of(p);return level.hasChunkAt(pos)&&!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.SaplingBlock)
@@ -254,6 +255,37 @@ final class Village {
         nextTickets=0;return true;
     }
 
+    /**
+     * A monster in a doorway is shoved back out to the street and the door shut behind it. Husks
+     * followed residents through the door and stood in the doorway: the door then closed with them on
+     * the inside half of the cell or could not close at all, and the people in the lit room were killed
+     * there (seed 1337: every husk death began with a husk in a door cell).
+     */
+    private void clearDoorways(){
+        for(BlockPos p:town.doors()){
+            if(!level.hasChunkAt(p))continue;
+            var s=level.getBlockState(p);
+            if(!(s.getBlock() instanceof net.minecraft.world.level.block.DoorBlock door)
+                    ||s.getValue(net.minecraft.world.level.block.DoorBlock.HALF)!=net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER)continue;
+            var monsters=level.getEntitiesOfClass(Monster.class,new AABB(p).expandTowards(0,1,0),Monster::isAlive);
+            if(monsters.isEmpty())continue;
+            var facing=s.getValue(net.minecraft.world.level.block.DoorBlock.FACING);
+            BlockPos a=p.relative(facing),b=p.relative(facing.getOpposite());
+            boolean skyA=level.canSeeSky(a),skyB=level.canSeeSky(b);
+            if(skyA==skyB)continue; // no telling the street from the room
+            BlockPos out=skyA?a:b;
+            if(!safeFeet(out))continue;
+            var to=feetPosition(out);
+            for(var m:monsters){
+                if(!level.noCollision(m,m.getBoundingBox().move(to.subtract(m.position()))))continue;
+                m.teleportTo(to.x,to.y,to.z);
+                m.setDeltaMovement(Vec3.ZERO);
+            }
+            if(s.getValue(net.minecraft.world.level.block.DoorBlock.OPEN)&&s.is(net.minecraft.tags.BlockTags.WOODEN_DOORS)
+                    &&level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new AABB(p).expandTowards(0,1,0),net.minecraft.world.entity.LivingEntity::isAlive).isEmpty())
+                door.setOpen(null,level,s,p,false);
+        }
+    }
     /**
      * At night every unoccupied wooden door of the village is shut. Residents open doors on their way
      * and the library does not close them; one open door let husks reach a whole house of sleepers.

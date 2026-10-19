@@ -258,7 +258,8 @@ final class VillagePlanner {
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
         // Roof shapes come out of wood the walls do not need: building goes bottom-up, and 24 slabs
         // made first left a mountain village with no planks for the floor (seed 42).
-        boolean spareWood=s.wood()>=s.need("planks")+4*s.need("logs")+6;
+        // At most 24 planks are held back: enough for the next walls, without making a roof wait for the whole house.
+        boolean spareWood=s.wood()>=Math.min(24,s.need("planks")+4*s.need("logs"))+6;
         if(spareWood&&s.need("slab")>owned(x->x.is(ItemTags.WOODEN_SLABS))&&!crafting(w,VillageCrafting.SLAB)&&CraftJob.affordable(v,VillageCrafting.SLAB,2,w))return new CraftJob(w,VillageCrafting.SLAB,2);
         if(spareWood&&s.need("stairs")>owned(x->x.is(ItemTags.WOODEN_STAIRS))&&!crafting(w,VillageCrafting.STAIRS)&&CraftJob.affordable(v,VillageCrafting.STAIRS,2,w))return new CraftJob(w,VillageCrafting.STAIRS,2);
         // Stone shapes from cobblestone, or from sandstone where the village builds from sand.

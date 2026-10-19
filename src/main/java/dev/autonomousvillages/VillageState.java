@@ -31,6 +31,8 @@ public final class VillageState {
     public Set<Long> lights=new LinkedHashSet<>();
     public Chronicle.Data chronicle=new Chronicle.Data();
     public long lastBirth;
+    /** Game time the residents last called an iron golem to their defence. */
+    public long lastGolem;
     static final int MAX_TICKET_CHUNKS=1024;
     static long footprintChunks(Bounds b){return ((long)(b.maxX>>4)-(b.minX>>4)+1)*((long)(b.maxZ>>4)-(b.minZ>>4)+1);}
     static <T> void trimOldest(Set<T> values,int limit){while(values.size()>limit)values.remove(values.iterator().next());}
@@ -125,7 +127,7 @@ public final class VillageState {
                 || y < -64 || y > 320 || residents == null || residents.size() > 1024 || residents.contains(null)
                 || storage == null || storage.size() > 128 || furnaces == null || furnaces.size() > 16
                 || completedShelters < 0 || completedShelters > 256 || mineLength < 0 || mineLength > 64 || mineDirection < 0 || mineDirection > 3
-                || lastBirth < 0)
+                || lastBirth < 0 || lastGolem < 0)
             throw new IllegalArgumentException("Повреждённые данные деревни");
         UUID.fromString(owner);
         if(bounds!=null&&(bounds.minX>bounds.maxX||bounds.minZ>bounds.maxZ||(long)bounds.maxX-bounds.minX>4096

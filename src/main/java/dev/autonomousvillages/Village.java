@@ -249,6 +249,7 @@ final class Village {
         if(state.contains(enemy.blockPosition())){
             if(alarmUntil<now)chronicle.add("alarms",1);
             alarmUntil=now+400;
+            summonGolem(now);
             if(now>=nextBell&&!level.isDarkOutside()){
                 var hub=meetingPoint();
                 if(level.getBlockState(hub).getBlock() instanceof net.minecraft.world.level.block.BellBlock bell
@@ -259,6 +260,22 @@ final class Village {
                         &&w.body().distanceToSqr(enemy)<24*24&&w.body().hasLineOfSight(enemy)
                         &&(w.combat==null||w.combat.completion().isDone())&&w.armed())
                 .sorted(Comparator.comparingDouble(w->w.body().distanceToSqr(enemy))).limit(2).toList().forEach(w->w.defend(enemy));
+    }
+
+    private long nextGolemAttempt;
+    /**
+     * A village of five or more under attack with no iron golem nearby calls one, as frightened
+     * vanilla villagers do, at most once a day.
+     */
+    private void summonGolem(long now){
+        if(now<nextGolemAttempt||now-state.lastGolem<24000||state.residents.size()<5)return;
+        nextGolemAttempt=now+1200;
+        BlockPos hub=meetingPoint();
+        if(!level.getEntitiesOfClass(net.minecraft.world.entity.animal.golem.IronGolem.class,new AABB(hub).inflate(48),net.minecraft.world.entity.LivingEntity::isAlive).isEmpty())return;
+        net.minecraft.util.SpawnUtil.trySpawnMob(net.minecraft.world.entity.EntityTypes.IRON_GOLEM,net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED,level,hub,10,8,6,
+                net.minecraft.util.SpawnUtil.Strategy.LEGACY_IRON_GOLEM,false).ifPresent(golem->{
+            state.lastGolem=now;chronicle.add("golems",1);chronicle.announce("Жители позвали на помощь железного голема!");runtime.save();
+        });
     }
 
     // --- geometry ----------------------------------------------------------------------------------

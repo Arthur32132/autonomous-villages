@@ -243,6 +243,7 @@ final class Worker {
                 ||m.getTarget() instanceof Villager target&&v.state.residents.contains(target.getUUID())
                 ||m instanceof Creeper creeper&&creeper.getSwellDir()>0;
     }
+    private long fleeStarted;
     private boolean danger(){
         var e=body();
         Monster enemy=v.level.getEntitiesOfClass(Monster.class,e.getBoundingBox().inflate(12),m->m.isAlive()&&threat(m)&&e.hasLineOfSight(m))
@@ -259,7 +260,9 @@ final class Worker {
             return false;
         }
         if(!(enemy instanceof Creeper))v.raiseAlarm(this,enemy);
-        if(!(enemy instanceof Creeper)&&armed()&&(e.getHealth()>=14||v.guard(id)&&e.getHealth()>=8)){defend(enemy);return true;}
+        // Still within reach after three seconds of running: cornered, so whoever has a sword fights back.
+        boolean cornered=fleeing&&now()-fleeStarted>60&&e.distanceToSqr(enemy)<9;
+        if(!(enemy instanceof Creeper)&&armed()&&(e.getHealth()>=14||v.guard(id)&&e.getHealth()>=8||cornered)){defend(enemy);return true;}
         // Keep running along the current route: planning a new one makes the body stand still.
         if(fleeing&&flight!=null&&now()-fleeSince<300&&flight.tick()==Job.Approach.State.MOVING)return true;
         if(job!=null){job.stop();job=null;v.reservations.release(id);}
@@ -270,6 +273,7 @@ final class Worker {
         Vec3 point=refuge!=null?Vec3.atBottomCenterOf(refuge):e.position().add(away.x/length*12,0,away.z/length*12);
         // Running blind into the dark can end in powder snow or off a cliff: without a bed to run to, run to the bell.
         if(refuge==null&&!v.safeFeet(BlockPos.containing(point)))point=v.feetPosition(v.meetingPoint());
+        if(!fleeing)fleeStarted=now();
         flight=new HomeJob(this).new Walk(point,1.5);fleeing=true;fleeSince=now();released=false;
         flight.tick();status="убегает от угрозы";
         return true;

@@ -60,8 +60,10 @@ public final class ModConfig {
     public boolean landmarks=true;
     /** Once a day the forge mends tools, the market sets out surplus, the mill bakes, the tavern cooks and brews mead, the pier brings fish. */
     public boolean landmarkGoods=true;
-    /** A fair every seventh day once there is a market (bell, music, a wandering trader); a feast at the tavern when a building is finished. */
+    /** A fair every seventh day once there is a market (bell, music, a wandering trader); a feast at the tavern when a building is finished; a lullaby for a birth, a lantern glow on the night watch, a bell stroke for news. */
     public boolean lifeEvents=true;
+    /** The material the build lacks most is posted as a request to players on the notice board; filling it is rewarded from the store. */
+    public boolean requests=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

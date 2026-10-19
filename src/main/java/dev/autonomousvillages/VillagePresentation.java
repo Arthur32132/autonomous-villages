@@ -62,7 +62,8 @@ final class VillagePresentation {
         if(p==null||!(v.level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign))return;
         var project=v.town.active();
         var lines=new ArrayList<String>();
-        if(project==null)lines.add("всё построено");
+        if(v.state.request!=null&&AutonomousVillagesMod.CONFIG.requests)lines.addAll(VillageRequests.board(v.state.request));
+        else if(project==null)lines.add("всё построено");
         else{
             lines.add("нужно на стройку:");
             v.town.missing(project).entrySet().stream().sorted(Map.Entry.<String,Integer>comparingByValue().reversed()).limit(2)

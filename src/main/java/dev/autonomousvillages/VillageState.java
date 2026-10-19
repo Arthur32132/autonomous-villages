@@ -52,6 +52,14 @@ public final class VillageState {
     public Map<String,Long> goodsDays=new LinkedHashMap<>();
     /** The game day of the last fair. */
     public long fairDay=-1;
+    /** The open request to players, if any, and the game time before which no new one is posted. */
+    public Request request;
+    public long nextRequest;
+    public static final class Request {
+        public String key="";
+        public int amount,delivered;
+        public long posted;
+    }
     static final int MAX_TICKET_CHUNKS=1024;
     static long footprintChunks(Bounds b){return ((long)(b.maxX>>4)-(b.minX>>4)+1)*((long)(b.maxZ>>4)-(b.minZ>>4)+1);}
     static <T> void trimOldest(Set<T> values,int limit){while(values.size()>limit)values.remove(values.iterator().next());}
@@ -81,6 +89,7 @@ public final class VillageState {
         if(donorNames==null)donorNames=new LinkedHashMap<>();
         if(honoured==null)honoured=new LinkedHashSet<>();
         if(goodsDays==null)goodsDays=new LinkedHashMap<>();
+        if(request!=null&&(request.key==null||request.key.isEmpty()||request.key.length()>64||request.amount<1||request.amount>VillageRequests.MAX_AMOUNT||request.delivered<0))request=null;
         goodsDays.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||!Landmarks.kind(e.getKey()));
         donations.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||e.getValue()<0);
         while(donations.size()>256)donations.remove(donations.keySet().iterator().next());

@@ -16,6 +16,7 @@ class LifeEventsTest {
 
     @Test void theTuneStaysInTheNoteBlockRange(){
         for(int n:LifeEvents.TUNE)assertTrue(n>=-1&&n<=24);
+        for(int n:LifeEvents.CRADLE)assertTrue(n>=-1&&n<=24);
         assertEquals(1f,LifeEvents.pitch(12),1e-6);
         assertEquals(2f,LifeEvents.pitch(24),1e-6);
         assertEquals(.5f,LifeEvents.pitch(0),1e-6);

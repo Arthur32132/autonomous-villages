@@ -19,10 +19,23 @@ final class Lighting {
                 ||below.is(net.minecraft.world.level.block.Blocks.FARMLAND)||below.is(net.minecraft.world.level.block.Blocks.DIRT_PATH))return false;
         return v.level.getBrightness(LightLayer.BLOCK,p)<5;
     }
-    /** One floor cell per dark bedroom: the darkest under a roof within a few blocks of the bed, nearest to it on a tie. */
+    /**
+     * One floor cell per dark room people use: the darkest under a roof within a few blocks of a bed,
+     * a workstation or a shared chest, nearest to it on a tie. A zombie that spawned in an unlit smithy
+     * stays there all day and kills whoever comes for the chest (rc10, seed 1337).
+     */
     static List<BlockPos> darkRooms(Village v,int limit){
+        var anchors=new ArrayList<BlockPos>(v.index.beds);
+        var b=v.state.bounds;
+        if(b!=null){
+            BlockPos center=new BlockPos((b.minX+b.maxX)/2,v.state.y,(b.minZ+b.maxZ)/2);
+            int r=Math.max(b.maxX-b.minX,b.maxZ-b.minZ)/2+1;
+            v.level.getPoiManager().getInSquare(h->h.is(net.minecraft.tags.PoiTypeTags.ACQUIRABLE_JOB_SITE),center,r,net.minecraft.world.entity.ai.village.poi.PoiManager.Occupancy.ANY)
+                    .map(net.minecraft.world.entity.ai.village.poi.PoiRecord::getPos).filter(v.state::contains).forEach(anchors::add);
+        }
+        for(long chest:v.state.storage)anchors.add(BlockPos.of(chest));
         var out=new ArrayList<BlockPos>();
-        for(BlockPos bed:v.index.beds){
+        for(BlockPos bed:anchors){
             if(out.size()>=limit)break;
             if(!v.level.hasChunkAt(bed)||!v.state.contains(bed))continue;
             BlockPos best=null;int bestLight=0;

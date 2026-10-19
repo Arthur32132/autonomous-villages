@@ -32,6 +32,8 @@ final class VillagePlanner {
         int wood(){return planks+logs*4;}
         int need(String key){return missing.getOrDefault(key,0);}
     }
+    private List<BlockPos> rooms=List.of();
+    private long roomsScanned=Village.LONG_AGO;
     Snapshot snapshot(){
         long now=v.level.getGameTime();
         if(s!=null&&now-refreshed<40)return s;
@@ -44,7 +46,11 @@ final class VillagePlanner {
         boolean night=v.level.isDarkOutside()||Math.floorMod(v.level.getOverworldClockTime(),24000)>9000;
         var dark=new ArrayList<BlockPos>();
         if(v.state.lights.size()<160&&(night||now%1200<600)){
-            if(AutonomousVillagesMod.CONFIG.lightHomes)dark.addAll(Lighting.darkRooms(v,4));
+            if(AutonomousVillagesMod.CONFIG.lightHomes){
+                // Rooms are scanned block by block, so only every ten seconds; the list is checked again before each torch.
+                if(now-roomsScanned>=200){rooms=Lighting.darkRooms(v,4);roomsScanned=now;}
+                for(var p:rooms)if(Lighting.needsLight(v,p)&&!Lighting.unreachable(v,p))dark.add(p);
+            }
             for(var p:Lighting.darkSpots(v,8))if(dark.size()<8)dark.add(p);
         }
         BlockPos hub=v.meetingPoint();

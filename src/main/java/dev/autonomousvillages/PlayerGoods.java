@@ -175,7 +175,8 @@ final class PlayerGoods {
     }
     static String kind(String kind){
         return switch(kind){case "house","native_house"->"Дом";case "well"->"Колодец";case "tower"->"Сторожевая вышка";case "storehouse"->"Амбар";
-            case "civic"->"Мастерская";case "farm_plot"->"Поле";case "workshop"->"Мастерская";case "lamp"->"Фонарь";case "path"->"Тропа";default->kind;};
+            case "civic"->"Мастерская";case "farm_plot"->"Поле";case "workshop"->"Мастерская";case "lamp"->"Фонарь";case "path"->"Тропа";
+            case "forge","market","tavern"->{var l=Landmarks.label(kind);yield Character.toUpperCase(l.charAt(0))+l.substring(1);}default->kind;};
     }
     /** Residents with role and what they do, ten to a page, four pages at most. */
     private static List<Component> people(Village v){

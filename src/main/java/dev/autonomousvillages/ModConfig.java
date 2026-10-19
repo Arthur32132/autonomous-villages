@@ -54,6 +54,8 @@ public final class ModConfig {
     public boolean ledger=true;
     /** A stack handed to a resident (sneaking) goes to the store; the village remembers it in trades and honours a generous donor. */
     public boolean donations=true;
+    /** After the watchtower the village builds its own forge, market square and tavern as it grows. */
+    public boolean landmarks=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

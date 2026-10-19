@@ -76,13 +76,18 @@ final class CraftJob extends Job {
         for(var n:needs(v,recipe,times,w))if(v.stock.count(n.test())+(w==null?0:w.count(n.test()))<n.amount())return false;
         return true;
     }
-    private boolean fetched;
+    private boolean fetched,recounted;
     @Override boolean tick(){
         // Fetch once: crafting uses up what was fetched, and that must not send the worker back out.
         if(!fetched){
             if(fetch==null)fetch=new Fetch(needs(v,recipe,times-made,w));
             var state=fetch.tick();
-            if(state==Approach.State.FAILED)return fail("нет на складе: "+fetch.missing);
+            if(state==Approach.State.FAILED){
+                // Someone took the planks or sticks while this worker walked over (a builder, most often):
+                // count again from what the store holds now, logs included, once.
+                if(!recounted&&affordable(v,recipe,times-made,w)){recounted=true;fetch.cancel();fetch=new Fetch(needs(v,recipe,times-made,w));return true;}
+                return fail("нет на складе: "+fetch.missing);
+            }
             if(state==Approach.State.MOVING)return true;
             fetched=true;
         }

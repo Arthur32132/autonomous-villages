@@ -27,6 +27,7 @@ final class Village {
     final Reservations reservations=new Reservations();
     final Map<Long,Long> rejected=new HashMap<>();
     private final Map<Long,Map<UUID,Long>> unreachableVotes=new HashMap<>();
+    private final Map<Long,Integer> unreachableStrikes=new HashMap<>();
     /**
      * A worker could not reach a chest or workbench. It is skipped by everyone for two minutes only
      * when two different residents failed (or the only one): a single trapped resident fails to reach
@@ -37,7 +38,13 @@ final class Village {
         var votes=unreachableVotes.computeIfAbsent(p.asLong(),k->new HashMap<>());
         votes.values().removeIf(expiry->expiry<=now);
         votes.put(worker,now+2400);
-        if(votes.size()>=Math.min(2,Math.max(1,workers.size()))){rejected.put(p.asLong(),now+2400);unreachableVotes.remove(p.asLong());}
+        if(votes.size()>=Math.min(2,Math.max(1,workers.size()))){
+            // Each time again it stays out twice as long, up to twenty minutes: a chest up a cliff came
+            // back every two minutes and sent crafts out for its sticks (rc14, seed 42: crafting 38% of the day).
+            int strikes=unreachableStrikes.merge(p.asLong(),1,Integer::sum);
+            rejected.put(p.asLong(),now+Math.min(24000L,2400L<<Math.min(4,strikes-1)));unreachableVotes.remove(p.asLong());
+            if(unreachableStrikes.size()>512)unreachableStrikes.clear();
+        }
         if(unreachableVotes.size()>256)unreachableVotes.clear();
     }
     /** When each visiting player may next receive a gift (game time). */
@@ -126,6 +133,14 @@ final class Village {
         }
         rotation++;
         if(time%5==0)rescueFromPowderSnow();
+        if(time%20==7)guardChildren();
+        if(time%100==23)huntLurkers();
+        // At dusk a village short of golems calls one before the zombies come, not after.
+        if(time%200==13&&Math.floorMod(level.getOverworldClockTime(),24000)>=11500&&Math.floorMod(level.getOverworldClockTime(),24000)<13000)summonGolem(time);
+        if(time%6000==1234)writeChronicleBook();
+        if(time%100==61)MorningNews.tick(this);
+        if(time%20==3)dayBells(time);
+        if(time%600==311&&AutonomousVillagesMod.CONFIG.nameplates)NameplateJob.refresh(this);
         presentation.tick();
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){
@@ -144,6 +159,9 @@ final class Village {
      */
     void rescueFromPowderSnow(){
         for(UUID id:state.residents){
+            // Pricked by a cactus it is wedged against: step to the nearest safe cell clear of cacti.
+            if(level.getEntity(id) instanceof Villager hurt&&hurt.isAlive()&&hurt.hurtTime>5&&hurt.getLastDamageSource()!=null
+                    &&hurt.getLastDamageSource().is(net.minecraft.world.damagesource.DamageTypes.CACTUS))stepAwayFromCactus(hurt);
             if(!(level.getEntity(id) instanceof Villager v)||!v.isAlive()||!v.isInPowderSnow&&v.getTicksFrozen()==0)continue;
             BlockPos feet=v.blockPosition();boolean dug=false;
             for(BlockPos p:List.of(feet,feet.above()))
@@ -156,6 +174,26 @@ final class Village {
                 chronicle.add("rescued",1);
             }
         }
+    }
+    private void stepAwayFromCactus(Villager body){
+        BlockPos here=body.blockPosition();BlockPos best=null;double score=Double.MAX_VALUE;
+        for(BlockPos q:BlockPos.betweenClosed(here.offset(-3,-2,-3),here.offset(3,2,3))){
+            if(!safeFeet(q))continue;
+            boolean prickly=false;
+            for(BlockPos c:BlockPos.betweenClosed(q.offset(-1,0,-1),q.offset(1,1,1)))if(level.getBlockState(c).is(net.minecraft.world.level.block.Blocks.CACTUS)){prickly=true;break;}
+            if(prickly)continue;
+            double d=q.distSqr(here);if(d<score){score=d;best=q.immutable();}
+        }
+        if(best==null)return;
+        var to=feetPosition(best);
+        var w=workers.get(body.getUUID());
+        if(w!=null){
+            // Whatever it was doing there is not worth another prick for a while.
+            if(w.job!=null&&w.job.target()!=null)rejected.put(w.job.target().asLong(),level.getGameTime()+2400);
+            if(w.job!=null)w.cooldown(w.job.kind(),600);
+            w.cancel();
+        }
+        body.teleportTo(to.x,to.y,to.z);chronicle.add("rescued",1);
     }
     void sync(){
         var area=VillageDiscovery.area(state,64);
@@ -223,8 +261,11 @@ final class Village {
             if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new AABB(p).expandTowards(0,1,0).inflate(.2),net.minecraft.world.entity.LivingEntity::isAlive).isEmpty())continue;
             // A villager or player about to pass is not shut out: closing the door in front of a
             // resident on its way home broke its route on the doorstep every hundred ticks.
+            // Only someone actually walking: a resident asleep or standing by the door must not keep it open
+            // all night (rc8: zombies walked into a hall whose door stayed open beside its sleepers).
             if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new AABB(p).expandTowards(0,1,0).inflate(2.5),
-                    e->e.isAlive()&&(e instanceof Villager||e instanceof net.minecraft.world.entity.player.Player)).isEmpty())continue;
+                    e->e.isAlive()&&!e.isSleeping()&&e.getDeltaMovement().horizontalDistanceSqr()>1.0E-4
+                            &&(e instanceof Villager||e instanceof net.minecraft.world.entity.player.Player)).isEmpty())continue;
             door.setOpen(null,level,s,p,false);
         }
     }
@@ -270,7 +311,7 @@ final class Village {
             summonGolem(now);
             if(now>=nextBell&&!level.isDarkOutside()){
                 var hub=meetingPoint();
-                if(level.getBlockState(hub).getBlock() instanceof net.minecraft.world.level.block.BellBlock bell
+                if(caller!=null&&level.getBlockState(hub).getBlock() instanceof net.minecraft.world.level.block.BellBlock bell
                         &&bell.attemptToRing(caller.body(),level,hub,Direction.NORTH))nextBell=now+100;
             }
         }
@@ -280,16 +321,101 @@ final class Village {
                 .sorted(Comparator.comparingDouble(w->w.body().distanceToSqr(enemy))).limit(2).toList().forEach(w->w.defend(enemy));
     }
 
+    /**
+     * The chronicle as a written book on the lectern nearest the bell (a librarian's), for players to
+     * read. Only an empty lectern or one holding the village's own book is used; a player's book stays.
+     */
+    /**
+     * Children are vanilla villagers the village does not steer; three were killed together in the
+     * open one night (seed 42). A monster near a child raises the alarm as an attack on an adult does:
+     * armed residents come and, if there is none, a golem is called.
+     */
+    private void guardChildren(){
+        for(UUID id:state.residents){
+            if(!(level.getEntity(id) instanceof Villager child)||!child.isAlive()||!child.isBaby()||!state.contains(child.blockPosition()))continue;
+            var enemy=level.getEntitiesOfClass(Monster.class,child.getBoundingBox().inflate(10),m->m.isAlive()&&!(m instanceof net.minecraft.world.entity.monster.Creeper)&&m.hasLineOfSight(child))
+                    .stream().min(Comparator.comparingDouble(child::distanceToSqr)).orElse(null);
+            if(enemy!=null){raiseAlarm(null,enemy);return;}
+        }
+    }
+    /**
+     * In daylight a zombie under a porch roof or in a doorway does not burn and waits for whoever comes
+     * out (seed 8675309: residents killed at one doorstep in the morning). The nearest armed, healthy
+     * resident goes for it without ringing the bell, so the rest of the village keeps working.
+     */
+    private long lastBellDay=-1,lastBellEvening=-1;
+    private int bellStrokes;private long nextStroke;
+    /**
+     * The bell by the meeting point rings three strokes at sunrise and at dusk: the sound only, so
+     * nobody takes it for an alarm (a real strike sends vanilla villagers into hiding).
+     */
+    private void dayBells(long time){
+        if(!AutonomousVillagesMod.CONFIG.dayBells)return;
+        if(bellStrokes>0){
+            if(time<nextStroke)return;
+            BlockPos bell=meetingPoint();
+            if(level.getBlockState(bell).is(net.minecraft.world.level.block.Blocks.BELL))
+                level.playSound(null,bell,net.minecraft.sounds.SoundEvents.BELL_BLOCK,net.minecraft.sounds.SoundSource.BLOCKS,2f,1f);
+            bellStrokes--;nextStroke=time+30;return;
+        }
+        long clock=level.getOverworldClockTime(),day=Math.floorDiv(clock,24000),hour=Math.floorMod(clock,24000);
+        if(hour<600&&lastBellDay!=day){lastBellDay=day;bellStrokes=3;}
+        else if(hour>=11800&&hour<12400&&lastBellEvening!=day){lastBellEvening=day;bellStrokes=3;}
+    }
+    private final Map<UUID,Long> hunted=new HashMap<>();
+    private void huntLurkers(){
+        if(Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))return;
+        long now=level.getGameTime();
+        hunted.values().removeIf(until->until<=now);
+        for(var lurker:level.getEntitiesOfClass(net.minecraft.world.entity.monster.zombie.Zombie.class,VillageDiscovery.area(state,0),
+                m->m.isAlive()&&state.contains(m.blockPosition())&&!m.isOnFire()&&!m.isInWater()&&Math.abs(m.getY()-state.y)<=6
+                        &&!(m instanceof net.minecraft.world.entity.monster.zombie.ZombifiedPiglin)&&!(m instanceof net.minecraft.world.entity.monster.zombie.Drowned))){
+            if(hunted.containsKey(lurker.getUUID())||workers.values().stream().anyMatch(w->w.fighting(lurker)))continue;
+            Worker hunter=workers.values().stream().filter(w->w.active()&&w.armed()&&w.body().getHealth()>=16&&!w.body().isSleeping()&&!w.body().isTrading()
+                    &&!w.fighting(null)&&w.ready("hunt")&&w.body().distanceToSqr(lurker)<16*16&&Math.abs(w.body().getY()-lurker.getY())<=4&&w.body().hasLineOfSight(lurker))
+                    .min(Comparator.comparingDouble(w->w.body().distanceToSqr(lurker))).orElse(null);
+            if(hunter==null)continue;
+            // One go per zombie in two minutes: one the hunter could not reach was chosen again every
+            // five seconds and kept a resident from work all day (rc14: over a hundred hunts a run).
+            hunted.put(lurker.getUUID(),now+2400);hunter.cooldown("hunt",600);
+            AutonomousVillagesMod.LOG.info("HUNT {} {} -> {} at {}",state.name,presentation.personName(hunter.id),lurker.getType().getDescription().getString(),lurker.blockPosition().toShortString());
+            hunter.defend(lurker);
+            return;
+        }
+    }
+    private final Set<Long> booksPlaced=new HashSet<>();
+    void writeChronicleBook(){
+        if(!AutonomousVillagesMod.CONFIG.chronicleBook)return;
+        BlockPos hub=meetingPoint();
+        var lectern=level.getPoiManager().getInRange(h->h.is(PoiTypes.LIBRARIAN),hub,Math.min(256,state.radius+16),PoiManager.Occupancy.ANY)
+                .map(PoiRecord::getPos).filter(state::contains).filter(level::hasChunkAt)
+                .filter(p->level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.LecternBlockEntity l&&(!l.hasBook()||Chronicle.ownBook(l.getBook())))
+                .min(Comparator.comparingDouble(hub::distSqr)).orElse(null);
+        if(lectern==null||!(level.getBlockEntity(lectern) instanceof net.minecraft.world.level.block.entity.LecternBlockEntity l))return;
+        boolean first=!l.hasBook();
+        // A player took the book: one copy is a gift, not a stream of them.
+        if(first&&!booksPlaced.add(lectern.asLong()))return;
+        var bs=level.getBlockState(lectern);
+        if(first){
+            if(!net.minecraft.world.level.block.LecternBlock.tryPlaceBook(null,level,lectern,bs,chronicle.book()))return;
+            chronicle.event("Летопись деревни лежит на кафедре у "+lectern.toShortString());
+        }else{l.setBook(chronicle.book());l.setChanged();level.sendBlockUpdated(lectern,bs,bs,3);}
+    }
     private long nextGolemAttempt;
     /**
      * A village of five or more under attack with no iron golem nearby calls one, as frightened
      * vanilla villagers do, at most once a day.
      */
+    /** One iron golem for every ten residents, three at most; none below five residents. */
+    int golemsWanted(){return state.residents.size()<5?0:Math.min(3,1+state.residents.size()/10);}
     private void summonGolem(long now){
-        if(now<nextGolemAttempt||now-state.lastGolem<24000||state.residents.size()<5)return;
+        // A golem that fell may be replaced after five minutes, never more than the village needs.
+        if(!AutonomousVillagesMod.CONFIG.summonGolems||now<nextGolemAttempt||now-state.lastGolem<6000)return;
         nextGolemAttempt=now+1200;
         BlockPos hub=meetingPoint();
-        if(!level.getEntitiesOfClass(net.minecraft.world.entity.animal.golem.IronGolem.class,new AABB(hub).inflate(48),net.minecraft.world.entity.LivingEntity::isAlive).isEmpty())return;
+        var area=VillageDiscovery.area(state,16);
+        int golems=level.getEntitiesOfClass(net.minecraft.world.entity.animal.golem.IronGolem.class,area,net.minecraft.world.entity.LivingEntity::isAlive).size();
+        if(golems>=golemsWanted())return;
         net.minecraft.util.SpawnUtil.trySpawnMob(net.minecraft.world.entity.EntityTypes.IRON_GOLEM,net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED,level,hub,10,8,6,
                 net.minecraft.util.SpawnUtil.Strategy.LEGACY_IRON_GOLEM,false).ifPresent(golem->{
             state.lastGolem=now;chronicle.add("golems",1);chronicle.announce("Жители позвали на помощь железного голема!");runtime.save();
@@ -345,7 +471,7 @@ final class Village {
         if(board==null&&now-boardTick<20)return null;
         boardTick=now;board=null;BlockPos hub=meetingPoint();
         for(BlockPos q:BlockPos.betweenClosed(hub.offset(-6,-2,-6),hub.offset(6,2,6)))
-            if(level.getBlockEntity(q) instanceof net.minecraft.world.level.block.entity.SignBlockEntity){board=q.immutable();break;}
+            if(level.getBlockEntity(q) instanceof net.minecraft.world.level.block.entity.SignBlockEntity&&!state.nameplates.containsKey(q.asLong())){board=q.immutable();break;}
         return board;
     }
     BlockPos stand(BlockPos target,Vec3 from){return stand(target,from,3.0,true,Set.of());}

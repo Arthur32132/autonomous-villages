@@ -40,7 +40,10 @@ final class ShelterJob extends Job {
     @Override boolean tick(){
         if(!Worker.nightRestWindow(v.level.getOverworldClockTime(),v.level.isDarkOutside()))return false;
         Vec3 point=v.feetPosition(cell);
-        if(body().position().distanceToSqr(point)<=1.2){
+        // Under the same roof a step or two away is shelter enough: the exact cell is often one a route
+        // cannot end in (a slab, a bed edge), and failing there sent residents back out (rc13, seed 42).
+        double away=body().position().distanceToSqr(point);
+        if(away<=1.2||away<=6.25&&indoor(v,body().blockPosition())&&!Lighting.byDoor(v,body().blockPosition())){
             // Manual zero input keeps the native brain from walking the body back outside.
             if(!holding){bot().actions().setMovement(0,0,false,false,false);holding=true;status="ночует под крышей";}
             return true;

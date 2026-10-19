@@ -10,11 +10,12 @@ from pathlib import Path
 
 
 def runs(folders):
+    """Results by run label; a label run more than once (a repeated batch) keeps every result."""
     out = {}
     for folder in folders:
         for result in Path(folder).glob('*/soak-result.json'):
             data = json.loads(result.read_text())
-            out[result.parent.name] = data
+            out.setdefault(result.parent.name, []).append(data)
     return out
 
 
@@ -45,17 +46,25 @@ def main():
     labels = sorted(set(base) | set(cand), key=lambda l: (l.split('-')[1], l))
     print(f'| прогон | {args.candidate_name} | {args.base_name} |')
     print('|---|---|---|')
-    totals = {name: {'births': 0, 'deaths': 0, 'built': 0} for name in ('c', 'b')}
+    # Repeated runs of a label are averaged, so totals stay comparable with a single batch.
+    totals = {name: {'births': 0.0, 'deaths': 0.0, 'built': 0.0, 'villagers': 0.0} for name in ('c', 'b')}
     for label in labels:
-        print(f'| {label} | {cell(cand.get(label))} | {cell(base.get(label))} |')
+        cells = [' / '.join(cell(r) for r in source.get(label, [])) or '—' for source in (cand, base)]
+        print(f'| {label} | {cells[0]} | {cells[1]} |')
         for key, source in (('c', cand), ('b', base)):
-            o = source.get(label, {}).get('outcome', {})
-            totals[key]['births'] += o.get('births', 0)
-            totals[key]['deaths'] += o.get('deaths', 0)
-            totals[key]['built'] += o.get('builtBlocks', 0)
-    c, b = totals['c'], totals['b']
-    print(f"| **итого** | рожд. {c['births']}, смертей {c['deaths']}, блоков {c['built']} | "
-          f"рожд. {b['births']}, смертей {b['deaths']}, блоков {b['built']} |")
+            results = source.get(label, [])
+            for r in results:
+                o = r.get('outcome', {})
+                totals[key]['births'] += o.get('births', 0) / len(results)
+                totals[key]['deaths'] += o.get('deaths', 0) / len(results)
+                totals[key]['built'] += o.get('builtBlocks', 0) / len(results)
+                totals[key]['villagers'] += (r.get('end', {}).get('villagers') or 0) / len(results)
+
+    def total(t):
+        return (f"жителей {t['villagers']:g}, рожд. {t['births']:g}, смертей {t['deaths']:g}, "
+                f"блоков {t['built']:g}")
+    repeated = any(len(v) > 1 for v in list(cand.values()) + list(base.values()))
+    print(f"| **итого{' (среднее повторов)' if repeated else ''}** | {total(totals['c'])} | {total(totals['b'])} |")
 
 
 if __name__ == '__main__':

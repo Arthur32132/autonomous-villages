@@ -45,13 +45,36 @@ final class VillageStock {
         return chests().stream().filter(c->!excluded.contains(c.getBlockPos())&&(holding==null||contains(c,holding)))
                 .min(Comparator.comparingDouble(c->{double dy=c.getBlockPos().getY()-from.getY();return c.getBlockPos().distSqr(from)+15*dy*dy;})).orElse(null);
     }
+    /**
+     * A chest with a free slot: the store by the bell first, nearest to the worker; a house chest only
+     * when the store is full. Goods spread over far house chests were walked to twice, and deposits
+     * timed out on house chests nobody reaches (rc13, seed 1337).
+     */
     ChestBlockEntity nearestWithRoom(BlockPos from,Set<BlockPos> excluded){
+        BlockPos hub=v.meetingPoint();
         return chests().stream().filter(c->!excluded.contains(c.getBlockPos())).filter(c->{for(int i=0;i<c.getContainerSize();i++)if(c.getItem(i).isEmpty())return true;return false;})
-                .min(Comparator.comparingDouble(c->c.getBlockPos().distSqr(from))).orElse(null);
+                .min(Comparator.<ChestBlockEntity>comparingInt(c->c.getBlockPos().distSqr(hub)<=12*12?0:1).thenComparingDouble(c->c.getBlockPos().distSqr(from))).orElse(null);
     }
     static boolean contains(ChestBlockEntity c,Predicate<ItemStack> test){
         for(int i=0;i<c.getContainerSize();i++){var s=c.getItem(i);if(!s.isEmpty()&&test.test(s))return true;}
         return false;
+    }
+    /**
+     * Puts items straight into the shared chests, the ones by the bell first: a chest in a far house
+     * may be one nobody reaches (rc11: a fletcher's sticks sat there and 19 crafts failed fetching them).
+     * Returns what did not fit.
+     */
+    ItemStack put(ItemStack stack){
+        var left=stack.copy();BlockPos hub=v.meetingPoint();
+        for(var c:chests().stream().sorted(java.util.Comparator.comparingDouble(c->c.getBlockPos().distSqr(hub))).toList()){
+            if(left.isEmpty())break;
+            var slots=new ArrayList<ItemStack>(c.getContainerSize());for(int i=0;i<c.getContainerSize();i++)slots.add(c.getItem(i).copy());
+            int moved=Supplies.insertPartial(slots,left);
+            if(moved==0)continue;
+            for(int i=0;i<slots.size();i++)c.setItem(i,slots.get(i));
+            c.setChanged();left.shrink(moved);
+        }
+        invalidate();return left;
     }
     /** Removes matching items straight from the chests (used when the household itself eats). */
     int consume(Predicate<ItemStack> test,int amount){

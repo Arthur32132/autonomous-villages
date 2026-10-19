@@ -7,8 +7,9 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 
 /**
- * Lights dark ground between houses so that monsters cannot spawn inside the village: a lamp post
- * (fence with a torch on top) when the store has fences, otherwise a torch on the ground.
+ * Lights dark ground between houses and dark bedrooms so that monsters cannot spawn inside the
+ * village: a lamp post (fence with a torch on top) outdoors when the store has fences, otherwise a
+ * torch on the ground.
  */
 final class LightJob extends Job {
     private final ArrayDeque<BlockPos> spots;
@@ -36,16 +37,19 @@ final class LightJob extends Job {
         var state=approach.tick();
         if(state==Approach.State.MOVING)return true;
         BlockPos spot=spots.poll();approach=null;
+        if(state==Approach.State.FAILED)v.rejected.put(spot.asLong(),now()+2400);
         if(state==Approach.State.ARRIVED){
             int fence=Supplies.find(bot(),s->s.is(net.minecraft.tags.ItemTags.WOODEN_FENCES));
             BlockPos torch=spot;
-            if(fence>=0&&Construction.clear(v.level.getBlockState(spot.above()))&&v.state.contains(spot.above())
+            // A lamp post outside; indoors and by a door the torch stands on the ground.
+            if(fence>=0&&!Lighting.indoors(v,spot)&&!Lighting.byDoor(v,spot)&&Construction.clear(v.level.getBlockState(spot.above()))&&v.state.contains(spot.above())
                     &&bot().inventory().snapshot().slots().get(fence).getItem() instanceof net.minecraft.world.item.BlockItem post
                     &&Construction.place(v,bot(),new Construction.Step(spot,post.getBlock().defaultBlockState(),post)))torch=spot.above();
             if(Construction.place(v,bot(),new Construction.Step(torch,Blocks.TORCH.defaultBlockState(),Items.TORCH))){
                 placed++;v.state.lights.add(torch.asLong());v.chronicle.lit();
                 if(!torch.equals(spot))v.chronicle.add("lamps",1);
-            }
+                if(Lighting.indoors(v,spot))v.chronicle.add("roomsLit",1);
+            }else v.rejected.put(spot.asLong(),now()+600); // someone standing there, most likely
         }
         return !spots.isEmpty();
     }

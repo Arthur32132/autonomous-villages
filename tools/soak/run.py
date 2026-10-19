@@ -4,7 +4,7 @@
 Example:
     python3 tools/soak/run.py --days 3 --difficulty normal --seeds 8675309,42 --parallel 2
 
-Each run writes build/soak-reports/<batch>/<seed>-<difficulty>/{soak-result.json,soak-timeline.jsonl,server-tail.log.gz}
+Each run writes build/soak-reports/<batch>/<seed>-<difficulty>/{soak-result.json,soak-timeline.jsonl,server-tail.log.gz,events.log}
 and a batch summary.json. Labs are deleted afterwards unless --keep-lab is given.
 """
 import argparse, gzip, json, os, random, shutil, subprocess, sys, threading, time, urllib.request
@@ -134,6 +134,9 @@ def run_one(java, batch_dir, seed, difficulty, args, jars):
     lines = (lab / 'server.log').read_bytes().splitlines()
     with gzip.open(report / 'server-tail.log.gz', 'wb') as tail:
         tail.write(b'\n'.join(lines[-4000:]))
+    # The village's own story for the whole run: deaths with their context, traps, chronicle events.
+    markers = (b'DEATH ', b'TRAPPED ', b'UNSTUCK ', b'SETTLEMENT ', b'JOB_FAILED ', b'HUNT ')
+    (report / 'events.log').write_bytes(b'\n'.join(l for l in lines if any(m in l for m in markers)))
     problems = [l.decode('utf8', 'replace') for l in lines if b'/ERROR]' in l or b'Exception' in l][:200]
     (report / 'errors.txt').write_text('\n'.join(problems))
     result['wallSeconds'] = round(time.time() - started, 1)

@@ -17,6 +17,8 @@ import org.slf4j.*;
 
 public final class AutonomousVillagesMod implements ModInitializer {
     public static final Logger LOG = LoggerFactory.getLogger("autonomous_villages");
+    /** Read at mod start; every switch on unless the server owner turned it off. */
+    public static ModConfig CONFIG = new ModConfig();
     public static final TicketType TICKET = Registry.register(BuiltInRegistries.TICKET_TYPE,
             Identifier.fromNamespaceAndPath("autonomous_villages", "settlement"),
             new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION | TicketType.FLAG_KEEP_DIMENSION_ACTIVE));
@@ -27,6 +29,7 @@ public final class AutonomousVillagesMod implements ModInitializer {
         return runtime;
     }
     @Override public void onInitialize() {
+        CONFIG = ModConfig.load(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir());
         dev.navigationai.api.BlockBreakPermissions.register((id,pos)->{
             if(runtime==null)return true;
             return runtime.mayBreak(id,pos);
@@ -41,9 +44,13 @@ public final class AutonomousVillagesMod implements ModInitializer {
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
             if (runtime != null) for (Village village : runtime.villages.values()) {
                 if (village.state.residents.contains(entity.getUUID())) {
-                    String who=village.presentation.personName(entity.getUUID())+", "+village.role(entity.getUUID());
+                    String name=village.presentation.personName(entity.getUUID());
+                    String role=entity.isBaby()?"малыш":village.role(entity.getUUID());
+                    String who=name+", "+role;
+                    if(CONFIG.graves)village.state.graves.add(new VillageState.Grave(name,role,village.level.getGameTime()/24000+1));
                     village.state.residents.remove(entity.getUUID());
                     var worker=village.workers.remove(entity.getUUID());
+                    LOG.info("DEATH {} {}: {}",village.state.name,who,deathContext(village,entity,worker));
                     if(worker!=null&&worker.job!=null)worker.job.stop();
                     village.reservations.release(entity.getUUID());
                     village.residentLost(entity.getUUID());
@@ -86,5 +93,19 @@ public final class AutonomousVillagesMod implements ModInitializer {
                 + "chronicle <имя> [стр] — летопись; storage <имя> <x y z> — сделать сундук общим; private <имя> <x y z>; "
                 + "protect <имя> <wood|mine|build|farm|all> <от> <до>; unprotect <имя> <номер>; expansion <имя> <north|south|east|west|none|all>; "
                 + "pause|resume|release <имя>."), false); return 1;
+    }
+
+    /** Where and how a resident died, for the logs: light, doors nearby, what it was doing. */
+    static String deathContext(Village village,net.minecraft.world.entity.LivingEntity body,Worker worker){
+        var level=village.level;var at=body.blockPosition();
+        var doors=new StringBuilder();
+        for(var q:net.minecraft.core.BlockPos.betweenClosed(at.offset(-6,-2,-6),at.offset(6,2,6))){
+            var s=level.getBlockState(q);
+            if(s.getBlock() instanceof net.minecraft.world.level.block.DoorBlock&&s.getValue(net.minecraft.world.level.block.DoorBlock.HALF)==net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER)
+                doors.append(q.toShortString()).append(s.getValue(net.minecraft.world.level.block.DoorBlock.OPEN)?" open":" closed").append(String.format(" %.1f; ",Math.sqrt(q.distSqr(at))));
+        }
+        return "pos="+at.toShortString()+" blockLight="+level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK,at)+" sky="+level.canSeeSky(at)
+                +" sleeping="+body.isSleeping()+" job="+(worker==null||worker.job==null?"none":worker.job.kind())+" status="+(worker==null?"":worker.status)
+                +" doors=["+doors+"] clock="+Math.floorMod(level.getOverworldClockTime(),24000);
     }
 }

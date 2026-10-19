@@ -36,6 +36,7 @@ final class PlaceJob extends Job {
         if(!Construction.place(v,bot(),new Construction.Step(spot,state,blockItem)))return fail("не удалось поставить");
         v.index.tables.removeIf(p->!v.level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.CRAFTING_TABLE));
         v.chronicle.event(status.replace("ставит: ","Поставили: "));
+        if(state.getBlock() instanceof net.minecraft.world.level.block.BedBlock)v.chronicle.add("spareBeds",1);
         return false;
     }
     @Override void stop(){if(fetch!=null)fetch.cancel();if(approach!=null)approach.cancel();}

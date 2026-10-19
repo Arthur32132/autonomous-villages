@@ -31,8 +31,19 @@ public final class VillageState {
     public Set<Long> lights=new LinkedHashSet<>();
     public Chronicle.Data chronicle=new Chronicle.Data();
     public long lastBirth;
+    /** The last game day each resident brought home its profession's product. */
+    public Map<UUID,Long> productDays=new LinkedHashMap<>();
     /** Game time the residents last called an iron golem to their defence. */
     public long lastGolem;
+    /** The morning the news was last told (overworld day), with the totals and population of that morning. */
+    public long newsDay=-1;
+    public Map<String,Long> newsTotals;
+    public int newsResidents=-1;
+    /** Residents lost and still without a sign at the cemetery; the cemetery's corner once chosen. */
+    public List<Grave> graves=new ArrayList<>();
+    public Long cemetery;
+    /** Signs beside home doors (position) and the building each names (origin). */
+    public Map<Long,Long> nameplates=new LinkedHashMap<>();
     static final int MAX_TICKET_CHUNKS=1024;
     static long footprintChunks(Bounds b){return ((long)(b.maxX>>4)-(b.minX>>4)+1)*((long)(b.maxZ>>4)-(b.minZ>>4)+1);}
     static <T> void trimOldest(Set<T> values,int limit){while(values.size()>limit)values.remove(values.iterator().next());}
@@ -54,6 +65,16 @@ public final class VillageState {
         if(policy==null)policy=new VillagePolicy();
         if(lights==null)lights=new LinkedHashSet<>();
         if(chronicle==null)chronicle=new Chronicle.Data();
+        if(productDays==null)productDays=new LinkedHashMap<>();
+        if(newsTotals!=null)newsTotals.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null);
+        if(graves==null)graves=new ArrayList<>();
+        if(nameplates==null)nameplates=new LinkedHashMap<>();
+        nameplates.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||!contains(BlockPos.of(e.getKey())));
+        while(nameplates.size()>256)nameplates.remove(nameplates.keySet().iterator().next());
+        graves.removeIf(g->g==null||g.name==null);
+        while(graves.size()>16)graves.removeFirst();
+        if(cemetery!=null&&!contains(BlockPos.of(cemetery)))cemetery=null;
+        productDays.keySet().retainAll(residents);
         chronicle.sanitize();
         trimOldest(plantedCrops,512);trimOldest(reforestation,2048);trimOldest(capturedPieces,4096);trimOldest(lights,1024);trimOldest(plantedTrees,512);
         while(treeWork.size()>256)treeWork.remove(treeWork.keySet().iterator().next());
@@ -79,6 +100,12 @@ public final class VillageState {
     boolean recordedWork(BlockPos p){return nearby(p);}
     /** Chests and furnaces become village metadata only inside the footprint; saplings also in the outskirts. */
     boolean mayRecordPlacement(BlockPos p,boolean sapling){return sapling?nearby(p):contains(p);}
+    public static final class Grave {
+        public String name="",role="";
+        public long day;
+        public Grave(){}
+        public Grave(String name,String role,long day){this.name=name;this.role=role;this.day=day;}
+    }
     public static final class ResidentName {
         public String json="";
         public boolean visible;

@@ -56,6 +56,28 @@ final class Worker {
     }
     private String name(BlockPos p){var s=v.level.getBlockState(p);var id=net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
         return s.hasProperty(net.minecraft.world.level.block.DoorBlock.OPEN)?id+(s.getValue(net.minecraft.world.level.block.DoorBlock.OPEN)?"(open)":"(closed)"):id;}
+    /**
+     * Even digging out failed: the resident stands somewhere routes cannot start from (a stair edge in
+     * a doorway, the top of a fence). It steps over to the nearest safe cell within three blocks that
+     * has room to walk on, as a player would shuffle aside.
+     */
+    private void unstick(){
+        BlockPos here=body().blockPosition();BlockPos best=null;double score=Double.MAX_VALUE;
+        for(BlockPos q:BlockPos.betweenClosed(here.offset(-3,-2,-3),here.offset(3,2,3))){
+            if(q.equals(here)||!v.safeFeet(q))continue;
+            // Only a step in plain sight: never through a wall, out of a player's trading cell or into another room.
+            var eye=body().getEyePosition();var there=v.feetPosition(q).add(0,body().getEyeHeight(),0);
+            if(v.level.clip(new net.minecraft.world.level.ClipContext(eye,there,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,body())).getType()
+                    !=net.minecraft.world.phys.HitResult.Type.MISS)continue;
+            int open=0;for(var d:net.minecraft.core.Direction.Plane.HORIZONTAL)if(v.safeFeet(q.relative(d)))open++;
+            if(open<2)continue;
+            double d=q.distSqr(here);if(d<score){score=d;best=q.immutable();}
+        }
+        if(best==null)return;
+        var to=v.feetPosition(best);
+        AutonomousVillagesMod.LOG.info("UNSTUCK {} {} {} -> {}",v.state.name,v.presentation.personName(id),here.toShortString(),best.toShortString());
+        bot().stopAll();body().teleportTo(to.x,to.y,to.z);stuckCount=0;
+    }
     private boolean nearStuckSpot(){return BlockPos.of(stuckAt).distSqr(body().blockPosition())<=9;}
     boolean released;
     final Map<String,Long> cooldowns=new HashMap<>();
@@ -95,8 +117,14 @@ final class Worker {
             if(job==null&&night&&watchman()&&ready("patrol"))start(new PatrolJob(this));
             if(job==null&&night&&!hasBed()&&ready("shelter")){var shelter=ShelterJob.find(this);if(shelter!=null)start(shelter);else cooldown("shelter",600);}
             if(job==null&&night&&!atHome()&&ready("home"))start(new HomeJob(this));
+            // No way home tonight: any roof is better than a doorstep (rc13: residents stood all night
+            // at a door after "не нашёл дорогу домой" and were killed there).
+            if(job==null&&night&&!atHome()&&!ready("home")&&!e.isSleeping()&&!ShelterJob.indoor(v,e.blockPosition())&&ready("shelter")){
+                var shelter=ShelterJob.find(this);if(shelter!=null)start(shelter);else cooldown("shelter",600);
+            }
             if(job==null){
                 if(!released){b.stopAll();released=true;}
+                if(profession&&!night)professionProduct(e);
                 status=v.alarm()&&!nightRest()?"прячется: тревога":night?(e.isSleeping()?"спит":"идёт спать"):profession?"работает по профессии и обновляет торговлю":"общение и отдых";
                 return;
             }
@@ -120,6 +148,20 @@ final class Worker {
         job=next;released=false;
         if(job.target()!=null&&!v.reservations.acquire(job.target().asLong(),id,now())){job=null;return;}
         status=job.status;
+        showTool(job.kind());
+    }
+    /** The tool of the job in hand from the start, so a player sees who goes to fell and who to dig. */
+    private void showTool(String kind){
+        var tag=switch(kind){
+            case "chop"->net.minecraft.tags.ItemTags.AXES;
+            case "quarry","shaft"->net.minecraft.tags.ItemTags.PICKAXES;
+            case "farm"->net.minecraft.tags.ItemTags.HOES;
+            case "patrol"->net.minecraft.tags.ItemTags.SWORDS;
+            default->null;
+        };
+        if(tag==null)return;
+        int slot=Supplies.find(bot(),s->s.is(tag)&&Supplies.usable(s));
+        if(slot>=0)bot().inventory().select(slot);
     }
     void endJob(){
         if(job==null)return;
@@ -136,6 +178,7 @@ final class Worker {
                 if(stuckCount==3)AutonomousVillagesMod.LOG.info("TRAPPED {} {} at {}: {}",v.state.name,v.presentation.personName(id),body().position(),surroundings());
             }
             v.failures.merge(job.kind()+": "+job.failure,1,Integer::sum);
+            if(job instanceof EscapeJob)unstick();
             if(now()>=nextFailureLog){
                 nextFailureLog=now()+600;
                 AutonomousVillagesMod.LOG.info("JOB_FAILED {} {} {} reason={} target={} at={} after={}t",v.state.name,v.presentation.personName(id),job.kind(),job.failure,
@@ -243,6 +286,24 @@ final class Worker {
                 ||m.getTarget() instanceof Villager target&&v.state.residents.contains(target.getUUID())
                 ||m instanceof Creeper creeper&&creeper.getSwellDir()>0;
     }
+    /** At its workstation during the profession hour, a resident makes the day's product for the store. */
+    private void professionProduct(Villager e){
+        if(!AutonomousVillagesMod.CONFIG.professionProducts)return;
+        long dayNumber=v.level.getOverworldClockTime()/24000;
+        // The day is kept in the save: a pause, a resume or a restart does not pay twice.
+        if(v.state.productDays.getOrDefault(id,-1L)>=dayNumber)return;
+        var site=e.getBrain().getMemory(MemoryModuleType.JOB_SITE).filter(p->p.dimension().equals(v.level.dimension())).map(GlobalPos::pos).orElse(null);
+        if(site==null||site.distSqr(e.blockPosition())>9)return;
+        v.state.productDays.put(id,dayNumber);
+        var product=Professions.product(e.getVillagerData().profession(),dayNumber);
+        if(product.isEmpty())return;
+        String label=Professions.label(product);int count=product.getCount();
+        // Straight into the shared store, so a farmer's daily loaf never stays in its own food pocket.
+        var rest=v.stock.put(product);
+        if(!rest.isEmpty()&&!bot().inventory().insert(rest).isEmpty())return;
+        v.chronicle.add("profession:"+label,count);
+        v.level.sendParticles(net.minecraft.core.particles.ParticleTypes.HAPPY_VILLAGER,e.getX(),e.getY()+2.1,e.getZ(),4,.3,.2,.3,0);
+    }
     private long fleeStarted;
     private boolean danger(){
         var e=body();
@@ -254,8 +315,10 @@ final class Worker {
             return false;
         }
         if(combat!=null&&!combat.completion().isDone())return true;
-        // Asleep or sheltering under a roof: running out into the dark is worse than staying put.
-        if((e.isSleeping()||job instanceof ShelterJob&&!e.level().canSeeSky(e.blockPosition()))&&e.distanceToSqr(enemy)>36){
+        // Asleep, or under a roof at night: running out into the dark is worse than staying put
+        // (rc13, seed 42: three residents killed outdoors at night while fleeing).
+        // The armed still go for a monster that is indoors with them.
+        if((e.isSleeping()||(job instanceof ShelterJob||nightRest()&&(!armed()||enemy.level().canSeeSky(enemy.blockPosition())))&&!e.level().canSeeSky(e.blockPosition()))&&e.distanceToSqr(enemy)>36){
             if(!(enemy instanceof Creeper))v.raiseAlarm(this,enemy);
             return false;
         }
@@ -280,8 +343,13 @@ final class Worker {
     }
     /** A guard fights with any sword; others only with stone or better. */
     boolean armed(){return v.guard(id)?VillageCrafting.hasSword(bot()):VillageCrafting.hasDefensiveSword(bot());}
+    private Monster foe;
+    /** In a fight now; with a target given, in a fight with that one. */
+    boolean fighting(Monster target){return combat!=null&&!combat.completion().isDone()&&(target==null||target==foe);}
     void defend(Monster enemy){
         if(job!=null){job.stop();job=null;v.reservations.release(id);}
+        foe=enemy;
+        int sword=Supplies.find(bot(),s->s.is(net.minecraft.tags.ItemTags.SWORDS)&&Supplies.usable(s));if(sword>=0)bot().inventory().select(sword);
         combat=bot().combat().fight(enemy,new CombatPolicy(CombatSkill.EXPERT,16,3,24,false,true,false).swordOnly());
         fleeSince=now();released=false;status="защищает деревню";
     }

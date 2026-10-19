@@ -32,6 +32,8 @@ final class VillagePlanner {
         int wood(){return planks+logs*4;}
         int need(String key){return missing.getOrDefault(key,0);}
     }
+    private List<BlockPos> rooms=List.of();
+    private long roomsScanned=Village.LONG_AGO;
     Snapshot snapshot(){
         long now=v.level.getGameTime();
         if(s!=null&&now-refreshed<40)return s;
@@ -42,7 +44,15 @@ final class VillagePlanner {
         var missing=new TreeMap<String,Integer>();
         for(var b:v.town.unfinished())v.town.missing(b).forEach((k,n)->missing.merge(k,n,Integer::sum));
         boolean night=v.level.isDarkOutside()||Math.floorMod(v.level.getOverworldClockTime(),24000)>9000;
-        var dark=v.state.lights.size()<160&&(night||now%1200<600)?Lighting.darkSpots(v,8):List.<BlockPos>of();
+        var dark=new ArrayList<BlockPos>();
+        if(v.state.lights.size()<160&&(night||now%1200<600)){
+            if(AutonomousVillagesMod.CONFIG.lightHomes){
+                // Rooms are scanned block by block, so only every ten seconds; the list is checked again before each torch.
+                if(now-roomsScanned>=200){rooms=new ArrayList<>(Lighting.darkDoorsteps(v,3));rooms.addAll(Lighting.darkRooms(v,2));roomsScanned=now;}
+                for(var p:rooms)if(Lighting.needsLight(v,p)&&!Lighting.unreachable(v,p))dark.add(p);
+            }
+            for(var p:Lighting.darkSpots(v,8))if(dark.size()<8)dark.add(p);
+        }
         BlockPos hub=v.meetingPoint();
         // The workbench nearest the bell that a route reaches; none such and the village makes its own by the bell.
         BlockPos table=v.index.tables.stream().filter(p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)&&p.distSqr(hub)<32*32&&v.rejected.getOrDefault(p.asLong(),0L)<=now)
@@ -83,7 +93,7 @@ final class VillagePlanner {
             if(!cells.isEmpty())return new HazardJob(w,cells);
         }
         // 4c. A visiting player gets a loaf from a well-stocked store, once a day.
-        if(s.bread()>=24&&v.activeJobs("gift")==0&&w.ready("gift")){
+        if(AutonomousVillagesMod.CONFIG.gifts&&s.bread()>=24&&v.activeJobs("gift")==0&&w.ready("gift")){
             var guest=GiftJob.guest(v);
             if(guest!=null&&guest.blockPosition().distSqr(w.body().blockPosition())<32*32){
                 v.gifted.put(guest.getUUID(),v.level.getGameTime()+1200);w.cooldown("gift",1200);
@@ -93,16 +103,16 @@ final class VillagePlanner {
         // 5. The role's own work, then shared priorities.
         Job own=role==null?null:switch(role){
             case BUILDER->first(()->build(w,s),()->craftForProject(w,s),()->chop(w,s,true));
-            case STEWARD->first(()->craftForProject(w,s),()->workshop(w,s),()->build(w,s));
+            case STEWARD->first(()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->build(w,s));
             case LOGGER->chop(w,s,false);
             case MINER->first(()->mine(w,s,false),()->sand(w,s));
-            case FARMER->first(()->farm(w),()->bread(w,s),()->shear(w,s),()->herd(w,s));
+            case FARMER->first(()->farm(w),()->bread(w,s),()->compost(w),()->shear(w,s),()->herd(w,s));
             case GUARD->chop(w,s,true);
             default->null;
         };
         if(own!=null)return own;
-        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->workshop(w,s),()->shear(w,s),()->chop(w,s,true),
-                ()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
+        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->grave(w,s),()->nameplate(w,s),()->flowers(w),()->shear(w,s),()->chop(w,s,true),
+                ()->helperPick(w,s),()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
         if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0&&w.ready("deposit"))return new DepositJob(w);
         return shared;
     }
@@ -230,7 +240,11 @@ final class VillagePlanner {
         var projects=v.town.unfinished().stream().sorted(Comparator.comparing(b->!b.kind.equals("house"))).toList();
         for(var project:projects){
             var job=new BuildJob(w,project);
-            if(v.town.pendingCuts(project,1).isEmpty()&&job.affordable(1).isEmpty()){v.town.unpaid(project);continue;}
+            boolean payable=!job.affordable(1).isEmpty();
+            if(v.town.pendingCuts(project,1).isEmpty()&&!payable){v.town.unpaid(project);continue;}
+            // With nothing to place, clearing the site is one resident's work: half the village went
+            // there and failed on materials (rc13, seed 1337: 19 residents, sand short).
+            if(!payable&&v.workers.values().stream().anyMatch(o->o!=w&&o.job instanceof BuildJob b&&b.project==project))continue;
             v.town.paid(project);
             return job;
         }
@@ -244,6 +258,54 @@ final class VillagePlanner {
     }
     /** Another worker is crafting this already; its output is not counted anywhere yet. */
     private boolean crafting(Worker w,VillageCrafting.Recipe recipe){return busy(w,recipe,Blocks.AIR);}
+    /** Every bed taken and no building waiting for one: a second bed beside a single one in a home. */
+    private Job spareBed(Worker w,Snapshot s){
+        if(!AutonomousVillagesMod.CONFIG.spareBeds||s.table()==null||s.need("bed")>0||!w.ready("sparebed")
+                ||v.state.residents.size()>=Breeding.MAX_RESIDENTS)return null;
+        if(v.breeding.freeBeds()>0){w.cooldown("sparebed",600);return null;}
+        if(v.workers.values().stream().anyMatch(o->o!=w&&(o.job instanceof PlaceJob p&&p.state.getBlock() instanceof BedBlock
+                ||o.job instanceof CraftJob c&&c.recipe.name().equals("bed"))))return null;
+        var spot=SpareBeds.spot(v,w.id);
+        if(spot==null){w.cooldown("sparebed",1200);return null;}
+        Item bed=SpareBeds.bedItem(v,w);
+        if(bed instanceof net.minecraft.world.item.BlockItem item&&item.getBlock() instanceof BedBlock){
+            w.cooldown("sparebed",600);
+            return new PlaceJob(w,spot.foot(),item.getBlock().defaultBlockState().setValue(BedBlock.FACING,spot.facing()),"вторая кровать");
+        }
+        // A bed in someone else's bag is on its way already.
+        if(owned(x->x.is(ItemTags.BEDS))==0&&s.woolColour()!=null&&s.wool()>=3&&w.ready("craft")&&CraftJob.affordable(v,VillageCrafting.bed(s.woolColour()),1,w))
+            return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
+        w.cooldown("sparebed",600);
+        return null;
+    }
+    /** Flowers from the store along the walls of the homes. */
+    private Job flowers(Worker w){
+        if(!AutonomousVillagesMod.CONFIG.flowers||v.activeJobs("flowers")>0||!w.ready("flowers"))return null;
+        w.cooldown("flowers",1200);
+        if(v.stock.count(FlowerJob.FLOWER)+w.count(FlowerJob.FLOWER)<2)return null;
+        var spots=FlowerJob.spots(v);
+        return spots.isEmpty()?null:new FlowerJob(w,spots);
+    }
+    /** A sign beside each home's door naming who lives there; one craft makes three. */
+    private Job nameplate(Worker w,Snapshot s){
+        if(!AutonomousVillagesMod.CONFIG.nameplates||v.activeJobs("nameplate")>0||!w.ready("nameplate"))return null;
+        var spot=NameplateJob.next(v);
+        if(spot==null){w.cooldown("nameplate",2400);return null;}
+        if(v.stock.count(x->x.is(ItemTags.SIGNS))+w.count(x->x.is(ItemTags.SIGNS))>0)return new NameplateJob(w,spot);
+        if(owned(x->x.is(ItemTags.SIGNS))==0&&s.table()!=null&&s.wood()>=24&&s.need("planks")==0&&!crafting(w,VillageCrafting.SIGN)&&w.ready("craft")
+                &&CraftJob.affordable(v,VillageCrafting.SIGN,1,w))return new CraftJob(w,VillageCrafting.SIGN,1);
+        w.cooldown("nameplate",1200);return null;
+    }
+    /** A sign at the cemetery for each resident lost; one craft makes three. */
+    private Job grave(Worker w,Snapshot s){
+        if(!AutonomousVillagesMod.CONFIG.graves||v.state.graves.isEmpty()||v.activeJobs("grave")>0||!w.ready("grave"))return null;
+        BlockPos spot=GraveJob.spot(v);
+        if(spot==null){w.cooldown("grave",2400);return null;}
+        if(v.stock.count(x->x.is(ItemTags.SIGNS))+w.count(x->x.is(ItemTags.SIGNS))>0)return new GraveJob(w,v.state.graves.getFirst(),spot);
+        if(owned(x->x.is(ItemTags.SIGNS))==0&&s.table()!=null&&s.wood()>=12&&!crafting(w,VillageCrafting.SIGN)&&w.ready("craft")
+                &&CraftJob.affordable(v,VillageCrafting.SIGN,1,w))return new CraftJob(w,VillageCrafting.SIGN,1);
+        w.cooldown("grave",1200);return null;
+    }
     /** Doors, beds, torches and slabs a project waits for, crafted from store materials. */
     private Job craftForProject(Worker w,Snapshot s){
         if(!w.ready("craft"))return null;
@@ -256,8 +318,12 @@ final class VillagePlanner {
         if(s.need("door")>owned(x->x.is(ItemTags.WOODEN_DOORS))&&!crafting(w,VillageCrafting.DOOR)&&CraftJob.affordable(v,VillageCrafting.DOOR,1,w))return new CraftJob(w,VillageCrafting.DOOR,1);
         if(s.need("bed")>owned(x->x.is(ItemTags.BEDS))&&s.woolColour()!=null&&s.wool()>=3&&!crafting(w,VillageCrafting.bed(s.woolColour()))&&CraftJob.affordable(v,VillageCrafting.bed(s.woolColour()),1,w))
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
-        if(s.need("slab")>owned(x->x.is(ItemTags.WOODEN_SLABS))&&!crafting(w,VillageCrafting.SLAB)&&CraftJob.affordable(v,VillageCrafting.SLAB,2,w))return new CraftJob(w,VillageCrafting.SLAB,2);
-        if(s.need("stairs")>owned(x->x.is(ItemTags.WOODEN_STAIRS))&&!crafting(w,VillageCrafting.STAIRS)&&CraftJob.affordable(v,VillageCrafting.STAIRS,2,w))return new CraftJob(w,VillageCrafting.STAIRS,2);
+        // Roof shapes come out of wood the walls do not need: building goes bottom-up, and 24 slabs
+        // made first left a mountain village with no planks for the floor (seed 42).
+        // At most 24 planks are held back: enough for the next walls, without making a roof wait for the whole house.
+        boolean spareWood=s.wood()>=Math.min(24,s.need("planks")+4*s.need("logs"))+6;
+        if(spareWood&&s.need("slab")>owned(x->x.is(ItemTags.WOODEN_SLABS))&&!crafting(w,VillageCrafting.SLAB)&&CraftJob.affordable(v,VillageCrafting.SLAB,2,w))return new CraftJob(w,VillageCrafting.SLAB,2);
+        if(spareWood&&s.need("stairs")>owned(x->x.is(ItemTags.WOODEN_STAIRS))&&!crafting(w,VillageCrafting.STAIRS)&&CraftJob.affordable(v,VillageCrafting.STAIRS,2,w))return new CraftJob(w,VillageCrafting.STAIRS,2);
         // Stone shapes from cobblestone, or from sandstone where the village builds from sand.
         if(s.need("stone_stairs")>owned(x->x.is(Items.COBBLESTONE_STAIRS)||x.is(Items.SANDSTONE_STAIRS))){
             if(!crafting(w,VillageCrafting.COBBLE_STAIRS)&&CraftJob.affordable(v,VillageCrafting.COBBLE_STAIRS,2,w))return new CraftJob(w,VillageCrafting.COBBLE_STAIRS,2);
@@ -321,6 +387,22 @@ final class VillagePlanner {
         if(s.wheat()>=3&&s.bread()<32&&s.table()!=null&&w.ready("craft")&&!busy(w,VillageCrafting.BREAD,Blocks.AIR))
             return new CraftJob(w,VillageCrafting.BREAD,Math.min(4,s.wheat()/3));
         return null;
+    }
+    /** Spare saplings and seeds into the composter, its bone meal onto young crops. */
+    private Job compost(Worker w){
+        if(!AutonomousVillagesMod.CONFIG.compost||!w.ready("compost")||v.activeJobs("compost")>0)return null;
+        w.cooldown("compost",1200);
+        if(v.index.crops.stream().noneMatch(p->CompostJob.young(v,p)))return null;
+        BlockPos hub=v.meetingPoint();
+        BlockPos composter=v.level.getPoiManager().getInRange(h->h.is(net.minecraft.world.entity.ai.village.poi.PoiTypes.FARMER),hub,Math.min(256,v.state.radius+16),
+                        net.minecraft.world.entity.ai.village.poi.PoiManager.Occupancy.ANY).map(net.minecraft.world.entity.ai.village.poi.PoiRecord::getPos)
+                .filter(v.state::contains).filter(p->v.level.getBlockState(p).getBlock() instanceof ComposterBlock)
+                .min(Comparator.comparingDouble(p->p.distSqr(w.body().blockPosition()))).orElse(null);
+        if(composter==null)return null;
+        boolean ready=v.level.getBlockState(composter).getValue(ComposterBlock.LEVEL)>=7;
+        int spare=Math.min(24,CompostJob.spare(v)),meal=Math.min(8,v.stock.count(CompostJob.BONE_MEAL));
+        if(!ready&&spare<8&&meal==0&&!w.has(CompostJob.BONE_MEAL))return null;
+        return new CompostJob(w,composter,spare<8?0:spare,meal);
     }
     /** A small flock grows with wheat from the store while beds still wait for wool. */
     private Job herd(Worker w,Snapshot s){
@@ -386,6 +468,24 @@ final class VillagePlanner {
      * Stone blocks the projects still lack, counted in cobblestone: rubble and sandstone fill
      * plain blocks, shapes take stone too (6 make 4 stairs, 3 make 6 slabs, 6 make 6 walls).
      */
+    /**
+     * Stone holds up the building and the miner alone digs it while the others stand idle (rc10-rc11:
+     * a tenth of the day "стройке не хватает: cobblestone"): a free hand takes up a pickaxe, three
+     * picks in the village at most.
+     */
+    private Job helperPick(Worker w,Snapshot s){
+        if(w.hasTool(ItemTags.PICKAXES)||stoneShort(s)<=0||s.table()==null||!w.ready("tool")||sandstoneVillage(s))return null;
+        Predicate<ItemStack> pick=x->x.is(ItemTags.PICKAXES)&&Supplies.usable(x);
+        long picks=v.workers.values().stream().filter(o->o.active()&&(o.has(pick)||o.job instanceof CraftJob c&&c.recipe.name().contains("pick")
+                ||o.job instanceof FetchJob&&o.job.status.endsWith("кирка"))).count();
+        if(picks>=3)return null;
+        if(v.stock.count(pick)>0&&w.ready("fetch")){w.cooldown("tool",600);return new FetchJob(w,new Job.Need(pick,1,"кирка"));}
+        // A wooden pick: stone is what the building is short of.
+        var recipe=VillageCrafting.tool("pick","wood");
+        if(!CraftJob.affordable(v,recipe,1,w))return null;
+        w.cooldown("tool",600);
+        return new CraftJob(w,recipe,1);
+    }
     private int stoneShort(Snapshot s){
         return s.need("cobblestone")+(s.need("stone_stairs")*3+1)/2+(s.need("stone_slab")+1)/2+s.need("stone_wall")-s.cobble()-s.rubble();
     }
@@ -404,14 +504,20 @@ final class VillagePlanner {
         if(!w.ready("mine")||!glass&&!sandstone)return null;
         BlockPos from=w.body().blockPosition(),hub=v.meetingPoint();
         // Sand for sandstone comes in bulk: a shallow pit away from homes and the bell, never a deep hole.
-        Predicate<BlockPos> quarry=p->glass||p.getY()>=v.state.y-1&&p.distSqr(hub)>=12*12&&v.index.beds.stream().noneMatch(b->b.distSqr(p)<6*6)
-                &&v.town.doors().stream().noneMatch(d->d.distSqr(p)<6*6)&&!v.town.protects(p.above());
+        Predicate<BlockPos> quarry=p->(glass||p.getY()>=v.state.y-1&&p.distSqr(hub)>=12*12&&v.index.beds.stream().noneMatch(b->b.distSqr(p)<6*6)
+                &&v.town.doors().stream().noneMatch(d->d.distSqr(p)<6*6)&&!v.town.protects(p.above()))&&!nearCactus(p);
         var sand=v.index.sand.stream().filter(p->Math.abs(p.getY()-from.getY())<=8&&p.distSqr(from)<64*64)
                 .filter(p->v.level.getBlockState(p).is(Blocks.SAND)||v.level.getBlockState(p).is(Blocks.RED_SAND)&&glass)
                 .filter(p->v.ready(p,w.id)&&v.state.policy.allows("mine",p)&&!v.town.protects(p))
                 .sorted(Comparator.comparingDouble(p->{double dy=p.getY()-from.getY();return p.distSqr(from)+15*dy*dy;}))
                 .filter(quarry).limit(8).toList();
-        return sand.size()>=2?new MineJob(w,sand):null;
+        if(sand.size()<2){w.cooldown("mine",200);return null;}
+        return new MineJob(w,sand);
+    }
+    /** Digging sand beside a cactus leaves the digger wedged against it (rc7: a miner was pricked to death). */
+    private boolean nearCactus(BlockPos p){
+        for(BlockPos q:BlockPos.betweenClosed(p.offset(-2,0,-2),p.offset(2,2,2)))if(v.level.getBlockState(q).is(Blocks.CACTUS))return true;
+        return false;
     }
     /** A staircase mine starts at the edge of the claim on natural ground, away from beds. */
     BlockPos mineEntrance(){

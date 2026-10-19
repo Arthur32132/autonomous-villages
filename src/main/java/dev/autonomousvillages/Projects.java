@@ -110,10 +110,14 @@ final class Projects {
         nextPlanning=now+100;
         for(var b:v.state.buildings)if(!b.completed&&remaining(b)==0){
             b.completed=true;v.chronicle.announce("Построено: "+label(b)+" — новоселье!");
-            if(b.kind.equals("house"))Festivities.housewarming(v,b);
+            if(b.kind.equals("house")||b.kind.equals("civic"))Festivities.housewarming(v,b);
+            if(b.kind.equals("civic"))furnish(b);
+            if(b.kind.equals("well"))fillWell(b);
+            if(b.kind.equals("pen")){furnish(b);stockPen(b);}
             if(b.path.isEmpty())b.path.addAll(footpath(b));
             v.runtime.save();
         }
+        closePenGate();
         var unfinished=unfinished();
         var active=unfinished.isEmpty()?null:unfinished.getFirst();
         if(active!=null){
@@ -134,14 +138,191 @@ final class Projects {
             v.state.buildings.add(house);v.state.completedShelters++;invalidate();
             v.chronicle.announce("Заложен "+label(house)+" у "+BlockPos.of(house.origin).toShortString());v.runtime.save();
             stage="заложен "+label(house);
-        }else if(unfinished.isEmpty()&&v.state.residents.size()>=4&&tower()==null){
+        }else if(AutonomousVillagesMod.CONFIG.storehouse&&unfinished.isEmpty()&&v.state.residents.size()>=4&&storehouse()==null){
+            // The store moves under a roof: a timber barn by the bell with chests inside.
+            BlockPos site=null;
+            for(int attempt=0;attempt<32&&site==null;attempt++){
+                BlockPos hub=v.meetingPoint();int ring=5+attempt/8*2;double angle=attempt*Math.PI/4+attempt/8*0.4;
+                site=siteAt(hub.getX()+(int)Math.round(Math.cos(angle)*ring)-BARN_W/2,hub.getZ()+(int)Math.round(Math.sin(angle)*ring)-BARN_D/2,BARN_W,BARN_D);
+            }
+            if(site==null){stage="жилья хватает; ищут место для амбара";return;}
+            var built=storehouse(site);v.state.buildings.add(built);invalidate();
+            v.chronicle.announce("Заложен амбар у "+site.toShortString());v.runtime.save();
+            stage="заложен амбар";
+        }else if(AutonomousVillagesMod.CONFIG.storehouse&&unfinished.isEmpty()&&storehouse()!=null&&well()==null&&!v.level.getBlockState(v.meetingPoint()).is(Blocks.WATER)){
+            BlockPos site=null;
+            for(int attempt=0;attempt<32&&site==null;attempt++){
+                BlockPos hub=v.meetingPoint();int ring=4+attempt/8*2;double angle=attempt*Math.PI/4+0.2+attempt/8*0.4;
+                site=siteAt(hub.getX()+(int)Math.round(Math.cos(angle)*ring)-2,hub.getZ()+(int)Math.round(Math.sin(angle)*ring)-2,4,4);
+            }
+            if(site==null){stage="жилья хватает; ищут место для колодца";return;}
+            var built=well(site);v.state.buildings.add(built);invalidate();
+            v.chronicle.announce("Заложен колодец у "+site.toShortString());v.runtime.save();
+            stage="заложен колодец";
+        }else if(AutonomousVillagesMod.CONFIG.watchtower&&unfinished.isEmpty()&&v.state.residents.size()>=4&&tower()==null){
             // With every family housed the village puts up a watchtower by the bell for its guards.
             BlockPos site=findSite(TOWER,TOWER);
             if(site==null){stage="жилья хватает; ищут место для вышки";return;}
             var built=tower(site);v.state.buildings.add(built);invalidate();
             v.chronicle.announce("Заложена "+label(built)+" у "+site.toShortString());v.runtime.save();
             stage="заложена "+label(built);
+        }else if(AutonomousVillagesMod.CONFIG.pen&&unfinished.isEmpty()&&tower()!=null&&v.state.residents.size()>=6&&pen()==null){
+            // A sheep pen keeps the flock, and the wool for new beds, within the village.
+            BlockPos site=findSite(PEN,PEN);
+            if(site==null){stage="жилья хватает; ищут место для загона";return;}
+            var built=pen(site);v.state.buildings.add(built);invalidate();
+            v.chronicle.announce("Заложен "+label(built)+" у "+site.toShortString());v.runtime.save();
+            stage="заложен "+label(built);
+        }else if(AutonomousVillagesMod.CONFIG.civicBuildings&&unfinished.isEmpty()&&tower()!=null&&(pen()!=null||!AutonomousVillagesMod.CONFIG.pen||v.state.residents.size()<6)&&civic().size()<Math.min(6,v.state.residents.size()/4)){
+            // Then the workplaces of a real village, one of each trade, as the village grows.
+            var built=civicBuilding();
+            if(built==null){stage="жилья хватает; ищут место для мастерской";return;}
+            v.state.buildings.add(built);invalidate();
+            v.chronicle.announce("Заложена "+label(built));v.runtime.save();
+            stage="заложена "+label(built);
         }else if(active==null)stage="жилья хватает; копят запасы";
+    }
+    List<TownBuilding> civic(){return v.state.buildings.stream().filter(b->b.kind.equals("civic")).toList();}
+    /** The next trade's workplace of the village's style, a trade not built yet, entrance toward the bell. */
+    TownBuilding civicBuilding(){
+        var have=new HashSet<String>();for(var b:civic())have.add(Blueprints.trade(b.design));
+        var designs=Blueprints.civic(v.level,style()).stream().filter(t->{String p=t.id().getPath();return !have.contains(Blueprints.trade(p.substring(p.lastIndexOf('/')+1)));})
+                .sorted(Comparator.comparingInt(Blueprints.Template::work)).toList();
+        BlockPos hub=v.meetingPoint();
+        for(var design:designs){
+            var b=place(design,hub);
+            if(b!=null){b.kind="civic";return b;}
+        }
+        return null;
+    }
+    /**
+     * A finished workplace is furnished by its guild: the template's workstation and decoration that
+     * the village could not make appear on the housewarming, so a new trade can move in. A field gets
+     * its farmland, water and first sowing the same way.
+     */
+    void furnish(TownBuilding b){
+        int placed=0;
+        for(var p:b.blocks){
+            var here=v.level.getBlockState(p.position());
+            // Fields are laid into the ground: soil and sand give way to the template's farmland.
+            if(!p.optional||!v.level.hasChunkAt(p.position())||!Construction.clear(here)&&!VillageIndex.naturalSoil(here)&&!here.is(Blocks.SAND))continue;
+            var s=p.block();
+            if(s.getBlock() instanceof BedBlock||s.getBlock() instanceof DoorBlock||!s.canSurvive(v.level,p.position()))continue;
+            v.level.setBlock(p.position(),s,3);placed++;
+        }
+        if(placed>0)v.chronicle.add("furnished",placed);
+    }
+    TownBuilding well(){return v.state.buildings.stream().filter(b->b.kind.equals("well")).findFirst().orElse(null);}
+    /** A well: a cobblestone ring round a 2×2 basin, oak posts at the corners and a slab canopy. */
+    TownBuilding well(BlockPos base){
+        var b=new TownBuilding("well",base);var cobble=Blocks.COBBLESTONE.defaultBlockState();
+        for(int x=0;x<4;x++)for(int z=0;z<4;z++){
+            BlockPos floor=base.offset(x,0,z);boolean basin=x>=1&&x<=2&&z>=1&&z<=2;
+            for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,cobble);}
+            if(!basin)b.add(floor,cobble);else b.add(floor.below(),cobble);
+            for(int y=1;y<=5;y++)if(!Construction.clear(v.level.getBlockState(floor.above(y))))b.cuts.add(floor.above(y).asLong());
+            if(basin&&!Construction.clear(v.level.getBlockState(floor)))b.cuts.add(floor.asLong());
+            boolean corner=(x==0||x==3)&&(z==0||z==3);
+            if(!basin)b.add(floor.above(),corner?cobble:Blocks.COBBLESTONE_WALL.defaultBlockState());
+            if(corner)for(int y=2;y<=3;y++)b.add(floor.above(y),Blocks.OAK_FENCE.defaultBlockState());
+            b.add(floor.above(4),(x==0||x==3||z==0||z==3)?Blocks.OAK_SLAB.defaultBlockState():Blocks.OAK_PLANKS.defaultBlockState());
+        }
+        b.blocks.removeIf(p->!v.state.contains(p.position()));
+        return b;
+    }
+    /** The well is filled on its housewarming: the basin turns to water. */
+    void fillWell(TownBuilding b){
+        BlockPos base=BlockPos.of(b.origin);
+        for(int x=1;x<=2;x++)for(int z=1;z<=2;z++){BlockPos p=base.offset(x,0,z);if(Construction.clear(v.level.getBlockState(p)))v.level.setBlock(p,Blocks.WATER.defaultBlockState(),3);}
+    }
+    TownBuilding storehouse(){return v.state.buildings.stream().filter(b->b.kind.equals("storehouse")).findFirst().orElse(null);}
+    static final int BARN_W=7,BARN_D=5;
+    /**
+     * A timber barn for the village store: log corners and a log sill, plank walls with a window on
+     * each side, a pitched plank-and-stair roof, three chests along the back wall, a workbench and a
+     * torch inside, the door facing south.
+     */
+    TownBuilding storehouse(BlockPos base){
+        var b=new TownBuilding("storehouse",base);
+        var log=Blocks.OAK_LOG.defaultBlockState();var planks=Blocks.OAK_PLANKS.defaultBlockState();
+        for(int x=0;x<BARN_W;x++)for(int z=0;z<BARN_D;z++){
+            BlockPos floor=base.offset(x,0,z);
+            for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,Blocks.COBBLESTONE.defaultBlockState());}
+            b.add(floor,(x==0||z==0||x==BARN_W-1||z==BARN_D-1)?Blocks.COBBLESTONE.defaultBlockState():planks);
+            for(int y=1;y<=6;y++)if(!Construction.clear(v.level.getBlockState(floor.above(y))))b.cuts.add(floor.above(y).asLong());
+        }
+        for(int y=1;y<=3;y++)for(int x=0;x<BARN_W;x++)for(int z=0;z<BARN_D;z++){
+            boolean edge=x==0||z==0||x==BARN_W-1||z==BARN_D-1;if(!edge)continue;
+            boolean corner=(x==0||x==BARN_W-1)&&(z==0||z==BARN_D-1);
+            if(x==3&&z==0&&y<=2)continue; // door
+            if(!corner&&y==2&&(z==2&&(x==0||x==BARN_W-1)||x==3&&z==BARN_D-1)){b.add(base.offset(x,y,z),Blocks.GLASS_PANE.defaultBlockState());continue;}
+            b.add(base.offset(x,y,z),corner||y==3?log:planks);
+        }
+        // Pitched roof along x: stairs on the long sides rising to a plank ridge.
+        for(int x=-1;x<=BARN_W;x++){
+            for(int z=-1;z<=BARN_D;z++){
+                int fromEdge=Math.min(z+1,BARN_D-z);
+                BlockPos p=base.offset(x,4+Math.min(fromEdge,2)-1,z);
+                if(fromEdge>=3){b.add(p,planks);continue;}
+                Direction up=z<BARN_D/2?Direction.SOUTH:Direction.NORTH;
+                b.add(p,Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING,up));
+            }
+        }
+        for(int z=1;z<BARN_D-1;z++){b.add(base.offset(0,4,z),planks);b.add(base.offset(BARN_W-1,4,z),planks);}
+        b.add(base.offset(3,1,0),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.SOUTH));
+        for(int x:new int[]{1,3,5})b.add(base.offset(x,1,BARN_D-2),Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING,Direction.SOUTH));
+        b.add(base.offset(1,1,1),Blocks.CRAFTING_TABLE.defaultBlockState());
+        b.add(base.offset(5,1,1),Blocks.TORCH.defaultBlockState());
+        b.decorate(base.offset(2,1,BARN_D-2),Blocks.BARREL.defaultBlockState());
+        b.decorate(base.offset(4,1,BARN_D-2),Blocks.BARREL.defaultBlockState());
+        b.blocks.removeIf(p->!v.state.contains(p.position()));
+        return b;
+    }
+    TownBuilding pen(){return v.state.buildings.stream().filter(b->b.kind.equals("pen")).findFirst().orElse(null);}
+    static final int PEN=7;
+    /**
+     * A sheep pen: a fence ring on log posts with torches on the posts so nothing spawns inside. The
+     * village cannot craft a gate yet, so the guild brings it on the housewarming with a hay bale and a
+     * water trough.
+     */
+    TownBuilding pen(BlockPos base){
+        var b=new TownBuilding("pen",base);
+        var log=Blocks.OAK_LOG.defaultBlockState();var fence=Blocks.OAK_FENCE.defaultBlockState();
+        for(int x=0;x<PEN;x++)for(int z=0;z<PEN;z++){
+            BlockPos ground=base.offset(x,0,z);
+            for(int y=1;y<=3;y++)if(!Construction.clear(v.level.getBlockState(ground.above(y))))b.cuts.add(ground.above(y).asLong());
+            boolean edge=x==0||z==0||x==PEN-1||z==PEN-1;
+            if(!edge)continue;
+            // The ring stands on solid ground: a hollow under it is filled, the grass inside stays.
+            for(int y=-2;y<=0;y++){BlockPos fill=ground.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,Blocks.COBBLESTONE.defaultBlockState());}
+            boolean corner=(x==0||x==PEN-1)&&(z==0||z==PEN-1);
+            if(x==PEN/2&&z==0){b.decorate(ground.above(),Blocks.OAK_FENCE_GATE.defaultBlockState().setValue(FenceGateBlock.FACING,Direction.SOUTH));continue;}
+            b.add(ground.above(),corner?log:fence);
+            if(corner)b.add(ground.above(2),Blocks.TORCH.defaultBlockState());
+        }
+        b.decorate(base.offset(1,1,PEN-2),Blocks.HAY_BLOCK.defaultBlockState());
+        b.decorate(base.offset(PEN-2,1,PEN-2),Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL,3));
+        b.blocks.removeIf(p->!v.state.contains(p.position()));
+        return b;
+    }
+    /** The guild brings the first pair of sheep on the housewarming; farmers breed them from then on. */
+    void stockPen(TownBuilding b){
+        BlockPos base=BlockPos.of(b.origin);
+        for(int i=0;i<2;i++){
+            BlockPos at=base.offset(2+i*2,1,3);
+            if(!Construction.clear(v.level.getBlockState(at)))continue;
+            if(net.minecraft.world.entity.EntityTypes.SHEEP.spawn(v.level,at,net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED)!=null)v.chronicle.add("pen_sheep",1);
+        }
+    }
+    /** The pen's gate is shut again once nobody stands in it, so the flock stays inside. */
+    void closePenGate(){
+        var pen=pen();if(pen==null||!pen.completed)return;
+        BlockPos gate=BlockPos.of(pen.origin).offset(PEN/2,1,0);
+        if(!v.level.hasChunkAt(gate))return;
+        var s=v.level.getBlockState(gate);
+        if(!(s.getBlock() instanceof FenceGateBlock)||!s.getValue(FenceGateBlock.OPEN))return;
+        if(!v.level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new net.minecraft.world.phys.AABB(gate).inflate(1.2,0,1.2),e->e.isAlive()&&!(e instanceof net.minecraft.world.entity.animal.sheep.Sheep)).isEmpty())return;
+        v.level.setBlock(gate,s.setValue(FenceGateBlock.OPEN,false),3);
     }
     TownBuilding tower(){return v.state.buildings.stream().filter(b->b.kind.equals("tower")).findFirst().orElse(null);}
     /** Where a guard stands on the finished watchtower's lookout, if there is one. */
@@ -171,8 +352,16 @@ final class Projects {
         return idle>24000||idle>3000&&missing(b).keySet().stream().noneMatch(EVERYDAY::contains);
     }
     static String label(TownBuilding b){
-        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";default->b.kind;};
+        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";case "civic"->trade(b.design);case "storehouse"->"амбар";case "well"->"колодец";case "pen"->"загон для овец";default->b.kind;};
+        if(b.kind.equals("civic"))return base;
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";
+    }
+    static String trade(String design){
+        return switch(Blueprints.trade(design)){
+            case "library"->"библиотека";case "temple"->"храм";case "tool_smith"->"кузница";case "weaponsmith","weapon_smith"->"оружейная";
+            case "armorer"->"бронная мастерская";case "butcher_shop","butchers_shop"->"мясная лавка";case "tannery"->"дубильня";case "mason"->"мастерская каменщика";
+            case "cartographer"->"картографическая";case "small_farm","large_farm","farm"->"поле";case "shepherd"->"овчарня";case "fletcher"->"мастерская лучника";default->"мастерская";
+        };
     }
     /** Structural blocks of the plan; decoration does not count toward progress. */
     int size(TownBuilding b){return (int)b.blocks.stream().filter(p->!p.optional).count();}
@@ -278,7 +467,7 @@ final class Projects {
             if(inside&&dy>=1&&!Construction.clear(s)&&!removable(s))return null;
             if(inside&&dy==0&&s.isAir()&&!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP))return null;
         }
-        if(v.state.buildings.stream().filter(b->b.kind.equals("house")||b.kind.equals("native_house")).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
+        if(v.state.buildings.stream().filter(b->b.kind.equals("house")||b.kind.equals("native_house")||b.kind.equals("civic")).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
         return base;
     }
     /** Vanilla style of the village, by the most common villager type among residents. */

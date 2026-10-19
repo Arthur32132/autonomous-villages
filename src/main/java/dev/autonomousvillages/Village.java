@@ -126,6 +126,7 @@ final class Village {
         }
         rotation++;
         if(time%5==0)rescueFromPowderSnow();
+        if(time%20==7)guardChildren();
         if(time%6000==1234)writeChronicleBook();
         presentation.tick();
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
@@ -297,7 +298,7 @@ final class Village {
             summonGolem(now);
             if(now>=nextBell&&!level.isDarkOutside()){
                 var hub=meetingPoint();
-                if(level.getBlockState(hub).getBlock() instanceof net.minecraft.world.level.block.BellBlock bell
+                if(caller!=null&&level.getBlockState(hub).getBlock() instanceof net.minecraft.world.level.block.BellBlock bell
                         &&bell.attemptToRing(caller.body(),level,hub,Direction.NORTH))nextBell=now+100;
             }
         }
@@ -311,6 +312,19 @@ final class Village {
      * The chronicle as a written book on the lectern nearest the bell (a librarian's), for players to
      * read. Only an empty lectern or one holding the village's own book is used; a player's book stays.
      */
+    /**
+     * Children are vanilla villagers the village does not steer; three were killed together in the
+     * open one night (seed 42). A monster near a child raises the alarm as an attack on an adult does:
+     * armed residents come and, if there is none, a golem is called.
+     */
+    private void guardChildren(){
+        for(UUID id:state.residents){
+            if(!(level.getEntity(id) instanceof Villager child)||!child.isAlive()||!child.isBaby()||!state.contains(child.blockPosition()))continue;
+            var enemy=level.getEntitiesOfClass(Monster.class,child.getBoundingBox().inflate(10),m->m.isAlive()&&!(m instanceof net.minecraft.world.entity.monster.Creeper)&&m.hasLineOfSight(child))
+                    .stream().min(Comparator.comparingDouble(child::distanceToSqr)).orElse(null);
+            if(enemy!=null){raiseAlarm(null,enemy);return;}
+        }
+    }
     private final Set<Long> booksPlaced=new HashSet<>();
     void writeChronicleBook(){
         BlockPos hub=meetingPoint();

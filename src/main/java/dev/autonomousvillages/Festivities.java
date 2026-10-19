@@ -21,6 +21,7 @@ final class Festivities {
 
     /** Fireworks well above the roof (nobody stands where they burst), a bell chime and happy sparks at the door. */
     static void housewarming(Village v,TownBuilding b){
+        if(!AutonomousVillagesMod.CONFIG.celebrations)return;
         var level=v.level;BlockPos origin=BlockPos.of(b.origin);
         int top=b.blocks.stream().mapToInt(p->p.position().getY()).max().orElse(origin.getY());
         double cx=b.blocks.stream().mapToInt(p->p.position().getX()).average().orElse(origin.getX())+.5;
@@ -40,6 +41,7 @@ final class Festivities {
     }
 
     static void birth(Village v,Villager baby){
+        if(!AutonomousVillagesMod.CONFIG.celebrations)return;
         v.level.sendParticles(ParticleTypes.HEART,baby.getX(),baby.getY()+.8,baby.getZ(),7,.5,.4,.5,0);
         v.level.playSound(null,baby.blockPosition(),SoundEvents.VILLAGER_CELEBRATE,SoundSource.NEUTRAL,1f,1.4f);
     }

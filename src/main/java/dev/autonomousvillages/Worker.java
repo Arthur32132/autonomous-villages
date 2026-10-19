@@ -269,6 +269,7 @@ final class Worker {
     }
     /** At its workstation during the profession hour, a resident makes the day's product for the store. */
     private void professionProduct(Villager e){
+        if(!AutonomousVillagesMod.CONFIG.professionProducts)return;
         long dayNumber=v.level.getOverworldClockTime()/24000;
         // The day is kept in the save: a pause, a resume or a restart does not pay twice.
         if(v.state.productDays.getOrDefault(id,-1L)>=dayNumber)return;

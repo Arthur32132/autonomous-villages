@@ -327,6 +327,7 @@ final class Village {
     }
     private final Set<Long> booksPlaced=new HashSet<>();
     void writeChronicleBook(){
+        if(!AutonomousVillagesMod.CONFIG.chronicleBook)return;
         BlockPos hub=meetingPoint();
         var lectern=level.getPoiManager().getInRange(h->h.is(PoiTypes.LIBRARIAN),hub,Math.min(256,state.radius+16),PoiManager.Occupancy.ANY)
                 .map(PoiRecord::getPos).filter(state::contains).filter(level::hasChunkAt)
@@ -348,7 +349,7 @@ final class Village {
      * vanilla villagers do, at most once a day.
      */
     private void summonGolem(long now){
-        if(now<nextGolemAttempt||now-state.lastGolem<24000||state.residents.size()<5)return;
+        if(!AutonomousVillagesMod.CONFIG.summonGolems||now<nextGolemAttempt||now-state.lastGolem<24000||state.residents.size()<5)return;
         nextGolemAttempt=now+1200;
         BlockPos hub=meetingPoint();
         if(!level.getEntitiesOfClass(net.minecraft.world.entity.animal.golem.IronGolem.class,new AABB(hub).inflate(48),net.minecraft.world.entity.LivingEntity::isAlive).isEmpty())return;

@@ -134,7 +134,7 @@ final class Projects {
             v.state.buildings.add(house);v.state.completedShelters++;invalidate();
             v.chronicle.announce("Заложен "+label(house)+" у "+BlockPos.of(house.origin).toShortString());v.runtime.save();
             stage="заложен "+label(house);
-        }else if(unfinished.isEmpty()&&v.state.residents.size()>=4&&tower()==null){
+        }else if(AutonomousVillagesMod.CONFIG.watchtower&&unfinished.isEmpty()&&v.state.residents.size()>=4&&tower()==null){
             // With every family housed the village puts up a watchtower by the bell for its guards.
             BlockPos site=findSite(TOWER,TOWER);
             if(site==null){stage="жилья хватает; ищут место для вышки";return;}

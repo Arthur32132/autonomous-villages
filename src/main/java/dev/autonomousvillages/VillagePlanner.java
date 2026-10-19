@@ -83,7 +83,7 @@ final class VillagePlanner {
             if(!cells.isEmpty())return new HazardJob(w,cells);
         }
         // 4c. A visiting player gets a loaf from a well-stocked store, once a day.
-        if(s.bread()>=24&&v.activeJobs("gift")==0&&w.ready("gift")){
+        if(AutonomousVillagesMod.CONFIG.gifts&&s.bread()>=24&&v.activeJobs("gift")==0&&w.ready("gift")){
             var guest=GiftJob.guest(v);
             if(guest!=null&&guest.blockPosition().distSqr(w.body().blockPosition())<32*32){
                 v.gifted.put(guest.getUUID(),v.level.getGameTime()+1200);w.cooldown("gift",1200);
@@ -327,7 +327,7 @@ final class VillagePlanner {
     }
     /** Spare saplings and seeds into the composter, its bone meal onto young crops. */
     private Job compost(Worker w){
-        if(!w.ready("compost")||v.activeJobs("compost")>0)return null;
+        if(!AutonomousVillagesMod.CONFIG.compost||!w.ready("compost")||v.activeJobs("compost")>0)return null;
         w.cooldown("compost",1200);
         if(v.index.crops.stream().noneMatch(p->CompostJob.young(v,p)))return null;
         BlockPos hub=v.meetingPoint();

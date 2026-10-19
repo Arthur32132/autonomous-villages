@@ -17,6 +17,8 @@ import org.slf4j.*;
 
 public final class AutonomousVillagesMod implements ModInitializer {
     public static final Logger LOG = LoggerFactory.getLogger("autonomous_villages");
+    /** Read at mod start; every switch on unless the server owner turned it off. */
+    public static ModConfig CONFIG = new ModConfig();
     public static final TicketType TICKET = Registry.register(BuiltInRegistries.TICKET_TYPE,
             Identifier.fromNamespaceAndPath("autonomous_villages", "settlement"),
             new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION | TicketType.FLAG_KEEP_DIMENSION_ACTIVE));
@@ -27,6 +29,7 @@ public final class AutonomousVillagesMod implements ModInitializer {
         return runtime;
     }
     @Override public void onInitialize() {
+        CONFIG = ModConfig.load(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir());
         dev.navigationai.api.BlockBreakPermissions.register((id,pos)->{
             if(runtime==null)return true;
             return runtime.mayBreak(id,pos);

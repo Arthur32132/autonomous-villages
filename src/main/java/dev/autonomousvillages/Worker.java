@@ -56,6 +56,24 @@ final class Worker {
     }
     private String name(BlockPos p){var s=v.level.getBlockState(p);var id=net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath();
         return s.hasProperty(net.minecraft.world.level.block.DoorBlock.OPEN)?id+(s.getValue(net.minecraft.world.level.block.DoorBlock.OPEN)?"(open)":"(closed)"):id;}
+    /**
+     * Even digging out failed: the resident stands somewhere routes cannot start from (a stair edge in
+     * a doorway, the top of a fence). It steps over to the nearest safe cell within three blocks that
+     * has room to walk on, as a player would shuffle aside.
+     */
+    private void unstick(){
+        BlockPos here=body().blockPosition();BlockPos best=null;double score=Double.MAX_VALUE;
+        for(BlockPos q:BlockPos.betweenClosed(here.offset(-3,-2,-3),here.offset(3,2,3))){
+            if(q.equals(here)||!v.safeFeet(q))continue;
+            int open=0;for(var d:net.minecraft.core.Direction.Plane.HORIZONTAL)if(v.safeFeet(q.relative(d)))open++;
+            if(open<2)continue;
+            double d=q.distSqr(here);if(d<score){score=d;best=q.immutable();}
+        }
+        if(best==null)return;
+        var to=v.feetPosition(best);
+        AutonomousVillagesMod.LOG.info("UNSTUCK {} {} {} -> {}",v.state.name,v.presentation.personName(id),here.toShortString(),best.toShortString());
+        bot().stopAll();body().teleportTo(to.x,to.y,to.z);stuckCount=0;
+    }
     private boolean nearStuckSpot(){return BlockPos.of(stuckAt).distSqr(body().blockPosition())<=9;}
     boolean released;
     final Map<String,Long> cooldowns=new HashMap<>();
@@ -136,6 +154,7 @@ final class Worker {
                 if(stuckCount==3)AutonomousVillagesMod.LOG.info("TRAPPED {} {} at {}: {}",v.state.name,v.presentation.personName(id),body().position(),surroundings());
             }
             v.failures.merge(job.kind()+": "+job.failure,1,Integer::sum);
+            if(job instanceof EscapeJob)unstick();
             if(now()>=nextFailureLog){
                 nextFailureLog=now()+600;
                 AutonomousVillagesMod.LOG.info("JOB_FAILED {} {} {} reason={} target={} at={} after={}t",v.state.name,v.presentation.personName(id),job.kind(),job.failure,

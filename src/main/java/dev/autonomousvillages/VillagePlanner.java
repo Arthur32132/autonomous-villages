@@ -193,7 +193,9 @@ final class VillagePlanner {
         if(!w.ready("tool"))return null;
         if(v.stock.count(x->x.is(tag)&&Supplies.usable(x))>0&&w.ready("fetch"))return new FetchJob(w,new Job.Need(x->x.is(tag)&&Supplies.usable(x),1,"инструмент"));
         if(s.table()==null)return null;
-        String tier=(family.equals("pick")||family.equals("sword"))&&s.iron()>=3?"iron":s.cobble()>=3?"stone":"wood";
+        // Two ingots stay for shears while beds wait for wool.
+        int spareIron=s.iron()-(s.need("bed")>0&&!s.shears()?2:0);
+        String tier=(family.equals("pick")||family.equals("sword"))&&spareIron>=3?"iron":s.cobble()>=3?"stone":"wood";
         var recipe=VillageCrafting.tool(family,tier);
         if(!CraftJob.affordable(v,recipe,1,w)){if(tier.equals("wood"))return null;recipe=VillageCrafting.tool(family,"wood");if(!CraftJob.affordable(v,recipe,1,w))return null;}
         w.cooldown("tool",200);

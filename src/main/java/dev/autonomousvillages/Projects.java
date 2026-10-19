@@ -53,8 +53,14 @@ final class Projects {
             if(v.state.buildings.size()>=256)break;
             var box=piece.getBoundingBox();
             long pieceId=new BlockPos(box.minX(),box.minY(),box.minZ()).asLong();
-            if(v.state.capturedPieces.contains(pieceId)||survey.homes().stream().noneMatch(box::isInside))continue;
+            if(v.state.capturedPieces.contains(pieceId))continue;
             v.state.capturedPieces.add(pieceId);
+            if(survey.homes().stream().noneMatch(box::isInside)){
+                // Smithies and stalls are not homes, but their chests (bread, often iron) serve the whole village.
+                for(BlockPos q:BlockPos.betweenClosed(new BlockPos(box.minX(),box.minY(),box.minZ()),new BlockPos(box.maxX(),box.maxY(),box.maxZ())))
+                    if(v.state.contains(q)&&v.level.getBlockEntity(q)!=null)adopt(q.immutable());
+                continue;
+            }
             var house=new TownBuilding("native_house",new BlockPos(box.minX(),box.minY(),box.minZ()));
             for(BlockPos q:BlockPos.betweenClosed(new BlockPos(box.minX(),box.minY(),box.minZ()),new BlockPos(box.maxX(),box.maxY(),box.maxZ()))){
                 BlockPos p=q.immutable();BlockState s=v.level.getBlockState(p);

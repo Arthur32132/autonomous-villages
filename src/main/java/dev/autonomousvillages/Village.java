@@ -127,6 +127,7 @@ final class Village {
         rotation++;
         if(time%5==0)rescueFromPowderSnow();
         if(time%20==7)guardChildren();
+        if(time%100==23)huntLurkers();
         // At dusk a village short of golems calls one before the zombies come, not after.
         if(time%200==13&&Math.floorMod(level.getOverworldClockTime(),24000)>=11500&&Math.floorMod(level.getOverworldClockTime(),24000)<13000)summonGolem(time);
         if(time%6000==1234)writeChronicleBook();
@@ -326,6 +327,24 @@ final class Village {
             var enemy=level.getEntitiesOfClass(Monster.class,child.getBoundingBox().inflate(10),m->m.isAlive()&&!(m instanceof net.minecraft.world.entity.monster.Creeper)&&m.hasLineOfSight(child))
                     .stream().min(Comparator.comparingDouble(child::distanceToSqr)).orElse(null);
             if(enemy!=null){raiseAlarm(null,enemy);return;}
+        }
+    }
+    /**
+     * In daylight a zombie under a porch roof or in a doorway does not burn and waits for whoever comes
+     * out (seed 8675309: residents killed at one doorstep in the morning). The nearest armed, healthy
+     * resident goes for it without ringing the bell, so the rest of the village keeps working.
+     */
+    private void huntLurkers(){
+        if(Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))return;
+        for(var lurker:level.getEntitiesOfClass(net.minecraft.world.entity.monster.zombie.Zombie.class,VillageDiscovery.area(state,0),
+                m->m.isAlive()&&state.contains(m.blockPosition()))){
+            if(workers.values().stream().anyMatch(w->w.fighting(lurker)))continue;
+            Worker hunter=workers.values().stream().filter(w->w.active()&&w.armed()&&w.body().getHealth()>=16&&!w.body().isSleeping()&&!w.body().isTrading()
+                    &&!w.fighting(null)&&w.body().distanceToSqr(lurker)<32*32).min(Comparator.comparingDouble(w->w.body().distanceToSqr(lurker))).orElse(null);
+            if(hunter==null)continue;
+            AutonomousVillagesMod.LOG.info("HUNT {} {} -> {} at {}",state.name,presentation.personName(hunter.id),lurker.getType().getDescription().getString(),lurker.blockPosition().toShortString());
+            hunter.defend(lurker);
+            return;
         }
     }
     private final Set<Long> booksPlaced=new HashSet<>();

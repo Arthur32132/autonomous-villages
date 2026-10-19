@@ -322,8 +322,12 @@ final class Worker {
     }
     /** A guard fights with any sword; others only with stone or better. */
     boolean armed(){return v.guard(id)?VillageCrafting.hasSword(bot()):VillageCrafting.hasDefensiveSword(bot());}
+    private Monster foe;
+    /** In a fight now; with a target given, in a fight with that one. */
+    boolean fighting(Monster target){return combat!=null&&!combat.completion().isDone()&&(target==null||target==foe);}
     void defend(Monster enemy){
         if(job!=null){job.stop();job=null;v.reservations.release(id);}
+        foe=enemy;
         combat=bot().combat().fight(enemy,new CombatPolicy(CombatSkill.EXPERT,16,3,24,false,true,false).swordOnly());
         fleeSince=now();released=false;status="защищает деревню";
     }

@@ -135,7 +135,7 @@ def run_one(java, batch_dir, seed, difficulty, args, jars):
     with gzip.open(report / 'server-tail.log.gz', 'wb') as tail:
         tail.write(b'\n'.join(lines[-4000:]))
     # The village's own story for the whole run: deaths with their context, traps, chronicle events.
-    markers = (b'DEATH ', b'TRAPPED ', b'UNSTUCK ', b'SETTLEMENT ', b'JOB_FAILED ')
+    markers = (b'DEATH ', b'TRAPPED ', b'UNSTUCK ', b'SETTLEMENT ', b'JOB_FAILED ', b'HUNT ')
     (report / 'events.log').write_bytes(b'\n'.join(l for l in lines if any(m in l for m in markers)))
     problems = [l.decode('utf8', 'replace') for l in lines if b'/ERROR]' in l or b'Exception' in l][:200]
     (report / 'errors.txt').write_text('\n'.join(problems))

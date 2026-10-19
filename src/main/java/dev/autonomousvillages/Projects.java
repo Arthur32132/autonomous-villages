@@ -112,6 +112,7 @@ final class Projects {
             b.completed=true;v.chronicle.announce("Построено: "+label(b)+" — новоселье!");
             if(b.kind.equals("house")||b.kind.equals("civic"))Festivities.housewarming(v,b);
             if(b.kind.equals("civic"))furnish(b);
+            if(b.kind.equals("well"))fillWell(b);
             if(b.path.isEmpty())b.path.addAll(footpath(b));
             v.runtime.save();
         }
@@ -146,6 +147,16 @@ final class Projects {
             var built=storehouse(site);v.state.buildings.add(built);invalidate();
             v.chronicle.announce("Заложен амбар у "+site.toShortString());v.runtime.save();
             stage="заложен амбар";
+        }else if(AutonomousVillagesMod.CONFIG.storehouse&&unfinished.isEmpty()&&storehouse()!=null&&well()==null&&!v.level.getBlockState(v.meetingPoint()).is(Blocks.WATER)){
+            BlockPos site=null;
+            for(int attempt=0;attempt<32&&site==null;attempt++){
+                BlockPos hub=v.meetingPoint();int ring=4+attempt/8*2;double angle=attempt*Math.PI/4+0.2+attempt/8*0.4;
+                site=siteAt(hub.getX()+(int)Math.round(Math.cos(angle)*ring)-2,hub.getZ()+(int)Math.round(Math.sin(angle)*ring)-2,4,4);
+            }
+            if(site==null){stage="жилья хватает; ищут место для колодца";return;}
+            var built=well(site);v.state.buildings.add(built);invalidate();
+            v.chronicle.announce("Заложен колодец у "+site.toShortString());v.runtime.save();
+            stage="заложен колодец";
         }else if(AutonomousVillagesMod.CONFIG.watchtower&&unfinished.isEmpty()&&v.state.residents.size()>=4&&tower()==null){
             // With every family housed the village puts up a watchtower by the bell for its guards.
             BlockPos site=findSite(TOWER,TOWER);
@@ -188,6 +199,29 @@ final class Projects {
             v.level.setBlock(p.position(),s,3);placed++;
         }
         if(placed>0)v.chronicle.add("furnished",placed);
+    }
+    TownBuilding well(){return v.state.buildings.stream().filter(b->b.kind.equals("well")).findFirst().orElse(null);}
+    /** A well: a cobblestone ring round a 2×2 basin, oak posts at the corners and a slab canopy. */
+    TownBuilding well(BlockPos base){
+        var b=new TownBuilding("well",base);var cobble=Blocks.COBBLESTONE.defaultBlockState();
+        for(int x=0;x<4;x++)for(int z=0;z<4;z++){
+            BlockPos floor=base.offset(x,0,z);boolean basin=x>=1&&x<=2&&z>=1&&z<=2;
+            for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,cobble);}
+            if(!basin)b.add(floor,cobble);else b.add(floor.below(),cobble);
+            for(int y=1;y<=5;y++)if(!Construction.clear(v.level.getBlockState(floor.above(y))))b.cuts.add(floor.above(y).asLong());
+            if(basin&&!Construction.clear(v.level.getBlockState(floor)))b.cuts.add(floor.asLong());
+            boolean corner=(x==0||x==3)&&(z==0||z==3);
+            if(!basin)b.add(floor.above(),corner?cobble:Blocks.COBBLESTONE_WALL.defaultBlockState());
+            if(corner)for(int y=2;y<=3;y++)b.add(floor.above(y),Blocks.OAK_FENCE.defaultBlockState());
+            b.add(floor.above(4),(x==0||x==3||z==0||z==3)?Blocks.OAK_SLAB.defaultBlockState():Blocks.OAK_PLANKS.defaultBlockState());
+        }
+        b.blocks.removeIf(p->!v.state.contains(p.position()));
+        return b;
+    }
+    /** The well is filled on its housewarming: the basin turns to water. */
+    void fillWell(TownBuilding b){
+        BlockPos base=BlockPos.of(b.origin);
+        for(int x=1;x<=2;x++)for(int z=1;z<=2;z++){BlockPos p=base.offset(x,0,z);if(Construction.clear(v.level.getBlockState(p)))v.level.setBlock(p,Blocks.WATER.defaultBlockState(),3);}
     }
     TownBuilding storehouse(){return v.state.buildings.stream().filter(b->b.kind.equals("storehouse")).findFirst().orElse(null);}
     static final int BARN_W=7,BARN_D=5;
@@ -260,7 +294,7 @@ final class Projects {
         return idle>24000||idle>3000&&missing(b).keySet().stream().noneMatch(EVERYDAY::contains);
     }
     static String label(TownBuilding b){
-        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";case "civic"->trade(b.design);case "storehouse"->"амбар";default->b.kind;};
+        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";case "civic"->trade(b.design);case "storehouse"->"амбар";case "well"->"колодец";default->b.kind;};
         if(b.kind.equals("civic"))return base;
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";
     }

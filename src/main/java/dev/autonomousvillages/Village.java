@@ -26,6 +26,8 @@ final class Village {
     final VillageIndex index=new VillageIndex();
     final Reservations reservations=new Reservations();
     final Map<Long,Long> rejected=new HashMap<>();
+    /** When each visiting player may next receive a gift (game time). */
+    final Map<UUID,Long> gifted=new HashMap<>();
     /** Why jobs ended early since the server started, by "kind: reason"; diagnostics only. */
     final Map<String,Integer> failures=new TreeMap<>();
     final Map<UUID,Worker> workers=new LinkedHashMap<>();

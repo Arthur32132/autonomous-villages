@@ -82,6 +82,14 @@ final class VillagePlanner {
                     .sorted(Comparator.comparing(p->!besideWalkway(p))).limit(12).toList();
             if(!cells.isEmpty())return new HazardJob(w,cells);
         }
+        // 4c. A visiting player gets a loaf from a well-stocked store, once a day.
+        if(s.bread()>=24&&v.activeJobs("gift")==0&&w.ready("gift")){
+            var guest=GiftJob.guest(v);
+            if(guest!=null&&guest.blockPosition().distSqr(w.body().blockPosition())<32*32){
+                v.gifted.put(guest.getUUID(),v.level.getGameTime()+24000);w.cooldown("gift",1200);
+                return new GiftJob(w,guest);
+            }
+        }
         // 5. The role's own work, then shared priorities.
         Job own=role==null?null:switch(role){
             case BUILDER->first(()->build(w,s),()->craftForProject(w,s),()->chop(w,s,true));

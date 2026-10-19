@@ -45,9 +45,10 @@ final class Worker {
     private long stuckAt;
     private int stuckCount;
     boolean trapped(){
-        if(stuckCount<3||body().blockPosition().asLong()!=stuckAt||!ready("escape"))return false;
+        if(stuckCount<3||!nearStuckSpot()||!ready("escape"))return false;
         stuckCount=0;cooldown("escape",1200);return true;
     }
+    private boolean nearStuckSpot(){return BlockPos.of(stuckAt).distSqr(body().blockPosition())<=9;}
     boolean released;
     final Map<String,Long> cooldowns=new HashMap<>();
     Worker(Village v,UUID id){this.v=v;this.id=id;}
@@ -120,9 +121,10 @@ final class Worker {
             if(job.target()!=null)v.rejected.put(job.target().asLong(),now()+600);
             cooldown(job.kind(),200);
             // Repeated route failures from one spot mean the worker itself is stuck, not the target.
-            if(job.failure.startsWith("не подойти")||job.failure.startsWith("не нашёл дорогу")||job.failure.startsWith("не дойти")||job.failure.contains("уложился")){
-                long here=body().blockPosition().asLong();
-                stuckCount=here==stuckAt?stuckCount+1:1;stuckAt=here;
+            // Any job whose route failed counts ("нет на складе: палки (unreachable)" too), and shuffling a block or two still is one spot.
+            if(job.failure.startsWith("не подойти")||job.failure.startsWith("не нашёл дорогу")||job.failure.startsWith("не дойти")||job.failure.contains("уложился")
+                    ||job.failure.endsWith("(unreachable)")||job.failure.contains("(stuck")){
+                stuckCount=nearStuckSpot()?stuckCount+1:1;if(stuckCount==1)stuckAt=body().blockPosition().asLong();
             }
             v.failures.merge(job.kind()+": "+job.failure,1,Integer::sum);
             if(now()>=nextFailureLog){

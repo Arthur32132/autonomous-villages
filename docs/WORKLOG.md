@@ -399,3 +399,16 @@ rc10 = `v03/core-rc10` (542dcd1), jar в `build/rc10-jars`, партия `v03-rc
 - Ветка navigation-ai `perf/snapshot-budget` (b9b0bbf, от `main`): лимиты ×4 (8 192 / 16 384).
   A/B: партия `v03-navbudget` = jar rc12 + эта навигация (`build/navbudget-jars`) против `v03-rc12`.
   Очередь: `v03-nav3` → `v03-rc7r` → `v03-rc12` → `v03-navbudget`. PR — по результатам.
+
+### navigation-ai#3 (snapshot по столбцам) — A/B и слияние
+| | rc11 + navigation-ai#3 | rc11 (navigation-ai `main`) |
+|---|---|---|
+| итого 6 прогонов | жителей 66, рожд. 10, смертей 6, блоков 480 | жителей 67, рожд. 8, смертей 3, блоков 362 |
+
+Блоков больше в 5 прогонах из 6 (в шестом поровну), +33% всего. Лишние смерти — старые домашние
+точки (кадавры в доме у колокола на 1337) и падение с горы на 42, не навигация. `stuck_changed_obstacle`
+30 против 21 — далеко от ×6 из rc4. Тесты библиотеки 118 зелёных → PR смёржен в `main` (f97d4d8).
+- `perf/snapshot-budget` перебазирована на новый `main` (feff75c).
+- Новый план очереди: `v03-rc7r` (идёт) → `v03-rc12` (rc12 + старый main навигации, чистое сравнение
+  мода с master) → `v03-rc12n` (rc12 + новый main навигации, `build/rc12n-jars`) → `v03-navbudget`
+  (rc12 + main + лимит ×4, `build/navbudget-jars`), сравнение navbudget против rc12n.

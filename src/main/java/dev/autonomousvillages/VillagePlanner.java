@@ -96,7 +96,7 @@ final class VillagePlanner {
             case STEWARD->first(()->craftForProject(w,s),()->workshop(w,s),()->build(w,s));
             case LOGGER->chop(w,s,false);
             case MINER->first(()->mine(w,s,false),()->sand(w,s));
-            case FARMER->first(()->farm(w),()->bread(w,s),()->shear(w,s),()->herd(w,s));
+            case FARMER->first(()->farm(w),()->bread(w,s),()->compost(w),()->shear(w,s),()->herd(w,s));
             case GUARD->chop(w,s,true);
             default->null;
         };
@@ -321,6 +321,22 @@ final class VillagePlanner {
         if(s.wheat()>=3&&s.bread()<32&&s.table()!=null&&w.ready("craft")&&!busy(w,VillageCrafting.BREAD,Blocks.AIR))
             return new CraftJob(w,VillageCrafting.BREAD,Math.min(4,s.wheat()/3));
         return null;
+    }
+    /** Spare saplings and seeds into the composter, its bone meal onto young crops. */
+    private Job compost(Worker w){
+        if(!w.ready("compost")||v.activeJobs("compost")>0)return null;
+        w.cooldown("compost",1200);
+        if(v.index.crops.stream().noneMatch(p->CompostJob.young(v,p)))return null;
+        BlockPos hub=v.meetingPoint();
+        BlockPos composter=v.level.getPoiManager().getInRange(h->h.is(net.minecraft.world.entity.ai.village.poi.PoiTypes.FARMER),hub,Math.min(256,v.state.radius+16),
+                        net.minecraft.world.entity.ai.village.poi.PoiManager.Occupancy.ANY).map(net.minecraft.world.entity.ai.village.poi.PoiRecord::getPos)
+                .filter(v.state::contains).filter(p->v.level.getBlockState(p).getBlock() instanceof ComposterBlock)
+                .min(Comparator.comparingDouble(p->p.distSqr(w.body().blockPosition()))).orElse(null);
+        if(composter==null)return null;
+        boolean ready=v.level.getBlockState(composter).getValue(ComposterBlock.LEVEL)>=7;
+        int spare=Math.min(24,CompostJob.spare(v));
+        if(!ready&&spare<8&&!w.has(x->x.is(Items.BONE_MEAL))&&v.stock.count(x->x.is(Items.BONE_MEAL))==0)return null;
+        return new CompostJob(w,composter,spare);
     }
     /** A small flock grows with wheat from the store while beds still wait for wool. */
     private Job herd(Worker w,Snapshot s){

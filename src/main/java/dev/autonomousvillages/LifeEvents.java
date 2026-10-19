@@ -32,9 +32,12 @@ final class LifeEvents {
 
     void tick(long time){
         playMusic(time);
-        if(!AutonomousVillagesMod.CONFIG.lifeEvents||time%20!=11)return;
+        if(!AutonomousVillagesMod.CONFIG.lifeEvents)return;
+        if(time%10==4)watchLanterns();
+        if(time%20!=11)return;
         long clock=v.level.getOverworldClockTime(),day=Math.floorDiv(clock,24000),hour=Math.floorMod(clock,24000);
         watchCompletions();
+        watchBirths();
         if(fairDay(day)&&hour>=1000&&hour<2000&&v.state.fairDay<day)openFair(day);
         if(v.state.fairDay==day&&hour>=1000&&hour<11000&&time%200==11)fairBustle();
         if(feastFor!=null&&hour>=12000&&hour<13500)feast();
@@ -90,6 +93,44 @@ final class LifeEvents {
         tune(hall,SoundEvents.NOTE_BLOCK_HARP.value());
         v.level.sendParticles(ParticleTypes.NOTE,hall.getX()+.5,hall.getY()+2,hall.getZ()+.5,10,2,.6,2,1);
         v.chronicle.add("feasts",1);
+    }
+
+    // --- births, the watch, the herald -------------------------------------------------------------
+    private long births=-1;
+    /** A newborn: the bell twice and a cradle song at the meeting point. */
+    private void watchBirths(){
+        long now=v.chronicle.total("births");
+        if(births>=0&&now>births){
+            BlockPos bell=v.meetingPoint();long t=v.level.getGameTime();
+            music.add(new Note(t,bell,SoundEvents.BELL_BLOCK,1.3f));music.add(new Note(t+25,bell,SoundEvents.BELL_BLOCK,1.3f));
+            long start=t+50;
+            for(int i=0;i<CRADLE.length;i++)if(CRADLE[i]>=0)music.add(new Note(start+i*6L,bell,SoundEvents.NOTE_BLOCK_BELL.value(),pitch(CRADLE[i])));
+            v.level.sendParticles(ParticleTypes.HEART,bell.getX()+.5,bell.getY()+2,bell.getZ()+.5,8,1.5,.6,1.5,0);
+        }
+        births=now;
+    }
+    /** A slow lullaby for a birth. */
+    static final int[] CRADLE={19,16,16,-1,19,16,16,-1,19,21,19,17,16};
+    /** A guard on the night watch carries the glow of a lantern: a flame at the hand while walking the rounds. */
+    private void watchLanterns(){
+        if(!v.level.isDarkOutside())return;
+        for(Worker w:v.workers.values()){
+            if(!(w.job instanceof PatrolJob)||!w.active())continue;
+            var body=w.body();
+            double yaw=Math.toRadians(body.yBodyRot);
+            double x=body.getX()-Math.sin(yaw)*.45-Math.cos(yaw)*.35,z=body.getZ()+Math.cos(yaw)*.45-Math.sin(yaw)*.35;
+            v.level.sendParticles(ParticleTypes.SMALL_FLAME,x,body.getY()+1.0,z,1,.02,.02,.02,0);
+        }
+    }
+    private long lastHerald=Long.MIN_VALUE;
+    /** News the village announces is struck once on the bell, so players far off look up; once in ten seconds at most. */
+    void herald(){
+        if(!AutonomousVillagesMod.CONFIG.lifeEvents)return;
+        long t=v.level.getGameTime();
+        if(t-lastHerald<200)return;
+        lastHerald=t;
+        BlockPos bell=v.meetingPoint();
+        if(v.level.getBlockState(bell).is(net.minecraft.world.level.block.Blocks.BELL))music.add(new Note(t,bell,SoundEvents.BELL_BLOCK,1.1f));
     }
 
     // --- shared -----------------------------------------------------------------------------------

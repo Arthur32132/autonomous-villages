@@ -4,7 +4,9 @@ import java.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.*;
@@ -125,27 +127,27 @@ final class Projects {
         closePenGate();
         var unfinished=unfinished();
         var active=unfinished.isEmpty()?null:unfinished.getFirst();
+        var houses=unfinished.stream().filter(b->b.kind.equals("house")).toList();
         if(active!=null){
             stage=(waiting(active)?"ждут материалы: ":"строят ")+label(active)+" "+built(active)+"/"+size(active);
+            // Every soak village stalled on its first house for want of a bed: no wool, and the pen that
+            // brings sheep came only after the tower. The pen is laid beside the house as soon as beds wait on wool.
+            if(woolWanted(houses)){layPen();return;}
             // Only houses hold up the next house: a half-built watchtower never keeps a family homeless.
-            var houses=unfinished.stream().filter(b->b.kind.equals("house")).toList();
             if(houses.size()>=3||!houses.stream().allMatch(this::waiting))return;
         }
         if(v.state.buildings.size()>=256||v.state.completedShelters>=64){stage="все проекты завершены";return;}
         int beds=v.index.beds.size();
-        String landmark=AutonomousVillagesMod.CONFIG.landmarks&&unfinished.isEmpty()&&tower()!=null?Landmarks.due(kinds(),v.state.residents.size(),deferred()):null;
+        boolean homeless=beds<v.state.residents.size()+2;
+        // Houses waiting only for beds hold up nothing else: the village builds its barn, well and tower
+        // meanwhile instead of laying another house that would wait for the same wool.
+        boolean bedBound=!houses.isEmpty()&&houses.stream().allMatch(b->waiting(b)&&missing(b).containsKey("bed"))&&v.stock.count(x->x.is(ItemTags.WOOL))<3;
+        boolean free=houses.size()==unfinished.size()&&(houses.isEmpty()||bedBound);
+        String landmark=AutonomousVillagesMod.CONFIG.landmarks&&free&&tower()!=null?Landmarks.due(kinds(),v.state.residents.size(),deferred()):null;
         TownBuilding planned=null;
-        if(beds<v.state.residents.size()+2){
-            var house=templateHouse();
-            if(house==null){
-                BlockPos site=findSite(HOUSE_W,HOUSE_D);
-                if(site==null){stage="ищут место для нового дома";return;}
-                house=cottage(site);
-            }
-            v.state.buildings.add(house);v.state.completedShelters++;invalidate();
-            v.chronicle.announce("Заложен "+label(house)+" у "+BlockPos.of(house.origin).toShortString());v.runtime.save();
-            stage="заложен "+label(house);
-        }else if(AutonomousVillagesMod.CONFIG.storehouse&&unfinished.isEmpty()&&v.state.residents.size()>=4&&storehouse()==null){
+        if(homeless&&!bedBound){
+            if(!layHouse())return;
+        }else if(AutonomousVillagesMod.CONFIG.storehouse&&free&&v.state.residents.size()>=4&&storehouse()==null){
             // The store moves under a roof: a timber barn by the bell with chests inside.
             BlockPos site=null;
             for(int attempt=0;attempt<32&&site==null;attempt++){
@@ -156,7 +158,7 @@ final class Projects {
             var built=storehouse(site);v.state.buildings.add(built);invalidate();
             v.chronicle.announce("Заложен амбар у "+site.toShortString());v.runtime.save();
             stage="заложен амбар";
-        }else if(AutonomousVillagesMod.CONFIG.storehouse&&unfinished.isEmpty()&&storehouse()!=null&&well()==null&&!v.level.getBlockState(v.meetingPoint()).is(Blocks.WATER)){
+        }else if(AutonomousVillagesMod.CONFIG.storehouse&&free&&storehouse()!=null&&well()==null&&!v.level.getBlockState(v.meetingPoint()).is(Blocks.WATER)){
             BlockPos site=null;
             for(int attempt=0;attempt<32&&site==null;attempt++){
                 BlockPos hub=v.meetingPoint();int ring=4+attempt/8*2;double angle=attempt*Math.PI/4+0.2+attempt/8*0.4;
@@ -166,21 +168,17 @@ final class Projects {
             var built=well(site);v.state.buildings.add(built);invalidate();
             v.chronicle.announce("Заложен колодец у "+site.toShortString());v.runtime.save();
             stage="заложен колодец";
-        }else if(AutonomousVillagesMod.CONFIG.watchtower&&unfinished.isEmpty()&&v.state.residents.size()>=4&&tower()==null){
+        }else if(AutonomousVillagesMod.CONFIG.watchtower&&free&&v.state.residents.size()>=4&&tower()==null){
             // With every family housed the village puts up a watchtower by the bell for its guards.
             BlockPos site=findSite(TOWER,TOWER);
             if(site==null){stage="жилья хватает; ищут место для вышки";return;}
             var built=tower(site);v.state.buildings.add(built);invalidate();
             v.chronicle.announce("Заложена "+label(built)+" у "+site.toShortString());v.runtime.save();
             stage="заложена "+label(built);
-        }else if(AutonomousVillagesMod.CONFIG.pen&&unfinished.isEmpty()&&tower()!=null&&v.state.residents.size()>=6&&pen()==null){
+        }else if(AutonomousVillagesMod.CONFIG.pen&&free&&tower()!=null&&v.state.residents.size()>=6&&pen()==null&&now>=penRetry){
             // A sheep pen keeps the flock, and the wool for new beds, within the village.
-            BlockPos site=findSite(PEN,PEN);
-            if(site==null){stage="жилья хватает; ищут место для загона";return;}
-            var built=pen(site);v.state.buildings.add(built);invalidate();
-            v.chronicle.announce("Заложен "+label(built)+" у "+site.toShortString());v.runtime.save();
-            stage="заложен "+label(built);
-        }else if(AutonomousVillagesMod.CONFIG.palisade&&unfinished.isEmpty()&&tower()!=null&&v.state.residents.size()>=6&&wall()==null&&now>=palisadeRetry){
+            layPen();
+        }else if(AutonomousVillagesMod.CONFIG.palisade&&free&&tower()!=null&&v.state.residents.size()>=6&&wall()==null&&now>=palisadeRetry){
             // Zombies walking in from the dark killed most residents lost in soak: the village fences itself in.
             var built=palisade();
             if(built==null){palisadeRetry=now+24000;stage="жилья хватает; частокол не замкнуть";return;}
@@ -193,14 +191,43 @@ final class Projects {
             String laid=(Landmarks.feminine(landmark)?"Заложена ":"Заложен ")+label(planned);
             v.chronicle.announce(laid+" у "+BlockPos.of(planned.origin).toShortString());v.runtime.save();
             stage=laid.toLowerCase(Locale.ROOT);
-        }else if(AutonomousVillagesMod.CONFIG.civicBuildings&&unfinished.isEmpty()&&tower()!=null&&(pen()!=null||!AutonomousVillagesMod.CONFIG.pen||v.state.residents.size()<6)&&civic().size()<Math.min(6,v.state.residents.size()/4)){
+        }else if(AutonomousVillagesMod.CONFIG.civicBuildings&&free&&tower()!=null&&(pen()!=null||!AutonomousVillagesMod.CONFIG.pen||v.state.residents.size()<6)&&civic().size()<Math.min(6,v.state.residents.size()/4)){
             // Then the workplaces of a real village, one of each trade, as the village grows.
             var built=civicBuilding();
             if(built==null){stage="жилья хватает; ищут место для мастерской";return;}
             v.state.buildings.add(built);invalidate();
             v.chronicle.announce("Заложена "+label(built));v.runtime.save();
             stage="заложена "+label(built);
+        }else if(homeless&&houses.size()==unfinished.size()){
+            layHouse();
         }else if(active==null)stage="жилья хватает; копят запасы";
+    }
+    /** Lays the next house (a village template, else a cottage); false while no site is found. */
+    private boolean layHouse(){
+        var house=templateHouse();
+        if(house==null){
+            BlockPos site=findSite(HOUSE_W,HOUSE_D);
+            if(site==null){stage="ищут место для нового дома";return false;}
+            house=cottage(site);
+        }
+        v.state.buildings.add(house);v.state.completedShelters++;invalidate();
+        v.chronicle.announce("Заложен "+label(house)+" у "+BlockPos.of(house.origin).toShortString());v.runtime.save();
+        stage="заложен "+label(house);
+        return true;
+    }
+    /** A house needs a bed, the store has no wool for one, and there is no pen for sheep yet. */
+    private boolean woolWanted(List<TownBuilding> houses){
+        return AutonomousVillagesMod.CONFIG.pen&&pen()==null&&now()>=penRetry&&v.stock.count(x->x.is(ItemTags.WOOL))<3
+                &&houses.stream().anyMatch(b->missing(b).containsKey("bed"));
+    }
+    private long penRetry;
+    private long now(){return v.level.getGameTime();}
+    private void layPen(){
+        BlockPos site=findSite(PEN,PEN);
+        if(site==null){penRetry=now()+6000;stage="ищут место для загона";return;}
+        var built=pen(site);v.state.buildings.add(built);invalidate();
+        v.chronicle.announce("Заложен "+label(built)+" у "+site.toShortString());v.runtime.save();
+        stage="заложен "+label(built);
     }
     TownBuilding wall(){return v.state.buildings.stream().filter(b->b.kind.equals("wall")).findFirst().orElse(null);}
     private long palisadeRetry;
@@ -460,9 +487,14 @@ final class Projects {
         b.blocks.removeIf(p->!v.state.contains(p.position()));
         return b;
     }
-    /** The guild brings the first pair of sheep on the housewarming; farmers breed them from then on. */
+    /**
+     * The guild brings the first pair of sheep on the housewarming, and a pair of shears to a village
+     * without iron for its own; farmers breed the flock from then on.
+     */
     void stockPen(TownBuilding b){
         BlockPos base=BlockPos.of(b.origin);
+        boolean shears=v.stock.count(x->x.is(Items.SHEARS))>0||v.workers.values().stream().anyMatch(o->o.count(x->x.is(Items.SHEARS))>0);
+        if(!shears&&v.stock.put(new ItemStack(Items.SHEARS)).isEmpty())v.chronicle.add("pen_shears",1);
         for(int i=0;i<2;i++){
             BlockPos at=base.offset(2+i*2,1,3);
             if(!Construction.clear(v.level.getBlockState(at)))continue;

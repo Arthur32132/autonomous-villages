@@ -35,7 +35,7 @@ final class VillageCrafting {
     record Recipe(String name,String[] pattern,Predicate<ItemStack> material,Predicate<ItemStack> output,String label){
         boolean needsTable(){return pattern.length>2||pattern[0].length()>2;}
         /** Vanilla wants one kind of wood for these; tools, chests and tables take mixed planks. */
-        boolean coherent(){return Set.of("door","fence","stairs","slab","sign","trapdoor").contains(name);}
+        boolean coherent(){return Set.of("door","fence","fence_gate","stairs","slab","sign","trapdoor").contains(name);}
         Map<Character,Integer> symbols(){
             var out=new TreeMap<Character,Integer>();
             for(String row:pattern)for(char c:row.toCharArray())if(c!=' ')out.merge(c,1,Integer::sum);
@@ -66,6 +66,8 @@ final class VillageCrafting {
     /** One ingot makes nine nuggets, eight of them a lantern for a lamp post. */
     static final Recipe NUGGETS=new Recipe("iron_nugget",new String[]{"M"},IRON,NUGGET,"железные самородки");
     static final Recipe LANTERN=new Recipe("lantern",new String[]{"MMM","MTM","MMM"},NUGGET,s->s.is(Items.LANTERN),"фонарь");
+    static final Recipe GATE=new Recipe("fence_gate",new String[]{"SPS","SPS"},PLANK,
+            s->s.getItem() instanceof BlockItem item&&item.getBlock() instanceof net.minecraft.world.level.block.FenceGateBlock,"ворота");
     static final Recipe LADDER=new Recipe("ladder",new String[]{"S S","SSS","S S"},STICK,s->s.is(Items.LADDER),"лестница");
     /** A desert village without wood for a pickaxe builds from sand: four make a block of sandstone, by hand. */
     static final Predicate<ItemStack> PLAIN_SAND=s->s.is(Items.SAND);

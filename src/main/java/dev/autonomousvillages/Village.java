@@ -272,6 +272,16 @@ final class Village {
                             &&(e instanceof Villager||e instanceof net.minecraft.world.entity.player.Player)).isEmpty())continue;
             door.setOpen(null,level,s,p,false);
         }
+        // Gates of the palisade likewise: residents open them on their way and nobody shuts them.
+        for(BlockPos p:town.gates()){
+            if(!level.hasChunkAt(p))continue;
+            var s=level.getBlockState(p);
+            if(!(s.getBlock() instanceof net.minecraft.world.level.block.FenceGateBlock)||!s.getValue(net.minecraft.world.level.block.FenceGateBlock.OPEN))continue;
+            if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new AABB(p).inflate(2.5),
+                    e->e.isAlive()&&(e instanceof Villager||e instanceof net.minecraft.world.entity.player.Player)).isEmpty())continue;
+            level.setBlock(p,s.setValue(net.minecraft.world.level.block.FenceGateBlock.OPEN,false),10);
+            level.playSound(null,p,net.minecraft.sounds.SoundEvents.FENCE_GATE_CLOSE,net.minecraft.sounds.SoundSource.BLOCKS,.6f,1f);
+        }
     }
 
     // --- store -----------------------------------------------------------------------------------

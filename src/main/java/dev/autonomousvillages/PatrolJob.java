@@ -21,6 +21,9 @@ final class PatrolJob extends Job {
         // Every few homes around the centre, so one round passes all sides of the village.
         int step=Math.max(1,homes.size()/6);
         for(int i=Math.floorMod(w.id.hashCode(),step);i<homes.size();i+=step)loop.add(homes.get(i));
+        // And the palisade's gates, where the dark comes in: a couple of them per guard.
+        var gates=new ArrayList<>(v.town.gates());gates.sort(Comparator.comparingLong(BlockPos::asLong));
+        for(int i=Math.floorMod(w.id.hashCode(),Math.max(1,gates.size())),n=0;n<Math.min(2,gates.size());n++,i=(i+gates.size()/2)%gates.size())loop.add(gates.get(i));
         // A finished watchtower is the first stop: the lookout over the whole village.
         lookout=v.town.lookout();
         if(lookout!=null)loop.addFirst(lookout);

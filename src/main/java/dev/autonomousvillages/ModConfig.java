@@ -44,6 +44,8 @@ public final class ModConfig {
     public boolean civicBuildings=true;
     /** A timber barn by the bell with the store's chests inside. */
     public boolean storehouse=true;
+    /** After the watchtower the village builds its own forge, market square and tavern as it grows. */
+    public boolean landmarks=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

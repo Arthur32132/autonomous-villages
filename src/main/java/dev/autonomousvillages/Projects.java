@@ -110,8 +110,9 @@ final class Projects {
         nextPlanning=now+100;
         for(var b:v.state.buildings)if(!b.completed&&remaining(b)==0){
             b.completed=true;v.chronicle.announce("Построено: "+label(b)+" — новоселье!");
-            if(b.kind.equals("house")||b.kind.equals("civic"))Festivities.housewarming(v,b);
-            if(b.kind.equals("civic"))furnish(b);
+            if(b.kind.equals("house")||b.kind.equals("civic")||Landmarks.kind(b.kind))Festivities.housewarming(v,b);
+            if(b.kind.equals("civic")||Landmarks.kind(b.kind))furnish(b);
+            if(Landmarks.kind(b.kind))signboard(b);
             if(b.kind.equals("well"))fillWell(b);
             if(b.path.isEmpty())b.path.addAll(footpath(b));
             v.runtime.save();
@@ -126,6 +127,8 @@ final class Projects {
         }
         if(v.state.buildings.size()>=256||v.state.completedShelters>=64){stage="все проекты завершены";return;}
         int beds=v.index.beds.size();
+        String landmark=AutonomousVillagesMod.CONFIG.landmarks&&unfinished.isEmpty()&&tower()!=null?Landmarks.due(kinds(),v.state.residents.size()):null;
+        TownBuilding planned=null;
         if(beds<v.state.residents.size()+2){
             var house=templateHouse();
             if(house==null){
@@ -164,6 +167,12 @@ final class Projects {
             var built=tower(site);v.state.buildings.add(built);invalidate();
             v.chronicle.announce("Заложена "+label(built)+" у "+site.toShortString());v.runtime.save();
             stage="заложена "+label(built);
+        }else if(landmark!=null&&(planned=landmark(Landmarks.design(landmark)))!=null){
+            // Then the village's own big buildings, one at a time as it grows: forge, market, tavern.
+            v.state.buildings.add(planned);invalidate();
+            String laid=(Landmarks.feminine(landmark)?"Заложена ":"Заложен ")+label(planned);
+            v.chronicle.announce(laid+" у "+BlockPos.of(planned.origin).toShortString());v.runtime.save();
+            stage=laid.toLowerCase(Locale.ROOT);
         }else if(AutonomousVillagesMod.CONFIG.civicBuildings&&unfinished.isEmpty()&&tower()!=null&&civic().size()<Math.min(6,v.state.residents.size()/4)){
             // Then the workplaces of a real village, one of each trade, as the village grows.
             var built=civicBuilding();
@@ -172,6 +181,36 @@ final class Projects {
             v.chronicle.announce("Заложена "+label(built));v.runtime.save();
             stage="заложена "+label(built);
         }else if(active==null)stage="жилья хватает; копят запасы";
+    }
+    Set<String> kinds(){var out=new HashSet<String>();for(var b:v.state.buildings)out.add(b.kind);return out;}
+    /** The landmark's design on a flat free site by the bell, its entrance turned toward it. */
+    TownBuilding landmark(Landmarks.Design design){
+        return place(design.size(),Direction.NORTH,(base,rotation)->fromDesign(design,base,rotation),v.meetingPoint());
+    }
+    TownBuilding fromDesign(Landmarks.Design d,BlockPos base,Rotation rotation){
+        var b=new TownBuilding(d.kind(),base);
+        for(var piece:d.pieces()){
+            BlockPos p=base.offset(Blueprints.turn(piece.pos(),d.size(),rotation));BlockState s=piece.state().rotate(rotation);
+            if(piece.optional())b.decorate(p,s);else b.add(p,s);
+            // The floor rests on a cobblestone footing where the ground is lower.
+            if(piece.pos().getY()==0&&!piece.optional())
+                for(int y=1;y<=3&&v.level.getBlockState(p.below(y)).isAir();y++)b.add(p.below(y),Blocks.COBBLESTONE.defaultBlockState());
+        }
+        for(int x=0;x<d.width();x++)for(int z=0;z<d.depth();z++)for(int y=1;y<=d.height();y++){
+            BlockPos p=base.offset(Blueprints.turn(new BlockPos(x,y,z),d.size(),rotation));
+            if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());
+        }
+        b.blocks.removeIf(p->!v.state.contains(p.position()));b.cuts.removeIf(p->!v.state.contains(BlockPos.of(p)));
+        return b;
+    }
+    /** The landmark's sign names it and the village, whoever placed it. */
+    void signboard(TownBuilding b){
+        for(var p:b.blocks)if(p.block().getBlock() instanceof SignBlock&&v.level.getBlockEntity(p.position()) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign){
+            var text=sign.getFrontText().setMessage(0,net.minecraft.network.chat.Component.empty())
+                    .setMessage(1,net.minecraft.network.chat.Component.literal(Landmarks.title(b.kind)))
+                    .setMessage(2,net.minecraft.network.chat.Component.literal(v.state.name)).setMessage(3,net.minecraft.network.chat.Component.empty());
+            sign.setText(text,true);sign.setChanged();v.level.sendBlockUpdated(p.position(),sign.getBlockState(),sign.getBlockState(),3);
+        }
     }
     List<TownBuilding> civic(){return v.state.buildings.stream().filter(b->b.kind.equals("civic")).toList();}
     /** The next trade's workplace of the village's style, a trade not built yet, entrance toward the bell. */
@@ -297,7 +336,8 @@ final class Projects {
         return idle>24000||idle>3000&&missing(b).keySet().stream().noneMatch(EVERYDAY::contains);
     }
     static String label(TownBuilding b){
-        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";case "civic"->trade(b.design);case "storehouse"->"амбар";case "well"->"колодец";default->b.kind;};
+        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";case "civic"->trade(b.design);case "storehouse"->"амбар";case "well"->"колодец";
+            case "forge","market","tavern"->Landmarks.label(b.kind);default->b.kind;};
         if(b.kind.equals("civic"))return base;
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";
     }
@@ -412,7 +452,7 @@ final class Projects {
             if(inside&&dy>=1&&!Construction.clear(s)&&!removable(s))return null;
             if(inside&&dy==0&&s.isAir()&&!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP))return null;
         }
-        if(v.state.buildings.stream().filter(b->b.kind.equals("house")||b.kind.equals("native_house")||b.kind.equals("civic")).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
+        if(v.state.buildings.stream().filter(b->b.kind.equals("house")||b.kind.equals("native_house")||b.kind.equals("civic")||Landmarks.kind(b.kind)).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
         return base;
     }
     /** Vanilla style of the village, by the most common villager type among residents. */
@@ -438,16 +478,20 @@ final class Projects {
         return null;
     }
     private TownBuilding place(Blueprints.Template design,BlockPos hub){
+        // A template whose door stands higher than layer 1 sinks further, so the door is at street level.
+        return place(design.size(),design.front(),(base,rotation)->fromTemplate(design,base.below(design.doorLevel()-1),rotation),hub);
+    }
+    /** A plan of the given size on a ring round the hub, its front turned toward the hub, with an open doorway. */
+    private TownBuilding place(net.minecraft.core.Vec3i size,Direction front,java.util.function.BiFunction<BlockPos,Rotation,TownBuilding> plan,BlockPos hub){
         for(int attempt=0;attempt<16;attempt++){
             int n=siteCursor++;int ring=8+(n/16%12)*4;double angle=(n%16)*Math.PI/8+(n/16)*0.37;
             int cx=hub.getX()+(int)Math.round(Math.cos(angle)*ring),cz=hub.getZ()+(int)Math.round(Math.sin(angle)*ring);
             Direction toHub=Math.abs(hub.getX()-cx)>=Math.abs(hub.getZ()-cz)?(hub.getX()>cx?Direction.EAST:Direction.WEST):(hub.getZ()>cz?Direction.SOUTH:Direction.NORTH);
-            var rotation=Blueprints.facing(design.front(),toHub);
-            var footprint=Blueprints.footprint(design.size(),rotation);
+            var rotation=Blueprints.facing(front,toHub);
+            var footprint=Blueprints.footprint(size,rotation);
             BlockPos base=siteAt(cx-footprint.getX()/2,cz-footprint.getZ()/2,footprint.getX(),footprint.getZ());
             if(base==null)continue;
-            // A template whose door stands higher than layer 1 sinks further, so the door is at street level.
-            var house=fromTemplate(design,base.below(design.doorLevel()-1),rotation);
+            var house=plan.apply(base,rotation);
             if(doorwayOpen(house))return house;
         }
         return null;

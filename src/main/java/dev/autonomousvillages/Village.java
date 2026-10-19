@@ -146,6 +146,7 @@ final class Village {
         presentation.tick();
         ambience.tick(time);
         if(time%200==77)LandmarkGoods.tick(this);
+        if(time%200==137)VillageRequests.tick(this);
         lifeEvents.tick(time);
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){

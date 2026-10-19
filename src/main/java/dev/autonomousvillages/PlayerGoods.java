@@ -95,6 +95,7 @@ final class PlayerGoods {
             v.chronicle.announce(player.getGameProfile().name()+" — почётный житель деревни "+v.state.name+"!");
             v.level.playSound(null,resident.blockPosition(),SoundEvents.PLAYER_LEVELUP,SoundSource.PLAYERS,1f,1f);
         }
+        VillageRequests.delivered(v,player,resident,item,given);
         v.runtime.save();
     }
     /** The certificate of honour: paper with the village's name, a glint and the date. */
@@ -167,6 +168,8 @@ final class PlayerGoods {
         if(project==null)return Component.literal("Стройка\n\nВсё построено.");
         var out=new StringBuilder("Стройка\n\n").append(kind(project.kind)).append(project.design.isEmpty()?"":"\n("+project.design+")")
                 .append("\nготово ").append(v.town.built(project)).append(" из ").append(v.town.size(project)).append("\n\nНе хватает:\n");
+        var request=v.state.request;
+        if(request!=null)out.append("\nЗаказ игроку: ").append(VillageRequests.label(request.key)).append(" ×").append(VillageRequests.left(request)).append("\n");
         var missing=v.town.missing(project);
         if(missing.isEmpty())out.append("ничего");
         missing.entrySet().stream().sorted(Map.Entry.<String,Integer>comparingByValue().reversed()).limit(8)

@@ -256,8 +256,11 @@ final class VillagePlanner {
         if(s.need("door")>owned(x->x.is(ItemTags.WOODEN_DOORS))&&!crafting(w,VillageCrafting.DOOR)&&CraftJob.affordable(v,VillageCrafting.DOOR,1,w))return new CraftJob(w,VillageCrafting.DOOR,1);
         if(s.need("bed")>owned(x->x.is(ItemTags.BEDS))&&s.woolColour()!=null&&s.wool()>=3&&!crafting(w,VillageCrafting.bed(s.woolColour()))&&CraftJob.affordable(v,VillageCrafting.bed(s.woolColour()),1,w))
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
-        if(s.need("slab")>owned(x->x.is(ItemTags.WOODEN_SLABS))&&!crafting(w,VillageCrafting.SLAB)&&CraftJob.affordable(v,VillageCrafting.SLAB,2,w))return new CraftJob(w,VillageCrafting.SLAB,2);
-        if(s.need("stairs")>owned(x->x.is(ItemTags.WOODEN_STAIRS))&&!crafting(w,VillageCrafting.STAIRS)&&CraftJob.affordable(v,VillageCrafting.STAIRS,2,w))return new CraftJob(w,VillageCrafting.STAIRS,2);
+        // Roof shapes come out of wood the walls do not need: building goes bottom-up, and 24 slabs
+        // made first left a mountain village with no planks for the floor (seed 42).
+        boolean spareWood=s.wood()>=s.need("planks")+4*s.need("logs")+6;
+        if(spareWood&&s.need("slab")>owned(x->x.is(ItemTags.WOODEN_SLABS))&&!crafting(w,VillageCrafting.SLAB)&&CraftJob.affordable(v,VillageCrafting.SLAB,2,w))return new CraftJob(w,VillageCrafting.SLAB,2);
+        if(spareWood&&s.need("stairs")>owned(x->x.is(ItemTags.WOODEN_STAIRS))&&!crafting(w,VillageCrafting.STAIRS)&&CraftJob.affordable(v,VillageCrafting.STAIRS,2,w))return new CraftJob(w,VillageCrafting.STAIRS,2);
         // Stone shapes from cobblestone, or from sandstone where the village builds from sand.
         if(s.need("stone_stairs")>owned(x->x.is(Items.COBBLESTONE_STAIRS)||x.is(Items.SANDSTONE_STAIRS))){
             if(!crafting(w,VillageCrafting.COBBLE_STAIRS)&&CraftJob.affordable(v,VillageCrafting.COBBLE_STAIRS,2,w))return new CraftJob(w,VillageCrafting.COBBLE_STAIRS,2);

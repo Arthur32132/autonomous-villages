@@ -49,7 +49,7 @@ final class LightJob extends Job {
                 placed++;v.state.lights.add(torch.asLong());v.chronicle.lit();
                 if(!torch.equals(spot))v.chronicle.add("lamps",1);
                 if(Lighting.indoors(v,spot))v.chronicle.add("roomsLit",1);
-            }
+            }else v.rejected.put(spot.asLong(),now()+600); // someone standing there, most likely
         }
         return !spots.isEmpty();
     }

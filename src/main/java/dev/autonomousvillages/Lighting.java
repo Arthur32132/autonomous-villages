@@ -27,7 +27,7 @@ final class Lighting {
             if(!v.level.hasChunkAt(bed)||!v.state.contains(bed))continue;
             BlockPos best=null;int bestLight=0;
             for(BlockPos q:BlockPos.betweenClosed(bed.offset(-3,-1,-3),bed.offset(3,1,3))){
-                if(!Construction.clear(v.level.getBlockState(q))||!Construction.clear(v.level.getBlockState(q.above()))||v.level.canSeeSky(q))continue;
+                if(!Construction.clear(v.level.getBlockState(q))||!Construction.clear(v.level.getBlockState(q.above()))||v.level.canSeeSky(q)||besideBed(v,q))continue;
                 int light=v.level.getBrightness(LightLayer.BLOCK,q);
                 if(best!=null&&(light>bestLight||light==bestLight&&q.distSqr(bed)>=best.distSqr(bed))||!needsLight(v,q)||unreachable(v,q))continue;
                 best=q.immutable();bestLight=light;
@@ -37,6 +37,11 @@ final class Lighting {
         return out;
     }
     static boolean indoors(Village v,BlockPos p){return !v.level.canSeeSky(p);}
+    /** The floor beside a bed stays free for a second bed and for whoever gets up. */
+    private static boolean besideBed(Village v,BlockPos p){
+        for(var d:Direction.Plane.HORIZONTAL)if(v.level.getBlockState(p.relative(d)).getBlock() instanceof net.minecraft.world.level.block.BedBlock)return true;
+        return false;
+    }
     /** A spot nobody could walk to lately (a locked room, a roof). */
     static boolean unreachable(Village v,BlockPos p){return v.rejected.getOrDefault(p.asLong(),0L)>v.level.getGameTime();}
     /** Grid samples around beds and buildings, nearest to the meeting point first. */

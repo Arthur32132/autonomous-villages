@@ -251,18 +251,21 @@ final class VillagePlanner {
     /** Every bed taken and no building waiting for one: a second bed beside a single one in a home. */
     private Job spareBed(Worker w,Snapshot s){
         if(!AutonomousVillagesMod.CONFIG.spareBeds||s.table()==null||s.need("bed")>0||!w.ready("sparebed")
-                ||v.state.residents.size()>=Breeding.MAX_RESIDENTS||v.breeding.freeBeds()>0)return null;
+                ||v.state.residents.size()>=Breeding.MAX_RESIDENTS)return null;
+        if(v.breeding.freeBeds()>0){w.cooldown("sparebed",600);return null;}
         if(v.workers.values().stream().anyMatch(o->o!=w&&(o.job instanceof PlaceJob p&&p.state.getBlock() instanceof BedBlock
                 ||o.job instanceof CraftJob c&&c.recipe.name().equals("bed"))))return null;
-        var spot=SpareBeds.spot(v);
+        var spot=SpareBeds.spot(v,w.id);
         if(spot==null){w.cooldown("sparebed",1200);return null;}
         Item bed=SpareBeds.bedItem(v,w);
         if(bed instanceof net.minecraft.world.item.BlockItem item&&item.getBlock() instanceof BedBlock){
             w.cooldown("sparebed",600);
             return new PlaceJob(w,spot.foot(),item.getBlock().defaultBlockState().setValue(BedBlock.FACING,spot.facing()),"вторая кровать");
         }
-        if(s.woolColour()!=null&&s.wool()>=3&&w.ready("craft")&&CraftJob.affordable(v,VillageCrafting.bed(s.woolColour()),1,w))
+        // A bed in someone else's bag is on its way already.
+        if(owned(x->x.is(ItemTags.BEDS))==0&&s.woolColour()!=null&&s.wool()>=3&&w.ready("craft")&&CraftJob.affordable(v,VillageCrafting.bed(s.woolColour()),1,w))
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
+        w.cooldown("sparebed",600);
         return null;
     }
     /** A sign at the cemetery for each resident lost; one craft makes three. */

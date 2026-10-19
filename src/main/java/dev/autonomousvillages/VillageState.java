@@ -64,6 +64,7 @@ public final class VillageState {
         if(lights==null)lights=new LinkedHashSet<>();
         if(chronicle==null)chronicle=new Chronicle.Data();
         if(productDays==null)productDays=new LinkedHashMap<>();
+        if(newsTotals!=null)newsTotals.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null);
         if(graves==null)graves=new ArrayList<>();
         graves.removeIf(g->g==null||g.name==null);
         while(graves.size()>16)graves.removeFirst();

@@ -46,7 +46,7 @@ final class MorningNews {
             if(Math.floorMod(clock,24000)>=2000||v.state.newsDay==day)return;
             var current=v.town.active();
             String building=current==null?null:Projects.label(current)+" — "+v.town.built(current)+" из "+v.town.size(current);
-            String news=text(v.chronicle.day(),v.state.residents.size(),v.state.newsResidents,v.state.newsTotals,totals,building);
+            String news=text("день "+(day+1),v.state.residents.size(),v.state.newsResidents,v.state.newsTotals,totals,building);
             v.chronicle.tell(news);
             AutonomousVillagesMod.LOG.info("SETTLEMENT {} news: {}",v.state.name,news);
         }

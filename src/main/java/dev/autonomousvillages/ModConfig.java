@@ -42,6 +42,8 @@ public final class ModConfig {
     public boolean dayBells=true;
     /** After homes and the watchtower the village builds the workplaces of its style: library, temple, smiths... */
     public boolean civicBuildings=true;
+    /** A timber barn by the bell with the store's chests inside. */
+    public boolean storehouse=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

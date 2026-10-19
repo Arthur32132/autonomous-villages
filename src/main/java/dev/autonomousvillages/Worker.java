@@ -148,6 +148,20 @@ final class Worker {
         job=next;released=false;
         if(job.target()!=null&&!v.reservations.acquire(job.target().asLong(),id,now())){job=null;return;}
         status=job.status;
+        showTool(job.kind());
+    }
+    /** The tool of the job in hand from the start, so a player sees who goes to fell and who to dig. */
+    private void showTool(String kind){
+        var tag=switch(kind){
+            case "chop"->net.minecraft.tags.ItemTags.AXES;
+            case "quarry","shaft"->net.minecraft.tags.ItemTags.PICKAXES;
+            case "farm"->net.minecraft.tags.ItemTags.HOES;
+            case "patrol"->net.minecraft.tags.ItemTags.SWORDS;
+            default->null;
+        };
+        if(tag==null)return;
+        int slot=Supplies.find(bot(),s->s.is(tag)&&Supplies.usable(s));
+        if(slot>=0)bot().inventory().select(slot);
     }
     void endJob(){
         if(job==null)return;
@@ -335,6 +349,7 @@ final class Worker {
     void defend(Monster enemy){
         if(job!=null){job.stop();job=null;v.reservations.release(id);}
         foe=enemy;
+        int sword=Supplies.find(bot(),s->s.is(net.minecraft.tags.ItemTags.SWORDS)&&Supplies.usable(s));if(sword>=0)bot().inventory().select(sword);
         combat=bot().combat().fight(enemy,new CombatPolicy(CombatSkill.EXPERT,16,3,24,false,true,false).swordOnly());
         fleeSince=now();released=false;status="защищает деревню";
     }

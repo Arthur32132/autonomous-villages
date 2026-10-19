@@ -84,7 +84,7 @@ final class VillagePlanner {
             case STEWARD->first(()->craftForProject(w,s),()->workshop(w,s),()->build(w,s));
             case LOGGER->chop(w,s,false);
             case MINER->first(()->mine(w,s,false),()->sand(w,s));
-            case FARMER->first(()->farm(w),()->bread(w,s),()->shear(w,s));
+            case FARMER->first(()->farm(w),()->bread(w,s),()->shear(w,s),()->herd(w,s));
             case GUARD->chop(w,s,true);
             default->null;
         };
@@ -274,6 +274,14 @@ final class VillagePlanner {
         if(s.wheat()>=3&&s.bread()<32&&s.table()!=null&&w.ready("craft")&&!busy(w,VillageCrafting.BREAD,Blocks.AIR))
             return new CraftJob(w,VillageCrafting.BREAD,Math.min(4,s.wheat()/3));
         return null;
+    }
+    /** A small flock grows with wheat from the store while beds still wait for wool. */
+    private Job herd(Worker w,Snapshot s){
+        if(!w.ready("herd")||s.need("bed")<=s.bedItems()||s.wheat()<4||v.activeJobs("herd")>0)return null;
+        var flock=HerdJob.flock(v,w.body(),48);
+        if(flock.size()<2||flock.size()>=8){w.cooldown("herd",2400);return null;}
+        w.cooldown("herd",6000); // vanilla animals breed again after five minutes
+        return new HerdJob(w);
     }
     private Job shear(Worker w,Snapshot s){
         int woolNeeded=3*Math.max(0,s.need("bed")-s.bedItems());

@@ -112,7 +112,7 @@ final class VillagePlanner {
         };
         if(own!=null)return own;
         Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->grave(w,s),()->shear(w,s),()->chop(w,s,true),
-                ()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
+                ()->helperPick(w,s),()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
         if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0&&w.ready("deposit"))return new DepositJob(w);
         return shared;
     }
@@ -446,6 +446,21 @@ final class VillagePlanner {
      * Stone blocks the projects still lack, counted in cobblestone: rubble and sandstone fill
      * plain blocks, shapes take stone too (6 make 4 stairs, 3 make 6 slabs, 6 make 6 walls).
      */
+    /**
+     * Stone holds up the building and the miner alone digs it while the others stand idle (rc10-rc11:
+     * a tenth of the day "стройке не хватает: cobblestone"): a free hand takes up a pickaxe, three
+     * picks in the village at most.
+     */
+    private Job helperPick(Worker w,Snapshot s){
+        if(w.hasTool(ItemTags.PICKAXES)||stoneShort(s)<=0||s.table()==null||!w.ready("tool")||sandstoneVillage(s))return null;
+        Predicate<ItemStack> pick=x->x.is(ItemTags.PICKAXES)&&Supplies.usable(x);
+        if(v.workers.values().stream().filter(o->o.active()&&o.has(pick)).count()>=3)return null;
+        w.cooldown("tool",600);
+        if(v.stock.count(pick)>0&&w.ready("fetch"))return new FetchJob(w,new Job.Need(pick,1,"кирка"));
+        var recipe=VillageCrafting.tool("pick",s.cobble()>=3?"stone":"wood");
+        if(!CraftJob.affordable(v,recipe,1,w)){recipe=VillageCrafting.tool("pick","wood");if(!CraftJob.affordable(v,recipe,1,w))return null;}
+        return new CraftJob(w,recipe,1);
+    }
     private int stoneShort(Snapshot s){
         return s.need("cobblestone")+(s.need("stone_stairs")*3+1)/2+(s.need("stone_slab")+1)/2+s.need("stone_wall")-s.cobble()-s.rubble();
     }

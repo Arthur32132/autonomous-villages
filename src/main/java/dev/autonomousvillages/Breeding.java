@@ -58,6 +58,7 @@ final class Breeding {
         var spot=v.feetPosition(crib);
         baby.snapTo(spot.x,spot.y,spot.z,0,0);
         v.level.addFreshEntityWithPassengers(baby);
+        Festivities.birth(v,baby);
         first.setAge(6000);second.setAge(6000);
         v.level.broadcastEntityEvent(first,(byte)12);v.level.broadcastEntityEvent(second,(byte)12);v.level.broadcastEntityEvent(baby,(byte)12);
         v.state.residents.add(baby.getUUID());v.state.lastBirth=now;

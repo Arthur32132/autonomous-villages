@@ -109,7 +109,8 @@ final class Projects {
         if(now<nextPlanning)return;
         nextPlanning=now+100;
         for(var b:v.state.buildings)if(!b.completed&&remaining(b)==0){
-            b.completed=true;v.chronicle.announce("Построено: "+label(b));
+            b.completed=true;v.chronicle.announce("Построено: "+label(b)+" — новоселье!");
+            if(b.kind.equals("house"))Festivities.housewarming(v,b);
             if(b.path.isEmpty())b.path.addAll(footpath(b));
             v.runtime.save();
         }

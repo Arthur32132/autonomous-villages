@@ -404,14 +404,19 @@ final class VillagePlanner {
         if(!w.ready("mine")||!glass&&!sandstone)return null;
         BlockPos from=w.body().blockPosition(),hub=v.meetingPoint();
         // Sand for sandstone comes in bulk: a shallow pit away from homes and the bell, never a deep hole.
-        Predicate<BlockPos> quarry=p->glass||p.getY()>=v.state.y-1&&p.distSqr(hub)>=12*12&&v.index.beds.stream().noneMatch(b->b.distSqr(p)<6*6)
-                &&v.town.doors().stream().noneMatch(d->d.distSqr(p)<6*6)&&!v.town.protects(p.above());
+        Predicate<BlockPos> quarry=p->!nearCactus(p)&&(glass||p.getY()>=v.state.y-1&&p.distSqr(hub)>=12*12&&v.index.beds.stream().noneMatch(b->b.distSqr(p)<6*6)
+                &&v.town.doors().stream().noneMatch(d->d.distSqr(p)<6*6)&&!v.town.protects(p.above()));
         var sand=v.index.sand.stream().filter(p->Math.abs(p.getY()-from.getY())<=8&&p.distSqr(from)<64*64)
                 .filter(p->v.level.getBlockState(p).is(Blocks.SAND)||v.level.getBlockState(p).is(Blocks.RED_SAND)&&glass)
                 .filter(p->v.ready(p,w.id)&&v.state.policy.allows("mine",p)&&!v.town.protects(p))
                 .sorted(Comparator.comparingDouble(p->{double dy=p.getY()-from.getY();return p.distSqr(from)+15*dy*dy;}))
                 .filter(quarry).limit(8).toList();
         return sand.size()>=2?new MineJob(w,sand):null;
+    }
+    /** Digging sand beside a cactus leaves the digger wedged against it (rc7: a miner was pricked to death). */
+    private boolean nearCactus(BlockPos p){
+        for(BlockPos q:BlockPos.betweenClosed(p.offset(-2,0,-2),p.offset(2,2,2)))if(v.level.getBlockState(q).is(Blocks.CACTUS))return true;
+        return false;
     }
     /** A staircase mine starts at the edge of the claim on natural ground, away from beds. */
     BlockPos mineEntrance(){

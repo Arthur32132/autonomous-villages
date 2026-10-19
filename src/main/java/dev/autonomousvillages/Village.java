@@ -145,6 +145,9 @@ final class Village {
      */
     void rescueFromPowderSnow(){
         for(UUID id:state.residents){
+            // Pricked by a cactus it is wedged against: step to the nearest safe cell clear of cacti.
+            if(level.getEntity(id) instanceof Villager hurt&&hurt.isAlive()&&hurt.hurtTime>0&&hurt.getLastDamageSource()!=null
+                    &&hurt.getLastDamageSource().is(net.minecraft.world.damagesource.DamageTypes.CACTUS))stepAwayFromCactus(hurt);
             if(!(level.getEntity(id) instanceof Villager v)||!v.isAlive()||!v.isInPowderSnow&&v.getTicksFrozen()==0)continue;
             BlockPos feet=v.blockPosition();boolean dug=false;
             for(BlockPos p:List.of(feet,feet.above()))
@@ -157,6 +160,20 @@ final class Village {
                 chronicle.add("rescued",1);
             }
         }
+    }
+    private void stepAwayFromCactus(Villager body){
+        BlockPos here=body.blockPosition();BlockPos best=null;double score=Double.MAX_VALUE;
+        for(BlockPos q:BlockPos.betweenClosed(here.offset(-3,-2,-3),here.offset(3,2,3))){
+            if(!safeFeet(q))continue;
+            boolean prickly=false;
+            for(BlockPos c:BlockPos.betweenClosed(q.offset(-1,0,-1),q.offset(1,1,1)))if(level.getBlockState(c).is(net.minecraft.world.level.block.Blocks.CACTUS)){prickly=true;break;}
+            if(prickly)continue;
+            double d=q.distSqr(here);if(d<score){score=d;best=q.immutable();}
+        }
+        if(best==null)return;
+        var to=feetPosition(best);
+        var w=workers.get(body.getUUID());if(w!=null)w.cancel();
+        body.teleportTo(to.x,to.y,to.z);chronicle.add("rescued",1);
     }
     void sync(){
         var area=VillageDiscovery.area(state,64);

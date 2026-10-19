@@ -42,19 +42,19 @@ final class Blueprints {
     }
     /** Houses with beds of one style (small, medium and big), smallest first. */
     /**
-     * The village's workplaces of the style: library, temple, smiths, tannery, butcher... (vanilla
-     * templates without beds; farms, pens, stables and the meeting place left out).
+     * The village's workplaces of the style: fields, library, temple, smiths, tannery, butcher...
+     * (vanilla templates without beds; pens, stables and the meeting place left out).
      */
     static List<Template> civic(ServerLevel level,String style){
         String prefix="village/"+style+"/houses/";
         return level.getStructureManager().listTemplates()
                 .filter(id->id.getNamespace().equals("minecraft")&&id.getPath().startsWith(prefix))
                 .filter(id->{String n=id.getPath().substring(prefix.length());
-                    return !n.contains("_house_")&&!n.contains("cottage")&&!n.contains("farm")&&!n.contains("animal_pen")&&!n.contains("meeting")
+                    return !n.contains("_house_")&&!n.contains("cottage")&&!n.contains("animal_pen")&&!n.contains("meeting")
                             &&!n.contains("accessory")&&!n.contains("stable")&&!n.contains("fisher");})
                 .sorted(Comparator.comparing(Identifier::toString))
                 .map(id->load(level,id)).flatMap(Optional::stream)
-                .filter(t->t.beds()==0&&t.size().getX()<=13&&t.size().getZ()<=13&&t.work()>=40&&t.work()<=360).toList();
+                .filter(t->t.beds()==0&&t.size().getX()<=13&&t.size().getZ()<=13&&t.work()<=360&&(t.work()>=40||t.id().getPath().contains("farm"))).toList();
     }
     /** "plains_tool_smith_1" → "tool_smith". */
     static String trade(String design){

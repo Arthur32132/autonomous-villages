@@ -188,12 +188,15 @@ final class Projects {
     }
     /**
      * A finished workplace is furnished by its guild: the template's workstation and decoration that
-     * the village could not make appear on the housewarming, so a new trade can move in.
+     * the village could not make appear on the housewarming, so a new trade can move in. A field gets
+     * its farmland, water and first sowing the same way.
      */
     void furnish(TownBuilding b){
         int placed=0;
         for(var p:b.blocks){
-            if(!p.optional||!v.level.hasChunkAt(p.position())||!Construction.clear(v.level.getBlockState(p.position())))continue;
+            var here=v.level.getBlockState(p.position());
+            // Fields are laid into the ground: soil and sand give way to the template's farmland.
+            if(!p.optional||!v.level.hasChunkAt(p.position())||!Construction.clear(here)&&!VillageIndex.naturalSoil(here)&&!here.is(Blocks.SAND))continue;
             var s=p.block();
             if(s.getBlock() instanceof BedBlock||s.getBlock() instanceof DoorBlock||!s.canSurvive(v.level,p.position()))continue;
             v.level.setBlock(p.position(),s,3);placed++;
@@ -302,7 +305,7 @@ final class Projects {
         return switch(Blueprints.trade(design)){
             case "library"->"библиотека";case "temple"->"храм";case "tool_smith"->"кузница";case "weaponsmith","weapon_smith"->"оружейная";
             case "armorer"->"бронная мастерская";case "butcher_shop","butchers_shop"->"мясная лавка";case "tannery"->"дубильня";case "mason"->"мастерская каменщика";
-            case "cartographer"->"картографическая";case "shepherd"->"овчарня";case "fletcher"->"мастерская лучника";default->"мастерская";
+            case "cartographer"->"картографическая";case "small_farm","large_farm","farm"->"поле";case "shepherd"->"овчарня";case "fletcher"->"мастерская лучника";default->"мастерская";
         };
     }
     /** Structural blocks of the plan; decoration does not count toward progress. */

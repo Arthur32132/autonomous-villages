@@ -11,5 +11,7 @@ class CivicTest {
         assertEquals("оружейная",Projects.trade("snowy_weapon_smith_1"));
         assertEquals("мясная лавка",Projects.trade("savanna_butchers_shop_2"));
         assertEquals("храм",Projects.trade("plains_temple_4"));
+        assertEquals("small_farm",Blueprints.trade("plains_small_farm_1"));
+        assertEquals("поле",Projects.trade("taiga_large_farm_2"));
     }
 }

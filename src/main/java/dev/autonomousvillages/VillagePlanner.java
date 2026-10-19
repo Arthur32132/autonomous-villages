@@ -310,6 +310,12 @@ final class VillagePlanner {
         var ores=v.index.ore.stream().filter(p->MineKnowledge.iron(v,p)||v.level.getBlockState(p).is(Blocks.COAL_ORE)||v.level.getBlockState(p).is(Blocks.DEEPSLATE_COAL_ORE))
                 .filter(usable).sorted(near).limit(6).toList();
         if(!ores.isEmpty())return new MineJob(w,ores);
+        // Iron for shears lies deeper than the surface stone: the staircase mine reaches it and
+        // yields cobblestone on the way, so it goes first while no iron ore is known.
+        if(ironWanted&&(!helping||v.smallCrew())&&v.activeJobs("shaft")==0){
+            BlockPos entrance=mineEntrance();
+            if(entrance!=null)return new MineJob(w,entrance);
+        }
         if(s.cobble()<wanted){
             var stone=v.index.stone.stream().filter(p->v.level.getBlockState(p).is(Blocks.STONE)).filter(usable).sorted(near).limit(12).toList();
             if(stone.size()>=4)return new MineJob(w,stone);

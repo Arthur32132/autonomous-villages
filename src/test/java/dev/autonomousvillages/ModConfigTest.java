@@ -11,11 +11,11 @@ class ModConfigTest {
         var first=ModConfig.load(dir);
         assertTrue(first.gifts&&first.summonGolems&&first.watchtower);
         Path file=dir.resolve("autonomous_villages.json");
-        assertTrue(Files.readString(file).contains("\\"chronicleBook\\": true"));
+        assertTrue(Files.readString(file).contains("\"chronicleBook\": true"));
         // An owner turns gifts off; a later start keeps that and still lists the other switches.
-        Files.writeString(file,"{\\"gifts\\": false}");
+        Files.writeString(file,"{\"gifts\": false}");
         var second=ModConfig.load(dir);
         assertFalse(second.gifts);assertTrue(second.compost);
-        assertTrue(Files.readString(file).contains("\\"compost\\": true"));
+        assertTrue(Files.readString(file).contains("\"compost\": true"));
     }
 }

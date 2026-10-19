@@ -44,6 +44,8 @@ public final class ModConfig {
     public boolean civicBuildings=true;
     /** A timber barn by the bell with the store's chests inside. */
     public boolean storehouse=true;
+    /** A fenced sheep pen with a gate; the guild brings the first two sheep. */
+    public boolean pen=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

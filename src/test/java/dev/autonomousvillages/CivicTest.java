@@ -14,4 +14,9 @@ class CivicTest {
         assertEquals("small_farm",Blueprints.trade("plains_small_farm_1"));
         assertEquals("поле",Projects.trade("taiga_large_farm_2"));
     }
+    @Test void theSheepPenIsAKnownBuildingAndOnByDefault(){
+        assertTrue(TownBuilding.KINDS.contains("pen"));
+        assertEquals("загон для овец",Projects.label(new TownBuilding("pen",net.minecraft.core.BlockPos.ZERO)));
+        assertTrue(new ModConfig().pen);
+    }
 }

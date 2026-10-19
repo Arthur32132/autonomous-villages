@@ -127,7 +127,7 @@ final class Projects {
         }
         if(v.state.buildings.size()>=256||v.state.completedShelters>=64){stage="все проекты завершены";return;}
         int beds=v.index.beds.size();
-        String landmark=AutonomousVillagesMod.CONFIG.landmarks&&unfinished.isEmpty()&&tower()!=null?Landmarks.due(kinds(),v.state.residents.size()):null;
+        String landmark=AutonomousVillagesMod.CONFIG.landmarks&&unfinished.isEmpty()&&tower()!=null?Landmarks.due(kinds(),v.state.residents.size(),deferred()):null;
         TownBuilding planned=null;
         if(beds<v.state.residents.size()+2){
             var house=templateHouse();
@@ -167,7 +167,7 @@ final class Projects {
             var built=tower(site);v.state.buildings.add(built);invalidate();
             v.chronicle.announce("Заложена "+label(built)+" у "+site.toShortString());v.runtime.save();
             stage="заложена "+label(built);
-        }else if(landmark!=null&&(planned=landmark(Landmarks.design(landmark)))!=null){
+        }else if(landmark!=null&&(planned=landmark(landmark))!=null){
             // Then the village's own big buildings, one at a time as it grows: forge, market, tavern.
             v.state.buildings.add(planned);invalidate();
             String laid=(Landmarks.feminine(landmark)?"Заложена ":"Заложен ")+label(planned);
@@ -183,9 +183,51 @@ final class Projects {
         }else if(active==null)stage="жилья хватает; копят запасы";
     }
     Set<String> kinds(){var out=new HashSet<String>();for(var b:v.state.buildings)out.add(b.kind);return out;}
-    /** The landmark's design on a flat free site by the bell, its entrance turned toward it. */
-    TownBuilding landmark(Landmarks.Design design){
-        return place(design.size(),Direction.NORTH,(base,rotation)->fromDesign(design,base,rotation),v.meetingPoint());
+    /** When a landmark without a site may look for one again (by kind). */
+    private final Map<String,Long> landmarkRetry=new HashMap<>();
+    Set<String> deferred(){long now=v.level.getGameTime();var out=new HashSet<String>();landmarkRetry.forEach((k,t)->{if(t>now)out.add(k);});return out;}
+    /**
+     * The landmark's design on a flat free site by the bell, its entrance turned toward it; a pier on the
+     * bank of water nearby. Without a site the next landmark gets its turn for five minutes.
+     */
+    TownBuilding landmark(String kind){
+        var design=Landmarks.design(kind);
+        var b=design.afloat()?pier(design):place(design.size(),Direction.NORTH,(base,rotation)->fromDesign(design,base,rotation),v.meetingPoint());
+        if(b==null)landmarkRetry.put(kind,v.level.getGameTime()+6000);
+        return b;
+    }
+    /**
+     * A bank cell by still water, the pier running out over it: the deck level with the bank, water
+     * under every plank and the air above clear. Banks are tried on rings round the bell.
+     */
+    TownBuilding pier(Landmarks.Design d){
+        if(v.state.bounds==null)return null;
+        BlockPos hub=v.meetingPoint();BlockPos bank=new BlockPos(1,0,-1);
+        for(int attempt=0;attempt<48;attempt++){
+            int n=siteCursor++;int ring=6+(n/16%12)*4;double angle=(n%16)*Math.PI/8+(n/16)*0.37;
+            int x=hub.getX()+(int)Math.round(Math.cos(angle)*ring),z=hub.getZ()+(int)Math.round(Math.sin(angle)*ring);
+            if(!v.level.hasChunkAt(new BlockPos(x,v.state.y,z))||!v.state.contains(new BlockPos(x,v.state.y,z)))continue;
+            BlockPos shore=new BlockPos(x,v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x,z)-1,z);
+            var ground=v.level.getBlockState(shore);
+            if(!ground.getFluidState().isEmpty()||!ground.isFaceSturdy(v.level,shore,Direction.UP)||protects(shore)
+                    ||!Construction.clear(v.level.getBlockState(shore.above()))||!Construction.clear(v.level.getBlockState(shore.above(2))))continue;
+            for(Direction out:Direction.Plane.HORIZONTAL){
+                // The design's front (north) faces back to the bank.
+                var rotation=Blueprints.facing(Direction.NORTH,out.getOpposite());
+                BlockPos at=Blueprints.turn(bank,d.size(),rotation);
+                BlockPos base=shore.offset(-at.getX(),0,-at.getZ());
+                boolean fits=true;
+                for(var piece:d.pieces()){
+                    if(piece.pos().getY()!=0||piece.optional())continue;
+                    BlockPos p=base.offset(Blueprints.turn(piece.pos(),d.size(),rotation));
+                    if(!v.level.hasChunkAt(p)||!v.state.contains(p)||protects(p)||!v.state.policy.allows("build",p)||!v.level.getBlockState(p).isAir()
+                            ||!v.level.getFluidState(p.below()).is(net.minecraft.tags.FluidTags.WATER)
+                            ||!v.level.getBlockState(p.above()).isAir()||!v.level.getBlockState(p.above(2)).isAir()){fits=false;break;}
+                }
+                if(fits)return fromDesign(d,base,rotation);
+            }
+        }
+        return null;
     }
     TownBuilding fromDesign(Landmarks.Design d,BlockPos base,Rotation rotation){
         var b=new TownBuilding(d.kind(),base);
@@ -337,7 +379,7 @@ final class Projects {
     }
     static String label(TownBuilding b){
         String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";case "civic"->trade(b.design);case "storehouse"->"амбар";case "well"->"колодец";
-            case "forge","market","tavern"->Landmarks.label(b.kind);default->b.kind;};
+            case "forge","market","tavern","mill","dock"->Landmarks.label(b.kind);default->b.kind;};
         if(b.kind.equals("civic"))return base;
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";
     }

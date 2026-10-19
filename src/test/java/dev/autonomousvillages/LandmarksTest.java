@@ -30,11 +30,32 @@ class LandmarksTest {
             if(!p.optional())assertTrue(made.contains(p.state().getBlock()),d.kind()+": "+p.state()+" at "+p.pos());
     }
     @Test void everyBlockIsWithinABuildersReach(){
-        // Builders stand on the ground or the floor (feet at y=1, eyes near 2.6) and reach 4.2 blocks.
-        for(var d:designs())for(var p:d.pieces()){
-            if(!p.optional())assertTrue(p.pos().getY()<=6,d.kind()+" too high at "+p.pos());
-            assertTrue(p.pos().getX()>=-1&&p.pos().getX()<=d.width()&&p.pos().getZ()>=-1&&p.pos().getZ()<=d.depth(),d.kind()+" outside at "+p.pos());
+        // As Village.stand picks a cell: feet at most two cells aside and up to six below, the eye 1.62
+        // above the feet within 3.55 of the block's centre. Builders are taken to stand only on the floor
+        // or the ground (feet at y=1), never on the walls; over water only on the deck or the bank.
+        for(var d:designs()){
+            var cells=cells(d);
+            for(var p:d.pieces()){
+                assertTrue(p.pos().getX()>=-2&&p.pos().getX()<=d.width()+1&&p.pos().getZ()>=-2&&p.pos().getZ()<=d.depth()+1,d.kind()+" outside at "+p.pos());
+                if(p.optional())continue;
+                assertTrue(p.pos().getY()<=Landmarks.REACH_TOP,d.kind()+" too high at "+p.pos());
+                boolean reached=false;
+                for(int dx=-2;dx<=2&&!reached;dx++)for(int dz=-2;dz<=2&&!reached;dz++){
+                    BlockPos feet=new BlockPos(p.pos().getX()+dx,1,p.pos().getZ()+dz);
+                    if(feet.equals(p.pos())||feet.above().equals(p.pos())||p.pos().getY()-feet.getY()>6)continue;
+                    if(solid(cells,feet)||solid(cells,feet.above()))continue;
+                    boolean inside=feet.getX()>=0&&feet.getX()<d.width()&&feet.getZ()>=0&&feet.getZ()<d.depth();
+                    boolean floor=solid(cells,feet.below())||!d.afloat()&&!inside||d.afloat()&&feet.getZ()<0;
+                    double ex=dx,ey=1+1.62-(p.pos().getY()+.5),ez=dz;
+                    if(floor&&ex*ex+ey*ey+ez*ez<=3.55*3.55)reached=true;
+                }
+                assertTrue(reached,d.kind()+": nowhere to stand for "+p.state()+" at "+p.pos());
+            }
         }
+    }
+    private static boolean solid(Map<BlockPos,Landmarks.Piece> cells,BlockPos p){
+        var c=cells.get(p);
+        return c!=null&&!c.optional()&&!(c.state().getBlock() instanceof TorchBlock)&&!(c.state().getBlock() instanceof DoorBlock);
     }
     @Test void attachedBlocksHaveSomethingToHangOn(){
         for(var d:designs()){
@@ -47,6 +68,8 @@ class LandmarksTest {
                         ||s.is(Blocks.CAMPFIRE)||s.is(Blocks.BREWING_STAND)||s.getBlock() instanceof StandingSignBlock)support=p.pos().below();
                 if(support==null)continue;
                 var under=cells.get(support);
+                // The bank by a pier is ground of its own (if it is water there, the sign is simply left out).
+                if(under==null&&d.afloat()&&support.getY()==0&&support.getZ()<0)continue;
                 assertNotNull(under,d.kind()+": "+s+" at "+p.pos()+" hangs on nothing");
                 // What a torch hangs on is built before it; decoration may rest on decoration placed before it.
                 assertTrue(p.optional()||!under.optional(),d.kind()+": "+s+" at "+p.pos()+" rests on decoration");
@@ -66,8 +89,8 @@ class LandmarksTest {
     @Test void theForgeSmeltsUnderItsChimneyAndIsOpenToWalkIn(){
         var f=Landmarks.forge();var cells=cells(f);
         assertEquals(2,f.pieces().stream().filter(p->p.state().is(Blocks.FURNACE)&&!p.optional()).count());
-        assertTrue(cells.get(new BlockPos(3,7,5)).state().is(Blocks.CAMPFIRE));
-        assertTrue(cells.get(new BlockPos(3,6,5)).state().is(Blocks.COBBLESTONE));
+        assertTrue(cells.get(new BlockPos(3,6,5)).state().is(Blocks.CAMPFIRE));
+        assertTrue(cells.get(new BlockPos(3,5,5)).state().is(Blocks.COBBLESTONE));
         for(int y=1;y<=2;y++)assertNull(cells.get(new BlockPos(3,y,0)),"entrance");
         // A workstation for each smith: armourer, toolsmith and weaponsmith can move in.
         for(Block b:new Block[]{Blocks.BLAST_FURNACE,Blocks.SMITHING_TABLE,Blocks.GRINDSTONE})
@@ -84,19 +107,42 @@ class LandmarksTest {
         var t=cells(Landmarks.tavern());
         assertEquals(Direction.SOUTH,t.get(new BlockPos(4,3,-1)).state().getValue(StairBlock.FACING));
         assertEquals(Direction.NORTH,t.get(new BlockPos(4,3,7)).state().getValue(StairBlock.FACING));
-        assertTrue(t.get(new BlockPos(4,6,3)).state().is(Blocks.OAK_PLANKS));
+        assertTrue(t.get(new BlockPos(4,5,3)).state().is(Blocks.OAK_PLANKS));
         // The gable ends are closed under the roof.
-        assertTrue(t.get(new BlockPos(0,5,3)).state().is(Blocks.OAK_PLANKS));
+        assertTrue(t.get(new BlockPos(0,4,3)).state().is(Blocks.OAK_PLANKS));
+    }
+    @Test void theMillTurnsItsSailsBesideItsWall(){
+        var m=Landmarks.mill();var cells=cells(m);
+        assertTrue(cells.get(new BlockPos(5,4,2)).state().is(Blocks.OAK_LOG)&&cells.get(new BlockPos(6,4,2)).optional());
+        // Four arms of three fence posts, each with two cloths; the lowest stays off the ground.
+        assertEquals(12,m.pieces().stream().filter(p->p.pos().getX()==6&&p.state().is(Blocks.OAK_FENCE)).count());
+        assertEquals(8,m.pieces().stream().filter(p->p.state().is(Blocks.WOOL.white())).count());
+        assertTrue(m.pieces().stream().filter(p->p.pos().getX()==6).allMatch(p->p.pos().getY()>=1));
+        assertTrue(m.pieces().stream().anyMatch(p->p.state().is(Blocks.COMPOSTER)));
+    }
+    @Test void thePierRunsOutFromTheBank(){
+        var p=Landmarks.dock();
+        assertTrue(p.afloat()&&!Landmarks.tavern().afloat());
+        // The deck is laid row by row from the bank, so each plank has one to stand on before it.
+        var deck=p.pieces().stream().filter(c->c.pos().getY()==0).toList();
+        assertEquals(18,deck.size());
+        for(int i=1;i<deck.size();i++)assertTrue(deck.get(i).pos().getZ()>=deck.get(i-1).pos().getZ());
+        assertTrue(p.pieces().stream().noneMatch(c->c.pos().getY()<0));
+        for(int z=0;z<p.depth()-1;z++)assertNull(cells(p).get(new BlockPos(1,1,z)),"walkway at z="+z);
     }
     @Test void landmarksComeOneAtATimeAsTheVillageGrows(){
-        assertNull(Landmarks.due(Set.of(),5));
-        assertEquals("forge",Landmarks.due(Set.of(),6));
-        assertNull(Landmarks.due(Set.of("forge"),7));
-        assertEquals("market",Landmarks.due(Set.of("forge"),8));
+        assertNull(Landmarks.due(Set.of(),5,Set.of()));
+        assertEquals("forge",Landmarks.due(Set.of(),6,Set.of()));
+        assertNull(Landmarks.due(Set.of("forge"),6,Set.of()));
+        assertEquals("market",Landmarks.due(Set.of("forge"),7,Set.of()));
         // In order: a big village without a forge builds the forge first.
-        assertEquals("forge",Landmarks.due(Set.of("market"),20));
-        assertEquals("tavern",Landmarks.due(Set.of("forge","market"),10));
-        assertNull(Landmarks.due(Set.of("forge","market","tavern"),40));
+        assertEquals("forge",Landmarks.due(Set.of("market"),20,Set.of()));
+        assertEquals("mill",Landmarks.due(Set.of("forge","market"),10,Set.of()));
+        assertEquals("tavern",Landmarks.due(Set.of("forge","market","mill"),10,Set.of()));
+        // No site for the tavern lately: the pier takes its turn once the village is big enough for it.
+        assertNull(Landmarks.due(Set.of("forge","market","mill"),10,Set.of("tavern")));
+        assertEquals("dock",Landmarks.due(Set.of("forge","market","mill"),12,Set.of("tavern")));
+        assertNull(Landmarks.due(Set.copyOf(Landmarks.ORDER),40,Set.of()));
         for(String kind:Landmarks.ORDER)assertTrue(TownBuilding.KINDS.contains(kind),kind);
         assertEquals("рынок",Projects.label(new TownBuilding("market",BlockPos.ZERO)));
     }

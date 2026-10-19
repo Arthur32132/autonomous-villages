@@ -56,6 +56,8 @@ public final class ModConfig {
     public boolean donations=true;
     /** After the watchtower the village builds its own forge, market square and tavern as it grows. */
     public boolean landmarks=true;
+    /** Once a day the forge mends tools, the market sets out surplus, the mill bakes, the tavern cooks and brews mead, the pier brings fish. */
+    public boolean landmarkGoods=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

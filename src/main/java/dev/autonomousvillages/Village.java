@@ -144,6 +144,7 @@ final class Village {
         if(time%600==311&&AutonomousVillagesMod.CONFIG.nameplates)NameplateJob.refresh(this);
         presentation.tick();
         ambience.tick(time);
+        if(time%200==77)LandmarkGoods.tick(this);
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){
             state.plantedTrees.removeIf(p->{var pos=BlockPos.of(p);return level.hasChunkAt(pos)&&!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.SaplingBlock)

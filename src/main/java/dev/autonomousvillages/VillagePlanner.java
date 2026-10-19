@@ -118,7 +118,10 @@ final class VillagePlanner {
     private Job storeJob(Worker w,Snapshot s){
         // Chests found in houses are shared too, but the store itself stands in the open by the bell.
         BlockPos hub=v.meetingPoint();
-        boolean noChest=v.stock.chests().stream().noneMatch(c->c.getBlockPos().distSqr(hub)<=10*10),full=s.chests()>0&&s.freeSlots()<9&&s.chests()<48;
+        // Every shared chest counts here, reachable at the moment or not: a chest no route reaches for a
+        // while is no reason to make another one out of scarce wood.
+        var all=v.chests();int allFree=0;for(var c:all)for(int i=0;i<c.getContainerSize();i++)if(c.getItem(i).isEmpty())allFree++;
+        boolean noChest=all.stream().noneMatch(c->c.getBlockPos().distSqr(hub)<=10*10),full=!all.isEmpty()&&allFree<9&&all.size()<48;
         if(s.table()==null&&!busy(w,VillageCrafting.TABLE,Blocks.CRAFTING_TABLE)){
             if(w.has(x->x.is(Items.CRAFTING_TABLE))&&w.ready("place")){BlockPos spot=utilitySpot();if(spot!=null)return new PlaceJob(w,spot,Blocks.CRAFTING_TABLE.defaultBlockState(),"верстак");}
             if(w.ready("craft")&&CraftJob.affordable(v,VillageCrafting.TABLE,1,w))return new CraftJob(w,VillageCrafting.TABLE,1);

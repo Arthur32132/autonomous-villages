@@ -21,6 +21,8 @@ final class CraftJob extends Job {
     private int made;
     CraftJob(Worker w,VillageCrafting.Recipe recipe,int times){super(w,"изготавливает: "+recipe.label());this.recipe=recipe;this.times=Math.max(1,times);}
     @Override String kind(){return "craft";}
+    /** Fetching from the store and walking to a workbench can cross a whole hillside village. */
+    @Override int timeLimit(){return 4800;}
     @Override boolean keeps(ItemStack s){return made<times&&(s.is(ItemTags.PLANKS)||s.is(Items.STICK)||s.is(ItemTags.LOGS_THAT_BURN)||recipe.material().test(s)||s.is(Items.IRON_INGOT));}
     /**
      * Ingredients as raw materials, counting what the worker already carries. Sticks and planks are

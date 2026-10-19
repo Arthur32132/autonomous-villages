@@ -24,12 +24,12 @@ final class Breeding {
         return v.level.getPoiManager().getInSquare(h->h.is(PoiTypes.HOME),center,r,PoiManager.Occupancy.HAS_SPACE)
                 .map(p->p.getPos()).filter(v.state::contains).toList();
     }
-    /** Bread-equivalents in the store: a bread feeds as much as four vegetables. */
-    int food(){return v.stock.count(s->s.is(Items.BREAD))+v.stock.count(s->s.is(Items.CARROT)||s.is(Items.POTATO)||s.is(Items.BEETROOT))/4;}
+    /** Bread-equivalents in the store: a bread or an apple from the felled oaks feeds as much as four vegetables. */
+    int food(){return v.stock.count(s->s.is(Items.BREAD)||s.is(Items.APPLE))+v.stock.count(s->s.is(Items.CARROT)||s.is(Items.POTATO)||s.is(Items.BEETROOT))/4;}
     String blocker(){
         if(v.state.residents.size()>=MAX_RESIDENTS)return "предел населения";
         if(freeBeds()<1)return "нет свободной кровати";
-        if(food()<3)return "мало еды на складе (нужно 3 хлеба)";
+        if(food()<3)return "мало еды на складе (нужно 3 хлеба или яблока)";
         long wait=v.state.lastBirth+INTERVAL-v.level.getGameTime();
         if(wait>0)return "семьи отдыхают ещё "+wait/20+" с";
         return "";
@@ -49,8 +49,8 @@ final class Breeding {
         BlockPos crib=v.safeFeet(bed.above())?bed.above():java.util.stream.Stream.of(net.minecraft.core.Direction.values()).map(bed::relative)
                 .filter(v::safeFeet).findFirst().orElse(null);
         if(crib==null)return;
-        int bread=Math.min(3,v.stock.count(s->s.is(Items.BREAD)));
-        int eaten=v.stock.consume(s->s.is(Items.BREAD),bread);
+        int eaten=v.stock.consume(s->s.is(Items.BREAD),3);
+        if(eaten<3)eaten+=v.stock.consume(s->s.is(Items.APPLE),3-eaten);
         if(eaten<3)v.stock.consume(s->s.is(Items.CARROT)||s.is(Items.POTATO)||s.is(Items.BEETROOT),(3-eaten)*4);
         Villager baby=first.getBreedOffspring(v.level,second);
         if(baby==null)return;

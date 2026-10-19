@@ -117,6 +117,11 @@ final class Worker {
             if(job==null&&night&&watchman()&&ready("patrol"))start(new PatrolJob(this));
             if(job==null&&night&&!hasBed()&&ready("shelter")){var shelter=ShelterJob.find(this);if(shelter!=null)start(shelter);else cooldown("shelter",600);}
             if(job==null&&night&&!atHome()&&ready("home"))start(new HomeJob(this));
+            // No way home tonight: any roof is better than a doorstep (rc13: residents stood all night
+            // at a door after "не нашёл дорогу домой" and were killed there).
+            if(job==null&&night&&!atHome()&&!ready("home")&&!e.isSleeping()&&v.level.canSeeSky(e.blockPosition())&&ready("shelter")){
+                var shelter=ShelterJob.find(this);if(shelter!=null)start(shelter);else cooldown("shelter",600);
+            }
             if(job==null){
                 if(!released){b.stopAll();released=true;}
                 if(profession&&!night)professionProduct(e);

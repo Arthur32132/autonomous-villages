@@ -10,7 +10,7 @@ import net.minecraft.world.level.block.state.properties.*;
 
 /**
  * The village's own big buildings, built after homes, the barn, the well and the watchtower: a forge,
- * a market square, a windmill, a tavern and a pier. Walls, floors, roofs, furnaces and light are made from wood and stone
+ * a market square, a windmill, a chapel, a tavern, a stable and a pier. Walls, floors, roofs, furnaces and light are made from wood and stone
  * like any house; workstations, barrels, carpets and tables are decoration the guild brings on the
  * housewarming. Designs face north (the entrance on the z=0 side) and are turned toward the bell.
  */
@@ -25,8 +25,8 @@ final class Landmarks {
         boolean afloat(){return kind.equals("dock");}
     }
     /** The order the village builds them in, and the residents it needs for each. */
-    static final List<String> ORDER=List.of("forge","market","mill","tavern","dock");
-    static int residents(String kind){return switch(kind){case "forge"->6;case "market"->7;case "mill"->8;case "tavern"->10;default->12;};}
+    static final List<String> ORDER=List.of("forge","market","mill","chapel","tavern","stable","dock");
+    static int residents(String kind){return switch(kind){case "forge"->6;case "market"->7;case "mill"->8;case "chapel"->9;case "tavern"->10;case "stable"->11;default->12;};}
     /**
      * The next landmark the village is big enough for; one at a time, in order. A deferred one (no site
      * found lately, no water for a pier) lets the next take its turn.
@@ -36,11 +36,14 @@ final class Landmarks {
         return null;
     }
     static boolean kind(String kind){return ORDER.contains(kind);}
-    static String label(String kind){return switch(kind){case "forge"->"большая кузница";case "market"->"рынок";case "mill"->"мельница";case "dock"->"пристань";default->"таверна";};}
+    static String label(String kind){return switch(kind){case "forge"->"большая кузница";case "market"->"рынок";case "mill"->"мельница";case "dock"->"пристань";
+        case "chapel"->"часовня";case "stable"->"конюшня";default->"таверна";};}
     static boolean feminine(String kind){return !kind.equals("market");}
     /** What the sign at the building says above the village's name. */
-    static String title(String kind){return switch(kind){case "forge"->"КУЗНИЦА";case "market"->"РЫНОК";case "mill"->"МЕЛЬНИЦА";case "dock"->"ПРИСТАНЬ";default->"ТАВЕРНА";};}
-    static Design design(String kind){return switch(kind){case "forge"->forge();case "market"->market();case "mill"->mill();case "dock"->dock();default->tavern();};}
+    static String title(String kind){return switch(kind){case "forge"->"КУЗНИЦА";case "market"->"РЫНОК";case "mill"->"МЕЛЬНИЦА";case "dock"->"ПРИСТАНЬ";
+        case "chapel"->"ЧАСОВНЯ";case "stable"->"КОНЮШНЯ";default->"ТАВЕРНА";};}
+    static Design design(String kind){return switch(kind){case "forge"->forge();case "market"->market();case "mill"->mill();case "dock"->dock();
+        case "chapel"->chapel();case "stable"->stable();default->tavern();};}
     /**
      * How far above the floor a builder reaches: {@code Village.stand} wants the eye (feet + 1.62) within
      * 3.55 of the block's centre, so from the floor nothing above layer 5 can be placed.
@@ -211,4 +214,60 @@ final class Landmarks {
         p.deco(0,1,-1,Blocks.OAK_SIGN.defaultBlockState().setValue(StandingSignBlock.ROTATION,8));
         return p.design("dock",w,d);
     }
+
+    /**
+     * A stone chapel 7×5: pews either side of an aisle, the cleric's brewing stand on the altar between
+     * candles, a little steeple on the ridge that the guild raises on the housewarming.
+     */
+    static Design chapel(){
+        int w=7,d=5;var p=new Plan();
+        for(int x=0;x<w;x++)for(int z=0;z<d;z++)p.put(x,0,z,COBBLE);
+        for(int y=1;y<=3;y++)for(int x=0;x<w;x++)for(int z=0;z<d;z++){
+            boolean edge=x==0||z==0||x==w-1||z==d-1;if(!edge)continue;
+            if(x==3&&z==0&&y<=2)continue; // door
+            boolean window=y==2&&((z==0||z==d-1)&&(x==1||x==5)||(x==0||x==w-1)&&z==2);
+            p.put(x,y,z,window?GLASS:COBBLE);
+        }
+        p.roof(w,d,3,2,COBBLE);
+        p.put(3,1,0,facing(Blocks.OAK_DOOR,Direction.SOUTH));
+        p.put(2,2,1,torch(Direction.SOUTH));p.put(4,2,1,torch(Direction.SOUTH));
+        for(int z=1;z<=2;z++)for(int x:new int[]{1,2,4,5})p.deco(x,1,z,facing(Blocks.OAK_STAIRS,Direction.NORTH));
+        p.deco(3,1,d-2,Blocks.BREWING_STAND.defaultBlockState());
+        for(int x:new int[]{2,4})p.deco(x,1,d-2,Blocks.CANDLE.defaultBlockState().setValue(CandleBlock.CANDLES,3).setValue(CandleBlock.LIT,true));
+        p.deco(3,REACH_TOP+1,2,Blocks.COBBLESTONE_WALL.defaultBlockState());p.deco(3,REACH_TOP+2,2,Blocks.COBBLESTONE_WALL.defaultBlockState());
+        p.deco(3,REACH_TOP+3,2,Blocks.LANTERN.defaultBlockState());
+        p.deco(4,2,-1,Blocks.OAK_WALL_SIGN.defaultBlockState().setValue(WallSignBlock.FACING,Direction.NORTH));
+        return p.design("chapel",w,d);
+    }
+
+    /**
+     * A timber stable 10×5 with three stalls behind fence gates, hay and a trough in each; on the
+     * housewarming two horses move in (see {@code Projects.stableHorses}).
+     */
+    static Design stable(){
+        int w=10,d=5;var p=new Plan();
+        for(int x=0;x<w;x++)for(int z=0;z<d;z++)p.put(x,0,z,x==0||z==0||x==w-1||z==d-1?COBBLE:PLANKS);
+        for(int y=1;y<=3;y++)for(int x=0;x<w;x++)for(int z=0;z<d;z++){
+            boolean edge=x==0||z==0||x==w-1||z==d-1;if(!edge)continue;
+            boolean corner=(x==0||x==w-1)&&(z==0||z==d-1);
+            if(corner){p.put(x,y,z,LOG);continue;}
+            if(z==0){
+                // The front: a beam over the stall fronts, a gate into each stall.
+                if(y==3)p.put(x,y,z,beam(Direction.Axis.X));
+                else if(y==1)p.put(x,y,z,STALLS.contains(x)?facing(Blocks.OAK_FENCE_GATE,Direction.NORTH):FENCE);
+                continue;
+            }
+            p.put(x,y,z,y==3?beam(z==d-1?Direction.Axis.X:Direction.Axis.Z):y==2&&z==2?GLASS:PLANKS);
+        }
+        for(int x:new int[]{3,6})for(int z=1;z<d-1;z++)p.put(x,1,z,FENCE);
+        p.roof(w,d,3,2,PLANKS);
+        for(int x:STALLS){
+            p.put(x+1,2,d-2,torch(Direction.NORTH));
+            p.deco(x+1,1,d-2,Blocks.HAY_BLOCK.defaultBlockState());p.deco(x,1,d-2,Blocks.CAULDRON.defaultBlockState());
+        }
+        p.deco(0,2,-1,Blocks.OAK_WALL_SIGN.defaultBlockState().setValue(WallSignBlock.FACING,Direction.NORTH));
+        return p.design("stable",w,d);
+    }
+    /** The x of each stall's gate; the stall is that column and the next. */
+    static final List<Integer> STALLS=List.of(1,4,7);
 }

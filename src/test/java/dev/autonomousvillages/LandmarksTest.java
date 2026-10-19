@@ -16,7 +16,7 @@ class LandmarksTest {
 
     /** What the village makes from wood, stone and coal; everything else in a design is decoration (built after bootstrap). */
     private static Set<Block> made(){return Set.of(Blocks.OAK_PLANKS,Blocks.OAK_LOG,Blocks.OAK_STAIRS,Blocks.OAK_SLAB,Blocks.OAK_FENCE,Blocks.OAK_DOOR,
-            Blocks.COBBLESTONE,Blocks.COBBLESTONE_WALL,Blocks.GLASS_PANE,Blocks.FURNACE,Blocks.TORCH,Blocks.WALL_TORCH);}
+            Blocks.COBBLESTONE,Blocks.COBBLESTONE_WALL,Blocks.GLASS_PANE,Blocks.OAK_FENCE_GATE,Blocks.FURNACE,Blocks.TORCH,Blocks.WALL_TORCH);}
 
     private static List<Landmarks.Design> designs(){return Landmarks.ORDER.stream().map(Landmarks::design).toList();}
     private static Map<BlockPos,Landmarks.Piece> cells(Landmarks.Design d){
@@ -138,12 +138,32 @@ class LandmarksTest {
         // In order: a big village without a forge builds the forge first.
         assertEquals("forge",Landmarks.due(Set.of("market"),20,Set.of()));
         assertEquals("mill",Landmarks.due(Set.of("forge","market"),10,Set.of()));
-        assertEquals("tavern",Landmarks.due(Set.of("forge","market","mill"),10,Set.of()));
-        // No site for the tavern lately: the pier takes its turn once the village is big enough for it.
-        assertNull(Landmarks.due(Set.of("forge","market","mill"),10,Set.of("tavern")));
-        assertEquals("dock",Landmarks.due(Set.of("forge","market","mill"),12,Set.of("tavern")));
+        assertEquals("chapel",Landmarks.due(Set.of("forge","market","mill"),10,Set.of()));
+        assertEquals("tavern",Landmarks.due(Set.of("forge","market","mill","chapel"),10,Set.of()));
+        // No site for the tavern lately: the stable takes its turn once the village is big enough for it.
+        assertNull(Landmarks.due(Set.of("forge","market","mill","chapel"),10,Set.of("tavern")));
+        assertEquals("stable",Landmarks.due(Set.of("forge","market","mill","chapel"),11,Set.of("tavern")));
+        assertEquals("dock",Landmarks.due(Set.of("forge","market","mill","chapel","tavern","stable"),12,Set.of()));
         assertNull(Landmarks.due(Set.copyOf(Landmarks.ORDER),40,Set.of()));
         for(String kind:Landmarks.ORDER)assertTrue(TownBuilding.KINDS.contains(kind),kind);
         assertEquals("рынок",Projects.label(new TownBuilding("market",BlockPos.ZERO)));
+    }
+    @Test void theStableKeepsAHorseBehindEachGate(){
+        var st=Landmarks.stable();var cells=cells(st);
+        for(int x:Landmarks.STALLS){
+            assertTrue(cells.get(new BlockPos(x,1,0)).state().getBlock() instanceof FenceGateBlock,"gate at x="+x);
+            // Behind the gate the stall is open floor for a horse (two high), fenced from the next.
+            for(int y=1;y<=2;y++)assertNull(cells.get(new BlockPos(x,y,1)),"stall at x="+x);
+        }
+        for(int z=1;z<st.depth()-1;z++)assertTrue(cells.get(new BlockPos(3,1,z)).state().is(Blocks.OAK_FENCE));
+        // No gap a horse can step through: every front cell between the corner posts is fence or gate.
+        for(int x=1;x<st.width()-1;x++)assertNotNull(cells.get(new BlockPos(x,1,0)),"front at x="+x);
+    }
+    @Test void theChapelHasPewsBeforeItsAltarAndAnAisle(){
+        var c=Landmarks.chapel();var cells=cells(c);
+        assertEquals(8,c.pieces().stream().filter(p->p.state().is(Blocks.OAK_STAIRS)&&p.optional()).count());
+        for(int z=1;z<=2;z++)assertNull(cells.get(new BlockPos(3,1,z)),"aisle at z="+z);
+        assertTrue(cells.get(new BlockPos(3,1,3)).state().is(Blocks.BREWING_STAND));
+        assertTrue(cells.get(new BlockPos(3,0,0)).state().is(Blocks.COBBLESTONE)&&cells.get(new BlockPos(3,1,0)).state().getBlock() instanceof DoorBlock);
     }
 }

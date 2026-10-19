@@ -116,6 +116,7 @@ final class Projects {
             if(b.kind.equals("house")||b.kind.equals("civic")||Landmarks.kind(b.kind))Festivities.housewarming(v,b);
             if(b.kind.equals("civic")||Landmarks.kind(b.kind))furnish(b);
             if(Landmarks.kind(b.kind))signboard(b);
+            if(b.kind.equals("stable"))stableHorses(b);
             if(b.kind.equals("well"))fillWell(b);
             if(b.path.isEmpty())b.path.addAll(footpath(b));
             v.runtime.save();
@@ -302,6 +303,22 @@ final class Projects {
         b.blocks.removeIf(p->!v.state.contains(p.position()));b.cuts.removeIf(p->!v.state.contains(BlockPos.of(p)));
         return b;
     }
+    /** Two horses move into the stalls of a new stable, behind the first and the last gate. */
+    void stableHorses(TownBuilding b){
+        double cx=b.blocks.stream().mapToInt(p->p.position().getX()).average().orElse(0),cz=b.blocks.stream().mapToInt(p->p.position().getZ()).average().orElse(0);
+        var gates=b.blocks.stream().filter(p->p.block().getBlock() instanceof FenceGateBlock).map(TownBuilding.Plan::position).toList();
+        for(int i=0;i<gates.size();i+=Math.max(1,gates.size()-1)){
+            BlockPos gate=gates.get(i),stall=null;double best=Double.MAX_VALUE;
+            for(Direction d:Direction.Plane.HORIZONTAL){BlockPos q=gate.relative(d);double dist=Math.pow(q.getX()+.5-cx,2)+Math.pow(q.getZ()+.5-cz,2);if(dist<best){best=dist;stall=q;}}
+            if(stall==null||!v.level.getBlockState(stall).getCollisionShape(v.level,stall).isEmpty())continue;
+            var horse=net.minecraft.world.entity.EntityTypes.HORSE.create(v.level,net.minecraft.world.entity.EntitySpawnReason.EVENT);
+            if(horse==null)continue;
+            horse.snapTo(stall.getX()+.5,stall.getY(),stall.getZ()+.5,v.level.getRandom().nextFloat()*360,0);
+            horse.setPersistenceRequired();
+            v.level.addFreshEntity(horse);
+        }
+        v.chronicle.announce("В конюшню привели лошадей");
+    }
     /** The landmark's sign names it and the village, whoever placed it. */
     void signboard(TownBuilding b){
         for(var p:b.blocks)if(p.block().getBlock() instanceof SignBlock&&v.level.getBlockEntity(p.position()) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign){
@@ -436,7 +453,7 @@ final class Projects {
     }
     static String label(TownBuilding b){
         String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";case "civic"->trade(b.design);case "storehouse"->"амбар";case "well"->"колодец";
-            case "forge","market","tavern","mill","dock"->Landmarks.label(b.kind);case "wall"->"частокол";default->b.kind;};
+            case "forge","market","tavern","mill","dock","chapel","stable"->Landmarks.label(b.kind);case "wall"->"частокол";default->b.kind;};
         if(b.kind.equals("civic"))return base;
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";
     }

@@ -38,6 +38,8 @@ public final class ModConfig {
     public boolean nameplates=true;
     /** Flowers from the store planted along the walls of the homes. */
     public boolean flowers=true;
+    /** The village bell rings three strokes at sunrise and at dusk (sound only). */
+    public boolean dayBells=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

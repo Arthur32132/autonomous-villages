@@ -139,6 +139,7 @@ final class Village {
         if(time%200==13&&Math.floorMod(level.getOverworldClockTime(),24000)>=11500&&Math.floorMod(level.getOverworldClockTime(),24000)<13000)summonGolem(time);
         if(time%6000==1234)writeChronicleBook();
         if(time%100==61)MorningNews.tick(this);
+        if(time%20==3)dayBells(time);
         if(time%600==311&&AutonomousVillagesMod.CONFIG.nameplates)NameplateJob.refresh(this);
         presentation.tick();
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
@@ -342,6 +343,25 @@ final class Village {
      * out (seed 8675309: residents killed at one doorstep in the morning). The nearest armed, healthy
      * resident goes for it without ringing the bell, so the rest of the village keeps working.
      */
+    private long lastBellDay=-1,lastBellEvening=-1;
+    private int bellStrokes;private long nextStroke;
+    /**
+     * The bell by the meeting point rings three strokes at sunrise and at dusk: the sound only, so
+     * nobody takes it for an alarm (a real strike sends vanilla villagers into hiding).
+     */
+    private void dayBells(long time){
+        if(!AutonomousVillagesMod.CONFIG.dayBells)return;
+        if(bellStrokes>0){
+            if(time<nextStroke)return;
+            BlockPos bell=meetingPoint();
+            if(level.getBlockState(bell).is(net.minecraft.world.level.block.Blocks.BELL))
+                level.playSound(null,bell,net.minecraft.sounds.SoundEvents.BELL_BLOCK,net.minecraft.sounds.SoundSource.BLOCKS,2f,1f);
+            bellStrokes--;nextStroke=time+30;return;
+        }
+        long clock=level.getOverworldClockTime(),day=Math.floorDiv(clock,24000),hour=Math.floorMod(clock,24000);
+        if(hour<600&&lastBellDay!=day){lastBellDay=day;bellStrokes=3;}
+        else if(hour>=11800&&hour<12400&&lastBellEvening!=day){lastBellEvening=day;bellStrokes=3;}
+    }
     private final Map<UUID,Long> hunted=new HashMap<>();
     private void huntLurkers(){
         if(Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))return;

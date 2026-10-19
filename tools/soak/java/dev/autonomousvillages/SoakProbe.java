@@ -163,6 +163,8 @@ public final class SoakProbe implements ModInitializer {
         long elapsed=level.getGameTime()-startGame;
         if(elapsed>0&&elapsed%intConfig("sampleTicks",1200)==0)sample();
         if(elapsed>0&&elapsed%intConfig("censusTicks",6000)==0)lastCensus=census();
+        // Frames for a timelapse of the village (tools/soak/map.py --gif), twice a game day.
+        if(elapsed>0&&elapsed%intConfig("mapTicks",12000)==0)writeMap(String.format("map-t%06d.json",elapsed));
         if(elapsed>=(long)(doubleConfig("days",3)*24000))finish(true,"completed");
     }
 

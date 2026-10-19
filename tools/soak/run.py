@@ -128,7 +128,7 @@ def run_one(java, batch_dir, seed, difficulty, args, jars):
     if (lab / 'soak-result.json').exists():
         result = json.loads((lab / 'soak-result.json').read_text())
         shutil.copy2(lab / 'soak-result.json', report / 'soak-result.json')
-    for name in ['soak-timeline.jsonl', 'map-start.json', 'map-end.json']:
+    for name in ['soak-timeline.jsonl', 'map-start.json', 'map-end.json'] + sorted(p.name for p in lab.glob('map-t*.json')):
         if (lab / name).exists():
             shutil.copy2(lab / name, report / name)
     lines = (lab / 'server.log').read_bytes().splitlines()

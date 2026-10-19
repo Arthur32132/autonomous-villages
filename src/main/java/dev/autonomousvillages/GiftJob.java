@@ -39,7 +39,7 @@ final class GiftJob extends Job {
         }
         if(body().distanceToSqr(guest)>2.5*2.5){
             if(walk==null||walk.point.distanceToSqr(guest.position())>4)walk=new Walk(guest.position(),2);
-            if(walk.tick()==Approach.State.FAILED)return fail("не подойти к гостю");
+            if(walk.tick()==Approach.State.FAILED)return fail("гость далеко");
             return true;
         }
         if(!Supplies.consume(bot(),Items.BREAD,1))return false;
@@ -49,7 +49,7 @@ final class GiftJob extends Job {
         v.level.sendParticles(ParticleTypes.HAPPY_VILLAGER,body().getX(),body().getY()+2.1,body().getZ(),5,.3,.2,.3,0);
         v.level.playSound(null,body().blockPosition(),SoundEvents.VILLAGER_YES,SoundSource.NEUTRAL,1f,1f);
         guest.sendSystemMessage(Component.literal(v.presentation.personName(w.id)+" из "+v.state.name+": «Угощайся, свежий хлеб!»").withStyle(net.minecraft.ChatFormatting.GREEN));
-        v.chronicle.add("gifts",1);
+        v.chronicle.add("gifts",1);v.gifted.put(player,now()+24000);
         return false;
     }
     @Override void stop(){if(fetch!=null)fetch.cancel();if(walk!=null)walk.cancel();}

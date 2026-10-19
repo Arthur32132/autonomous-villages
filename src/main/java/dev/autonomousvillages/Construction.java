@@ -106,13 +106,14 @@ final class Construction {
                     || !v.level.getBlockState(second.below()).isFaceSturdy(v.level,second.below(),Direction.UP)) return false;
         } else if (step.state().getBlock() instanceof DoorBlock) { second=p.above(); secondState=step.state().setValue(DoorBlock.HALF,DoubleBlockHalf.UPPER); }
         if (second != null && (!v.state.contains(second)||!v.level.getBlockState(second).isAir())) return false;
-        if (intersectsActor(v,b,step) || !v.level.getEntities(b.entity(),new AABB(p),e->e.isAlive()&&e.isPickable()).isEmpty()) return false;
+        // Fences, walls, panes and stairs join their neighbours as if a player had placed them;
+        // the joined shape is the one that must not cut into the builder.
+        BlockState placed=step.state().getBlock() instanceof CrossCollisionBlock||step.state().getBlock() instanceof WallBlock||step.state().getBlock() instanceof StairBlock
+                ?Block.updateFromNeighbourShapes(step.state(),v.level,p):step.state();
+        if (intersectsActor(v,b,new Step(p,placed,step.item())) || !v.level.getEntities(b.entity(),new AABB(p),e->e.isAlive()&&e.isPickable()).isEmpty()) return false;
         int selected=Supplies.find(b,s->s.is(step.item()));if(selected>=0)b.inventory().select(selected);
         if (!Supplies.consume(b,step.item(),cost(step))) return false;
         // No callbacks or yielding between item debit and the two vanilla block writes.
-        // Fences, walls, panes and stairs join their neighbours as if a player had placed them.
-        BlockState placed=step.state().getBlock() instanceof CrossCollisionBlock||step.state().getBlock() instanceof WallBlock||step.state().getBlock() instanceof StairBlock
-                ?Block.updateFromNeighbourShapes(step.state(),v.level,p):step.state();
         v.level.setBlock(p,placed,second == null ? 3 : 18);
         v.town.invalidate();
         if (second != null) { v.level.setBlock(second,secondState,18); v.level.updateNeighborsAt(p,step.state().getBlock()); v.level.updateNeighborsAt(second,secondState.getBlock()); }

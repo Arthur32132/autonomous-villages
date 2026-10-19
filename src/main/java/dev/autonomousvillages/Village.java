@@ -26,6 +26,20 @@ final class Village {
     final VillageIndex index=new VillageIndex();
     final Reservations reservations=new Reservations();
     final Map<Long,Long> rejected=new HashMap<>();
+    private final Map<Long,Map<UUID,Long>> unreachableVotes=new HashMap<>();
+    /**
+     * A worker could not reach a chest or workbench. It is skipped by everyone for two minutes only
+     * when two different residents failed (or the only one): a single trapped resident fails to reach
+     * everything and must not hide the whole store from the village.
+     */
+    void unreachableFrom(BlockPos p,UUID worker){
+        long now=level.getGameTime();
+        var votes=unreachableVotes.computeIfAbsent(p.asLong(),k->new HashMap<>());
+        votes.values().removeIf(expiry->expiry<=now);
+        votes.put(worker,now+2400);
+        if(votes.size()>=Math.min(2,Math.max(1,workers.size()))){rejected.put(p.asLong(),now+2400);unreachableVotes.remove(p.asLong());}
+        if(unreachableVotes.size()>256)unreachableVotes.clear();
+    }
     /** When each visiting player may next receive a gift (game time). */
     final Map<UUID,Long> gifted=new HashMap<>();
     /** Why jobs ended early since the server started, by "kind: reason"; diagnostics only. */

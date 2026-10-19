@@ -147,7 +147,7 @@ final class Projects {
     /** Where a guard stands on the finished watchtower's lookout, if there is one. */
     BlockPos lookout(){
         var t=tower();
-        return t==null||!t.completed?null:BlockPos.of(t.origin).offset(1,6,1);
+        return t==null||!t.completed?null:BlockPos.of(t.origin).offset(1,5,1);
     }
     TownBuilding active(){
         return v.state.buildings.stream().filter(b->!b.completed&&!b.kind.equals("native_house")).findFirst().orElse(null);
@@ -335,16 +335,19 @@ final class Projects {
      * up or down. A door facing a lamp post or a well traps whoever stands in the doorway.
      */
     boolean doorwayOpen(TownBuilding b){
-        var footprint=new HashSet<Long>();for(var p:b.blocks)footprint.add(BlockPos.asLong(p.position().getX(),0,p.position().getZ()));
+        // The template's own doorstep and porch are part of its blocks, so "outside" is told by
+        // direction: the door's neighbour farther from the middle of the building.
+        double cx=b.blocks.stream().mapToInt(p->p.position().getX()).average().orElse(0),cz=b.blocks.stream().mapToInt(p->p.position().getZ()).average().orElse(0);
         boolean anyDoor=false;
         for(var plan:b.blocks){
             if(!(plan.block().getBlock() instanceof DoorBlock))continue;
             anyDoor=true;BlockPos door=plan.position();
+            Direction out=null;double best=0;
             for(Direction d:Direction.Plane.HORIZONTAL){
-                BlockPos out=door.relative(d);
-                if(footprint.contains(BlockPos.asLong(out.getX(),0,out.getZ())))continue;
-                if(walkable(out)&&walkable(out.relative(d)))return true;
+                double away=d.getStepX()*(door.getX()+.5-cx)+d.getStepZ()*(door.getZ()+.5-cz);
+                if(away>best){best=away;out=d;}
             }
+            if(out!=null&&walkable(door.relative(out))&&walkable(door.relative(out,2)))return true;
         }
         return !anyDoor;
     }
@@ -412,7 +415,8 @@ final class Projects {
     static final int TOWER=5;
     /**
      * A watchtower: a 3×3 cobblestone shaft with a door and a ladder up the middle, a 5×5 plank
-     * lookout on top with a fence railing, and torches on the railing's corners when the store has them.
+     * lookout four blocks up with a fence railing, and torches on the railing's corners when the store
+     * has them.
      */
     TownBuilding tower(BlockPos base){
         var b=new TownBuilding("tower",base);
@@ -422,18 +426,19 @@ final class Projects {
             for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,cobble);}
             b.add(floor,cobble);
         }
-        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)for(int y=1;y<=7;y++){
+        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)for(int y=1;y<=6;y++){
             BlockPos p=base.offset(x,y,z);if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());
         }
-        for(int y=1;y<=4;y++)for(int x=1;x<=3;x++)for(int z=1;z<=3;z++){
+        for(int y=1;y<=3;y++)for(int x=1;x<=3;x++)for(int z=1;z<=3;z++){
             if(x==2&&z==2||x==2&&z==1&&y<=2)continue; // the ladder shaft and the doorway
             b.add(base.offset(x,y,z),cobble);
         }
         b.add(base.offset(2,1,1),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.SOUTH));
-        for(int y=1;y<=5;y++)b.add(base.offset(2,y,2),Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING,Direction.WEST));
-        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)if(x!=2||z!=2)b.add(base.offset(x,5,z),Blocks.OAK_PLANKS.defaultBlockState());
-        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)if(x==0||z==0||x==TOWER-1||z==TOWER-1)b.add(base.offset(x,6,z),Blocks.OAK_FENCE.defaultBlockState());
-        for(int[] c:new int[][]{{0,0},{0,4},{4,0},{4,4}})b.decorate(base.offset(c[0],7,c[1]),Blocks.TORCH.defaultBlockState());
+        for(int y=1;y<=4;y++)b.add(base.offset(2,y,2),Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING,Direction.WEST));
+        // Every block is within a builder's reach from the ground around the tower.
+        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)if(x!=2||z!=2)b.add(base.offset(x,4,z),Blocks.OAK_PLANKS.defaultBlockState());
+        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)if(x==0||z==0||x==TOWER-1||z==TOWER-1)b.add(base.offset(x,5,z),Blocks.OAK_FENCE.defaultBlockState());
+        for(int[] c:new int[][]{{0,0},{0,4},{4,0},{4,4}})b.decorate(base.offset(c[0],6,c[1]),Blocks.TORCH.defaultBlockState());
         b.blocks.removeIf(p->!v.state.contains(p.position()));
         return b;
     }

@@ -48,7 +48,7 @@ final class GraveJob extends Job {
                     .setMessage(2,Component.literal(grave.role==null?"":grave.role)).setMessage(3,Component.literal("† день "+grave.day));
             entity.setText(text,true);entity.setChanged();v.level.sendBlockUpdated(spot,state,state,3);
         }
-        v.state.graves.remove(grave);v.chronicle.event("На кладбище поставили табличку: "+grave.name);
+        v.state.graves.remove(grave);v.chronicle.add("graves",1);v.chronicle.event("На кладбище поставили табличку: "+grave.name);
         return false;
     }
     @Override void stop(){if(fetch!=null)fetch.cancel();if(approach!=null)approach.cancel();}

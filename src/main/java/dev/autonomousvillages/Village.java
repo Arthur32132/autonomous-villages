@@ -59,6 +59,7 @@ final class Village {
     final Breeding breeding;
     final VillagePresentation presentation;
     final Ambience ambience;
+    final LifeEvents lifeEvents;
     boolean ticketed;
     String problem="осмотр территории";
     private int rotation;
@@ -76,7 +77,7 @@ final class Village {
 
     Village(VillageRuntime runtime,VillageState state){
         this.runtime=runtime;this.state=state;this.level=runtime.server.overworld();
-        this.town=new Projects(this);this.planner=new VillagePlanner(this);this.breeding=new Breeding(this);this.presentation=new VillagePresentation(this);this.ambience=new Ambience(this);
+        this.town=new Projects(this);this.planner=new VillagePlanner(this);this.breeding=new Breeding(this);this.presentation=new VillagePresentation(this);this.ambience=new Ambience(this);this.lifeEvents=new LifeEvents(this);
     }
 
     // --- chunk loading ------------------------------------------------------------------------
@@ -145,6 +146,7 @@ final class Village {
         presentation.tick();
         ambience.tick(time);
         if(time%200==77)LandmarkGoods.tick(this);
+        lifeEvents.tick(time);
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){
             state.plantedTrees.removeIf(p->{var pos=BlockPos.of(p);return level.hasChunkAt(pos)&&!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.SaplingBlock)

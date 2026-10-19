@@ -50,6 +50,8 @@ public final class VillageState {
     public Set<UUID> honoured=new LinkedHashSet<>();
     /** The game day each landmark last gave its goods (forge, market, mill, tavern, dock). */
     public Map<String,Long> goodsDays=new LinkedHashMap<>();
+    /** The game day of the last fair. */
+    public long fairDay=-1;
     static final int MAX_TICKET_CHUNKS=1024;
     static long footprintChunks(Bounds b){return ((long)(b.maxX>>4)-(b.minX>>4)+1)*((long)(b.maxZ>>4)-(b.minZ>>4)+1);}
     static <T> void trimOldest(Set<T> values,int limit){while(values.size()>limit)values.remove(values.iterator().next());}

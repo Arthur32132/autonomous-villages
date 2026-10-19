@@ -221,6 +221,10 @@ final class Village {
                     ||s.getValue(net.minecraft.world.level.block.DoorBlock.HALF)!=net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER
                     ||!s.getValue(net.minecraft.world.level.block.DoorBlock.OPEN))continue;
             if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new AABB(p).expandTowards(0,1,0).inflate(.2),net.minecraft.world.entity.LivingEntity::isAlive).isEmpty())continue;
+            // A villager or player about to pass is not shut out: closing the door in front of a
+            // resident on its way home broke its route on the doorstep every hundred ticks.
+            if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new AABB(p).expandTowards(0,1,0).inflate(2.5),
+                    e->e.isAlive()&&(e instanceof Villager||e instanceof net.minecraft.world.entity.player.Player)).isEmpty())continue;
             door.setOpen(null,level,s,p,false);
         }
     }

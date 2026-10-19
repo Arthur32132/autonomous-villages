@@ -126,6 +126,7 @@ final class Village {
         }
         rotation++;
         if(time%5==0)rescueFromPowderSnow();
+        if(time%6000==1234)writeChronicleBook();
         presentation.tick();
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){
@@ -280,6 +281,24 @@ final class Village {
                 .sorted(Comparator.comparingDouble(w->w.body().distanceToSqr(enemy))).limit(2).toList().forEach(w->w.defend(enemy));
     }
 
+    /**
+     * The chronicle as a written book on the lectern nearest the bell (a librarian's), for players to
+     * read. Only an empty lectern or one holding the village's own book is used; a player's book stays.
+     */
+    void writeChronicleBook(){
+        BlockPos hub=meetingPoint();
+        var lectern=level.getPoiManager().getInRange(h->h.is(PoiTypes.LIBRARIAN),hub,Math.min(256,state.radius+16),PoiManager.Occupancy.ANY)
+                .map(PoiRecord::getPos).filter(state::contains).filter(level::hasChunkAt)
+                .filter(p->level.getBlockEntity(p) instanceof net.minecraft.world.level.block.entity.LecternBlockEntity l&&(!l.hasBook()||Chronicle.ownBook(l.getBook())))
+                .min(Comparator.comparingDouble(hub::distSqr)).orElse(null);
+        if(lectern==null||!(level.getBlockEntity(lectern) instanceof net.minecraft.world.level.block.entity.LecternBlockEntity l))return;
+        boolean first=!l.hasBook();
+        var bs=level.getBlockState(lectern);
+        if(first){
+            if(!net.minecraft.world.level.block.LecternBlock.tryPlaceBook(null,level,lectern,bs,chronicle.book()))return;
+            chronicle.event("Летопись деревни лежит на кафедре у "+lectern.toShortString());
+        }else{l.setBook(chronicle.book());l.setChanged();level.sendBlockUpdated(lectern,bs,bs,3);}
+    }
     private long nextGolemAttempt;
     /**
      * A village of five or more under attack with no iron golem nearby calls one, as frightened

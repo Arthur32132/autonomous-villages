@@ -45,9 +45,15 @@ final class VillageStock {
         return chests().stream().filter(c->!excluded.contains(c.getBlockPos())&&(holding==null||contains(c,holding)))
                 .min(Comparator.comparingDouble(c->{double dy=c.getBlockPos().getY()-from.getY();return c.getBlockPos().distSqr(from)+15*dy*dy;})).orElse(null);
     }
+    /**
+     * A chest with a free slot: the store by the bell first, nearest to the worker; a house chest only
+     * when the store is full. Goods spread over far house chests were walked to twice, and deposits
+     * timed out on house chests nobody reaches (rc13, seed 1337).
+     */
     ChestBlockEntity nearestWithRoom(BlockPos from,Set<BlockPos> excluded){
+        BlockPos hub=v.meetingPoint();
         return chests().stream().filter(c->!excluded.contains(c.getBlockPos())).filter(c->{for(int i=0;i<c.getContainerSize();i++)if(c.getItem(i).isEmpty())return true;return false;})
-                .min(Comparator.comparingDouble(c->c.getBlockPos().distSqr(from))).orElse(null);
+                .min(Comparator.<ChestBlockEntity>comparingInt(c->c.getBlockPos().distSqr(hub)<=12*12?0:1).thenComparingDouble(c->c.getBlockPos().distSqr(from))).orElse(null);
     }
     static boolean contains(ChestBlockEntity c,Predicate<ItemStack> test){
         for(int i=0;i<c.getContainerSize();i++){var s=c.getItem(i);if(!s.isEmpty()&&test.test(s))return true;}

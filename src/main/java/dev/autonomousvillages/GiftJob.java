@@ -26,7 +26,9 @@ final class GiftJob extends Job {
     static ServerPlayer guest(Village v){
         long now=v.level.getGameTime();
         BlockPos hub=v.meetingPoint();
-        return v.level.players().stream().filter(p->p.isAlive()&&!p.isSpectator()&&v.state.contains(p.blockPosition())&&p.blockPosition().distSqr(hub)<48*48
+        // Navigation bots are players too (a soak camera, other mods' helpers); gifts are for people.
+        return v.level.players().stream().filter(p->p.isAlive()&&!p.isSpectator()&&v.runtime.bots.find(p.getUUID()).isEmpty()
+                &&v.state.contains(p.blockPosition())&&p.blockPosition().distSqr(hub)<48*48
                 &&v.gifted.getOrDefault(p.getUUID(),0L)<=now).min(Comparator.comparingDouble(p->p.blockPosition().distSqr(hub))).orElse(null);
     }
     @Override boolean tick(){

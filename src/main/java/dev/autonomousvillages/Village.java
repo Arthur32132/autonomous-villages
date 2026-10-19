@@ -27,6 +27,7 @@ final class Village {
     final Reservations reservations=new Reservations();
     final Map<Long,Long> rejected=new HashMap<>();
     private final Map<Long,Map<UUID,Long>> unreachableVotes=new HashMap<>();
+    private final Map<Long,Integer> unreachableStrikes=new HashMap<>();
     /**
      * A worker could not reach a chest or workbench. It is skipped by everyone for two minutes only
      * when two different residents failed (or the only one): a single trapped resident fails to reach
@@ -37,7 +38,13 @@ final class Village {
         var votes=unreachableVotes.computeIfAbsent(p.asLong(),k->new HashMap<>());
         votes.values().removeIf(expiry->expiry<=now);
         votes.put(worker,now+2400);
-        if(votes.size()>=Math.min(2,Math.max(1,workers.size()))){rejected.put(p.asLong(),now+2400);unreachableVotes.remove(p.asLong());}
+        if(votes.size()>=Math.min(2,Math.max(1,workers.size()))){
+            // Each time again it stays out twice as long, up to twenty minutes: a chest up a cliff came
+            // back every two minutes and sent crafts out for its sticks (rc14, seed 42: crafting 38% of the day).
+            int strikes=unreachableStrikes.merge(p.asLong(),1,Integer::sum);
+            rejected.put(p.asLong(),now+Math.min(24000L,2400L<<Math.min(4,strikes-1)));unreachableVotes.remove(p.asLong());
+            if(unreachableStrikes.size()>512)unreachableStrikes.clear();
+        }
         if(unreachableVotes.size()>256)unreachableVotes.clear();
     }
     /** When each visiting player may next receive a gift (game time). */
@@ -334,14 +341,21 @@ final class Village {
      * out (seed 8675309: residents killed at one doorstep in the morning). The nearest armed, healthy
      * resident goes for it without ringing the bell, so the rest of the village keeps working.
      */
+    private final Map<UUID,Long> hunted=new HashMap<>();
     private void huntLurkers(){
         if(Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))return;
+        long now=level.getGameTime();
+        hunted.values().removeIf(until->until<=now);
         for(var lurker:level.getEntitiesOfClass(net.minecraft.world.entity.monster.zombie.Zombie.class,VillageDiscovery.area(state,0),
-                m->m.isAlive()&&state.contains(m.blockPosition()))){
-            if(workers.values().stream().anyMatch(w->w.fighting(lurker)))continue;
+                m->m.isAlive()&&state.contains(m.blockPosition())&&!m.isOnFire())){
+            if(hunted.containsKey(lurker.getUUID())||workers.values().stream().anyMatch(w->w.fighting(lurker)))continue;
             Worker hunter=workers.values().stream().filter(w->w.active()&&w.armed()&&w.body().getHealth()>=16&&!w.body().isSleeping()&&!w.body().isTrading()
-                    &&!w.fighting(null)&&w.body().distanceToSqr(lurker)<32*32).min(Comparator.comparingDouble(w->w.body().distanceToSqr(lurker))).orElse(null);
+                    &&!w.fighting(null)&&w.body().distanceToSqr(lurker)<24*24&&Math.abs(w.body().getY()-lurker.getY())<=4)
+                    .min(Comparator.comparingDouble(w->w.body().distanceToSqr(lurker))).orElse(null);
             if(hunter==null)continue;
+            // One go per zombie in two minutes: one the hunter could not reach was chosen again every
+            // five seconds and kept a resident from work all day (rc14: over a hundred hunts a run).
+            hunted.put(lurker.getUUID(),now+2400);
             AutonomousVillagesMod.LOG.info("HUNT {} {} -> {} at {}",state.name,presentation.personName(hunter.id),lurker.getType().getDescription().getString(),lurker.blockPosition().toShortString());
             hunter.defend(lurker);
             return;

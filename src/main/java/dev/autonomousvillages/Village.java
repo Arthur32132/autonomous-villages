@@ -127,6 +127,8 @@ final class Village {
         rotation++;
         if(time%5==0)rescueFromPowderSnow();
         if(time%20==7)guardChildren();
+        // At dusk a village short of golems calls one before the zombies come, not after.
+        if(time%200==13&&Math.floorMod(level.getOverworldClockTime(),24000)>=11500&&Math.floorMod(level.getOverworldClockTime(),24000)<13000)summonGolem(time);
         if(time%6000==1234)writeChronicleBook();
         presentation.tick();
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
@@ -348,11 +350,16 @@ final class Village {
      * A village of five or more under attack with no iron golem nearby calls one, as frightened
      * vanilla villagers do, at most once a day.
      */
+    /** One iron golem for every ten residents, three at most; none below five residents. */
+    int golemsWanted(){return state.residents.size()<5?0:Math.min(3,1+state.residents.size()/10);}
     private void summonGolem(long now){
-        if(!AutonomousVillagesMod.CONFIG.summonGolems||now<nextGolemAttempt||now-state.lastGolem<24000||state.residents.size()<5)return;
+        // A golem that fell may be replaced after five minutes, never more than the village needs.
+        if(!AutonomousVillagesMod.CONFIG.summonGolems||now<nextGolemAttempt||now-state.lastGolem<6000)return;
         nextGolemAttempt=now+1200;
         BlockPos hub=meetingPoint();
-        if(!level.getEntitiesOfClass(net.minecraft.world.entity.animal.golem.IronGolem.class,new AABB(hub).inflate(48),net.minecraft.world.entity.LivingEntity::isAlive).isEmpty())return;
+        var area=VillageDiscovery.area(state,16);
+        int golems=level.getEntitiesOfClass(net.minecraft.world.entity.animal.golem.IronGolem.class,area,net.minecraft.world.entity.LivingEntity::isAlive).size();
+        if(golems>=golemsWanted())return;
         net.minecraft.util.SpawnUtil.trySpawnMob(net.minecraft.world.entity.EntityTypes.IRON_GOLEM,net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED,level,hub,10,8,6,
                 net.minecraft.util.SpawnUtil.Strategy.LEGACY_IRON_GOLEM,false).ifPresent(golem->{
             state.lastGolem=now;chronicle.add("golems",1);chronicle.announce("Жители позвали на помощь железного голема!");runtime.save();

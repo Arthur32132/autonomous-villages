@@ -28,8 +28,10 @@ final class VillageCrafting {
     static final Predicate<ItemStack> FUEL=s->s.is(Items.COAL)||s.is(Items.CHARCOAL);
     static final Predicate<ItemStack> WHEAT=s->s.is(Items.WHEAT);
     static final Predicate<ItemStack> WOOL=s->s.is(ItemTags.WOOL);
+    static final Predicate<ItemStack> NUGGET=s->s.is(Items.IRON_NUGGET);
+    static final Predicate<ItemStack> TORCH_ITEM=s->s.is(Items.TORCH);
 
-    /** M is the recipe's main material, P planks, S sticks, I iron ingots. */
+    /** M is the recipe's main material, P planks, S sticks, I iron ingots, T a torch. */
     record Recipe(String name,String[] pattern,Predicate<ItemStack> material,Predicate<ItemStack> output,String label){
         boolean needsTable(){return pattern.length>2||pattern[0].length()>2;}
         /** Vanilla wants one kind of wood for these; tools, chests and tables take mixed planks. */
@@ -39,7 +41,7 @@ final class VillageCrafting {
             for(String row:pattern)for(char c:row.toCharArray())if(c!=' ')out.merge(c,1,Integer::sum);
             return out;
         }
-        Predicate<ItemStack> ingredient(char symbol){return switch(symbol){case 'P'->PLANK;case 'S'->STICK;case 'I'->IRON;default->material;};}
+        Predicate<ItemStack> ingredient(char symbol){return switch(symbol){case 'P'->PLANK;case 'S'->STICK;case 'I'->IRON;case 'T'->TORCH_ITEM;default->material;};}
     }
     static final Recipe PLANKS=new Recipe("planks",new String[]{"M"},LOG,PLANK,"доски");
     static final Recipe STICKS=new Recipe("sticks",new String[]{"P","P"},PLANK,STICK,"палки");
@@ -61,6 +63,9 @@ final class VillageCrafting {
     static final Recipe COBBLE_SLAB=new Recipe("cobblestone_slab",new String[]{"MMM"},COBBLESTONE,s->s.is(Items.COBBLESTONE_SLAB),"каменные плиты");
     static final Recipe COBBLE_WALL=new Recipe("cobblestone_wall",new String[]{"MMM","MMM"},COBBLESTONE,s->s.is(Items.COBBLESTONE_WALL),"каменная ограда");
     static final Recipe TRAPDOOR=new Recipe("trapdoor",new String[]{"PPP","PPP"},PLANK,s->s.is(ItemTags.WOODEN_TRAPDOORS),"ставни");
+    /** One ingot makes nine nuggets, eight of them a lantern for a lamp post. */
+    static final Recipe NUGGETS=new Recipe("iron_nugget",new String[]{"M"},IRON,NUGGET,"железные самородки");
+    static final Recipe LANTERN=new Recipe("lantern",new String[]{"MMM","MTM","MMM"},NUGGET,s->s.is(Items.LANTERN),"фонарь");
     static final Recipe LADDER=new Recipe("ladder",new String[]{"S S","SSS","S S"},STICK,s->s.is(Items.LADDER),"лестница");
     /** A desert village without wood for a pickaxe builds from sand: four make a block of sandstone, by hand. */
     static final Predicate<ItemStack> PLAIN_SAND=s->s.is(Items.SAND);
@@ -98,7 +103,7 @@ final class VillageCrafting {
         for(String row:pattern)for(int x=0;x<width;x++){
             char symbol=row.charAt(x);
             if(symbol==' '){grid.add(ItemStack.EMPTY);continue;}
-            Predicate<ItemStack> ingredient=switch(symbol){case 'P'->plank==null?PLANK:s->s.is(plank);case 'S'->STICK;case 'I'->IRON;default->material;};
+            Predicate<ItemStack> ingredient=switch(symbol){case 'P'->plank==null?PLANK:s->s.is(plank);case 'S'->STICK;case 'I'->IRON;case 'T'->TORCH_ITEM;default->material;};
             ItemStack chosen=next.stream().filter(s->!s.isEmpty()&&Inventory.isUsableForCrafting(s)&&ingredient.test(s)).findFirst().orElse(null);
             if(chosen==null)return false;
             grid.add(chosen.copyWithCount(1));chosen.shrink(1);

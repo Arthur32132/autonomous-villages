@@ -44,6 +44,12 @@ public final class ModConfig {
     public boolean civicBuildings=true;
     /** A timber barn by the bell with the store's chests inside. */
     public boolean storehouse=true;
+    /** Spare iron becomes lanterns that replace the torches on the lamp posts. */
+    public boolean lanterns=true;
+    /** Once the footpaths are done, the ground around the bell is trodden into a small square. */
+    public boolean plaza=true;
+    /** Particles and sounds only: smoke over lived-in homes in the evening, fireflies at night, residents greeting a player and frowning at a failed task. */
+    public boolean ambience=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

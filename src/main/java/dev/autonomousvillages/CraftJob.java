@@ -23,7 +23,8 @@ final class CraftJob extends Job {
     @Override String kind(){return "craft";}
     /** Fetching from the store and walking to a workbench can cross a whole hillside village. */
     @Override int timeLimit(){return 4800;}
-    @Override boolean keeps(ItemStack s){return made<times&&(s.is(ItemTags.PLANKS)||s.is(Items.STICK)||s.is(ItemTags.LOGS_THAT_BURN)||recipe.material().test(s)||s.is(Items.IRON_INGOT));}
+    @Override boolean keeps(ItemStack s){return made<times&&(s.is(ItemTags.PLANKS)||s.is(Items.STICK)||s.is(ItemTags.LOGS_THAT_BURN)||recipe.material().test(s)||s.is(Items.IRON_INGOT)
+            ||recipe.symbols().containsKey('T')&&s.is(Items.TORCH));}
     /**
      * Ingredients as raw materials, counting what the worker already carries. Sticks and planks are
      * expressed in logs when there are too few planks. Doors, fences, stairs, slabs and signs need
@@ -37,6 +38,7 @@ final class CraftJob extends Job {
                 case 'P'->planks+=n;
                 case 'S'->sticks+=n;
                 case 'I'->out.add(new Need(VillageCrafting.IRON,n,"железо"));
+                case 'T'->out.add(new Need(VillageCrafting.TORCH_ITEM,n,"факелы"));
                 default->{if(recipe.material()==VillageCrafting.PLANK)planks+=n;else out.add(new Need(recipe.material(),n,recipe.label()+": материал"));}
             }
         }

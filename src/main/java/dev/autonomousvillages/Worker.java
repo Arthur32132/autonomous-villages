@@ -178,6 +178,7 @@ final class Worker {
                 if(stuckCount==3)AutonomousVillagesMod.LOG.info("TRAPPED {} {} at {}: {}",v.state.name,v.presentation.personName(id),body().position(),surroundings());
             }
             v.failures.merge(job.kind()+": "+job.failure,1,Integer::sum);
+            v.ambience.frown(this);
             if(job instanceof EscapeJob)unstick();
             if(now()>=nextFailureLog){
                 nextFailureLog=now()+600;

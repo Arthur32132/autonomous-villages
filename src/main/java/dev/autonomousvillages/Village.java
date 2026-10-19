@@ -58,6 +58,7 @@ final class Village {
     final VillagePlanner planner;
     final Breeding breeding;
     final VillagePresentation presentation;
+    final Ambience ambience;
     boolean ticketed;
     String problem="осмотр территории";
     private int rotation;
@@ -75,7 +76,7 @@ final class Village {
 
     Village(VillageRuntime runtime,VillageState state){
         this.runtime=runtime;this.state=state;this.level=runtime.server.overworld();
-        this.town=new Projects(this);this.planner=new VillagePlanner(this);this.breeding=new Breeding(this);this.presentation=new VillagePresentation(this);
+        this.town=new Projects(this);this.planner=new VillagePlanner(this);this.breeding=new Breeding(this);this.presentation=new VillagePresentation(this);this.ambience=new Ambience(this);
     }
 
     // --- chunk loading ------------------------------------------------------------------------
@@ -142,12 +143,14 @@ final class Village {
         if(time%20==3)dayBells(time);
         if(time%600==311&&AutonomousVillagesMod.CONFIG.nameplates)NameplateJob.refresh(this);
         presentation.tick();
+        ambience.tick(time);
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){
             state.plantedTrees.removeIf(p->{var pos=BlockPos.of(p);return level.hasChunkAt(pos)&&!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.SaplingBlock)
                     &&!level.getBlockState(pos).is(net.minecraft.tags.BlockTags.LOGS)&&!state.fellingTrees.contains(p);});
             state.furnaces.removeIf(p->level.hasChunkAt(BlockPos.of(p))&&!(level.getBlockEntity(BlockPos.of(p)) instanceof net.minecraft.world.level.block.entity.FurnaceBlockEntity));
-            state.lights.removeIf(p->level.hasChunkAt(BlockPos.of(p))&&!level.getBlockState(BlockPos.of(p)).is(net.minecraft.world.level.block.Blocks.TORCH));
+            state.lights.removeIf(p->level.hasChunkAt(BlockPos.of(p))&&!level.getBlockState(BlockPos.of(p)).is(net.minecraft.world.level.block.Blocks.TORCH)
+                    &&!level.getBlockState(BlockPos.of(p)).is(net.minecraft.world.level.block.Blocks.LANTERN));
             rejected.values().removeIf(expiry->expiry<=time);
             problem=workers.isEmpty()?"нет загруженных взрослых жителей":town.stage;
         }

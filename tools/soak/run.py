@@ -70,12 +70,12 @@ def build(java):
                    cwd=ROOT, env=env, check=True)
 
 
-def snapshot_jars(batch_dir, jars_from=None):
+def snapshot_jars(batch_dir, jars_from=None, mod_version=None):
     """Copies the mod jars once per batch, so a rebuild while the batch runs cannot mix versions."""
     target = batch_dir / 'jars'
     shutil.rmtree(target, ignore_errors=True)
     target.mkdir(parents=True)
-    v, nav = version(ROOT), version(NAV)
+    v, nav = mod_version or version(ROOT), version(NAV)
     if jars_from:
         sources = [p for p in Path(jars_from).glob('*.jar') if not p.name.endswith('-sources.jar')]
     else:
@@ -164,6 +164,7 @@ def main():
     parser.add_argument('--batch', default=None, help='report folder name; default timestamp')
     parser.add_argument('--no-claim', action='store_true', help='observe the untouched village (control run)')
     parser.add_argument('--skip-build', action='store_true')
+    parser.add_argument('--mod-version', default=None, help='version suffix of the mod jars in build/libs, e.g. 0.3.0-dev from -Pversion=0.3.0-dev')
     parser.add_argument('--jars', default=None, help='folder with the mod and soak jars to test instead of build/libs (e.g. an older release)')
     parser.add_argument('--keep-lab', action='store_true')
     parser.add_argument('--prepare-only', action='store_true', help='only download/boot the cached server template')
@@ -177,7 +178,7 @@ def main():
         build(java)
     batch_dir = ROOT / 'build/soak-reports' / (args.batch or time.strftime('%Y%m%d-%H%M%S'))
     batch_dir.mkdir(parents=True, exist_ok=True)
-    jars = snapshot_jars(batch_dir, args.jars)
+    jars = snapshot_jars(batch_dir, args.jars, args.mod_version)
     jobs = [(s.strip(), d.strip()) for s in args.seeds.split(',') for d in args.difficulty.split(',')]
     results, lock, queue = {}, threading.Lock(), list(jobs)
 

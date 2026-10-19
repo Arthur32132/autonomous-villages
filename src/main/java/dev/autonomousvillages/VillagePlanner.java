@@ -111,7 +111,7 @@ final class VillagePlanner {
             default->null;
         };
         if(own!=null)return own;
-        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->grave(w,s),()->nameplate(w,s),()->flowers(w),()->shear(w,s),()->chop(w,s,true),
+        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->grave(w,s),()->nameplate(w,s),()->flowers(w),()->lanterns(w,s),()->shear(w,s),()->chop(w,s,true),
                 ()->helperPick(w,s),()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
         if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0&&w.ready("deposit"))return new DepositJob(w);
         return shared;
@@ -339,6 +339,8 @@ final class VillagePlanner {
         }
 
         if(s.need("trapdoor")>owned(x->x.is(ItemTags.WOODEN_TRAPDOORS))&&!crafting(w,VillageCrafting.TRAPDOOR)&&CraftJob.affordable(v,VillageCrafting.TRAPDOOR,1,w))return new CraftJob(w,VillageCrafting.TRAPDOOR,1);
+        if(s.need("fence_gate")>owned(x->x.getItem() instanceof net.minecraft.world.item.BlockItem item&&item.getBlock() instanceof net.minecraft.world.level.block.FenceGateBlock)
+                &&!crafting(w,VillageCrafting.GATE)&&CraftJob.affordable(v,VillageCrafting.GATE,1,w))return new CraftJob(w,VillageCrafting.GATE,1);
         if(s.need("ladder")>owned(x->x.is(Items.LADDER))&&!crafting(w,VillageCrafting.LADDER)&&CraftJob.affordable(v,VillageCrafting.LADDER,1,w))return new CraftJob(w,VillageCrafting.LADDER,1);
         if(s.need("glass_pane")>owned(x->x.is(Items.GLASS_PANE))&&!crafting(w,VillageCrafting.GLASS_PANE)&&CraftJob.affordable(v,VillageCrafting.GLASS_PANE,1,w))return new CraftJob(w,VillageCrafting.GLASS_PANE,1);
         if(s.need("fence")>owned(x->x.is(ItemTags.WOODEN_FENCES))&&!crafting(w,VillageCrafting.FENCE)&&CraftJob.affordable(v,VillageCrafting.FENCE,1,w))return new CraftJob(w,VillageCrafting.FENCE,1);
@@ -369,10 +371,28 @@ final class VillagePlanner {
         }
         return null;
     }
+    /**
+     * Lanterns for the lamp posts from spare iron: an ingot gives nine nuggets, eight of them and a
+     * torch a lantern. Only while the village is lit and has iron and torches to spare.
+     */
+    private Job lanterns(Worker w,Snapshot s){
+        if(!AutonomousVillagesMod.CONFIG.lanterns||v.activeJobs("lantern")>0||!w.ready("lantern"))return null;
+        var posts=LanternJob.posts(v,8);
+        if(posts.isEmpty()){w.cooldown("lantern",2400);return null;}
+        if(v.stock.count(x->x.is(Items.LANTERN))+w.count(x->x.is(Items.LANTERN))>0)return new LanternJob(w,posts);
+        w.cooldown("lantern",600);
+        if(owned(x->x.is(Items.LANTERN))>0||s.table()==null||!s.dark().isEmpty()||s.torches()<16||!w.ready("craft")
+                ||crafting(w,VillageCrafting.LANTERN)||crafting(w,VillageCrafting.NUGGETS))return null;
+        if(owned(VillageCrafting.NUGGET)>=8)return CraftJob.affordable(v,VillageCrafting.LANTERN,1,w)?new CraftJob(w,VillageCrafting.LANTERN,1):null;
+        // Iron for shears and an iron pick or sword comes first.
+        int spareIron=s.iron()-(s.need("bed")>0&&!s.shears()?2:0);
+        return spareIron>=4&&CraftJob.affordable(v,VillageCrafting.NUGGETS,1,w)?new CraftJob(w,VillageCrafting.NUGGETS,1):null;
+    }
     /** Footpaths from new houses, once there is nothing more urgent; a shovel is made for it. */
     private Job pave(Worker w,Snapshot s){
         if(!w.ready("path")||v.activeJobs("path")>0)return null;
         var cells=v.town.unpaved(24);
+        if(cells.isEmpty()&&AutonomousVillagesMod.CONFIG.plaza)cells=PathJob.plaza(v,24);
         if(cells.isEmpty()){w.cooldown("path",1200);return null;}
         boolean shovel=w.hasTool(ItemTags.SHOVELS)||v.stock.count(x->x.is(ItemTags.SHOVELS)&&Supplies.usable(x))>0;
         if(!shovel){

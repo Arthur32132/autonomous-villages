@@ -19,7 +19,7 @@ final class LightJob extends Job {
     LightJob(Worker w,List<BlockPos> spots){super(w,"освещает деревню");this.spots=new ArrayDeque<>(spots);}
     @Override String kind(){return "light";}
     @Override BlockPos target(){return spots.peek();}
-    @Override boolean keeps(ItemStack s){return s.is(Items.TORCH)||s.is(net.minecraft.tags.ItemTags.WOODEN_FENCES);}
+    @Override boolean keeps(ItemStack s){return s.is(Items.TORCH)||s.is(Items.LANTERN)||s.is(net.minecraft.tags.ItemTags.WOODEN_FENCES);}
     @Override boolean tick(){
         if(w.count(s->s.is(Items.TORCH))<1){
             if(fetch==null){
@@ -45,7 +45,11 @@ final class LightJob extends Job {
             if(fence>=0&&!Lighting.indoors(v,spot)&&!Lighting.byDoor(v,spot)&&Construction.clear(v.level.getBlockState(spot.above()))&&v.state.contains(spot.above())
                     &&bot().inventory().snapshot().slots().get(fence).getItem() instanceof net.minecraft.world.item.BlockItem post
                     &&Construction.place(v,bot(),new Construction.Step(spot,post.getBlock().defaultBlockState(),post)))torch=spot.above();
-            if(Construction.place(v,bot(),new Construction.Step(torch,Blocks.TORCH.defaultBlockState(),Items.TORCH))){
+            // A lamp post carries a lantern when there is one.
+            boolean lantern=!torch.equals(spot)&&w.has(s->s.is(Items.LANTERN))
+                    &&Construction.place(v,bot(),new Construction.Step(torch,Blocks.LANTERN.defaultBlockState(),Items.LANTERN));
+            if(lantern||Construction.place(v,bot(),new Construction.Step(torch,Blocks.TORCH.defaultBlockState(),Items.TORCH))){
+                if(lantern)v.chronicle.add("lanterns",1);
                 placed++;v.state.lights.add(torch.asLong());v.chronicle.lit();
                 if(!torch.equals(spot))v.chronicle.add("lamps",1);
                 if(Lighting.indoors(v,spot))v.chronicle.add("roomsLit",1);

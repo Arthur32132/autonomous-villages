@@ -134,6 +134,7 @@ final class Construction {
         if(step.item()==Items.CHEST || step.item()==Items.FURNACE)v.runtime.save();
         b.entity().swing(net.minecraft.world.InteractionHand.MAIN_HAND);
         var sound=step.state().getSoundType();v.level.playSound(null,p,sound.getPlaceSound(),net.minecraft.sounds.SoundSource.BLOCKS,.7f,1f);
+        Ambience.puff(v,p,placed);
         return true;
     }
     static boolean intersectsActor(Village v, BotHandle b, Step step) {

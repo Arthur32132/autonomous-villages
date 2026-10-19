@@ -37,6 +37,13 @@ public final class AutonomousVillagesMod implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> runtime = new VillageRuntime(server));
         ServerEntityEvents.ENTITY_LOAD.register((entity,level)->{if(runtime!=null&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident&&level==runtime.server.overworld())runtime.residentLoaded(resident);});
         ServerTickEvents.END_SERVER_TICK.register(server -> { if (runtime != null) runtime.tick(); });
+        net.fabricmc.fabric.api.event.player.UseEntityCallback.EVENT.register((player,level,hand,entity,hit)->
+                runtime!=null&&!level.isClientSide()&&player instanceof net.minecraft.server.level.ServerPlayer p&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident
+                        ?PlayerGoods.useOnResident(runtime,p,hand,resident):net.minecraft.world.InteractionResult.PASS);
+        net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register((player,level,hand)->{
+            if(runtime!=null&&!level.isClientSide()&&player instanceof net.minecraft.server.level.ServerPlayer p)PlayerGoods.refresh(runtime,p,hand);
+            return net.minecraft.world.InteractionResult.PASS;
+        });
         ServerEntityEvents.ENTITY_UNLOAD.register((entity,level)->{
             if(runtime!=null&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident&&resident.isAlive()&&level==runtime.server.overworld())
                 for(var village:runtime.villages.values())if(village.state.residents.contains(resident.getUUID()))village.state.residentPositions.put(resident.getUUID(),resident.blockPosition().asLong());

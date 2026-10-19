@@ -25,6 +25,7 @@ final class Chronicle {
     void announce(String message){
         event(message);
         tell(message);
+        if(v.lifeEvents!=null)v.lifeEvents.herald();
     }
     /** Shown in chat to players near the village, but not kept among the events. */
     void tell(String message){

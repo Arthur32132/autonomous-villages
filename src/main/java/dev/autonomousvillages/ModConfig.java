@@ -46,6 +46,26 @@ public final class ModConfig {
     public boolean storehouse=true;
     /** A fenced sheep pen with a gate; the guild brings the first two sheep. */
     public boolean pen=true;
+    /** Spare iron becomes lanterns that replace the torches on the lamp posts. */
+    public boolean lanterns=true;
+    /** Once the footpaths are done, the ground around the bell is trodden into a small square. */
+    public boolean plaza=true;
+    /** Particles and sounds only: smoke over lived-in homes in the evening, fireflies at night, residents greeting a player and frowning at a failed task. */
+    public boolean ambience=true;
+    /** A book and quill handed to a resident (sneaking) becomes the village ledger, which is current whenever opened. */
+    public boolean ledger=true;
+    /** A stack handed to a resident (sneaking) goes to the store; the village remembers it in trades and honours a generous donor. */
+    public boolean donations=true;
+    /** After the watchtower the village builds its own forge, market square and tavern as it grows. */
+    public boolean landmarks=true;
+    /** After the watchtower the village fences itself in, with gates on its streets shut at night. */
+    public boolean palisade=true;
+    /** Once a day the forge mends tools, the market sets out surplus, the mill bakes, the tavern cooks and brews mead, the pier brings fish. */
+    public boolean landmarkGoods=true;
+    /** A fair every seventh day once there is a market (bell, music, a wandering trader); a feast at the tavern when a building is finished; a lullaby for a birth, a lantern glow on the night watch, a bell stroke for news. */
+    public boolean lifeEvents=true;
+    /** The material the build lacks most is posted as a request to players on the notice board; filling it is rewarded from the store. */
+    public boolean requests=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

@@ -36,6 +36,8 @@ public final class ModConfig {
     public boolean graves=true;
     /** A sign beside each home's door naming who lives there. */
     public boolean nameplates=true;
+    /** Flowers from the store planted along the walls of the homes. */
+    public boolean flowers=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

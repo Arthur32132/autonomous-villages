@@ -111,7 +111,7 @@ final class VillagePlanner {
             default->null;
         };
         if(own!=null)return own;
-        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->grave(w,s),()->nameplate(w,s),()->shear(w,s),()->chop(w,s,true),
+        Job shared=first(()->build(w,s),()->craftForProject(w,s),()->spareBed(w,s),()->workshop(w,s),()->grave(w,s),()->nameplate(w,s),()->flowers(w),()->shear(w,s),()->chop(w,s,true),
                 ()->helperPick(w,s),()->mine(w,s,true),()->sand(w,s),()->farm(w),()->bread(w,s),()->pave(w,s));
         if(shared==null&&w.hasSurplus()&&s.chests()>0&&s.freeSlots()>0&&w.ready("deposit"))return new DepositJob(w);
         return shared;
@@ -277,6 +277,14 @@ final class VillagePlanner {
             return new CraftJob(w,VillageCrafting.bed(s.woolColour()),1);
         w.cooldown("sparebed",600);
         return null;
+    }
+    /** Flowers from the store along the walls of the homes. */
+    private Job flowers(Worker w){
+        if(!AutonomousVillagesMod.CONFIG.flowers||v.activeJobs("flowers")>0||!w.ready("flowers"))return null;
+        w.cooldown("flowers",1200);
+        if(v.stock.count(x->x.is(ItemTags.SMALL_FLOWERS))+w.count(x->x.is(ItemTags.SMALL_FLOWERS))<2)return null;
+        var spots=FlowerJob.spots(v);
+        return spots.isEmpty()?null:new FlowerJob(w,spots);
     }
     /** A sign beside each home's door naming who lives there; one craft makes three. */
     private Job nameplate(Worker w,Snapshot s){

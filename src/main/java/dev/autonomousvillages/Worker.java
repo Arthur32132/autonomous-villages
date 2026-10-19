@@ -115,6 +115,7 @@ final class Worker {
             if(job==null&&night&&!atHome()&&ready("home"))start(new HomeJob(this));
             if(job==null){
                 if(!released){b.stopAll();released=true;}
+                if(profession&&!night)professionProduct(e);
                 status=v.alarm()&&!nightRest()?"прячется: тревога":night?(e.isSleeping()?"спит":"идёт спать"):profession?"работает по профессии и обновляет торговлю":"общение и отдых";
                 return;
             }
@@ -261,6 +262,21 @@ final class Worker {
         return m.getType()==EntityTypes.ZOMBIE||m.getType()==EntityTypes.ZOMBIE_VILLAGER||m.getType()==EntityTypes.HUSK||m.getType()==EntityTypes.DROWNED
                 ||m.getTarget() instanceof Villager target&&v.state.residents.contains(target.getUUID())
                 ||m instanceof Creeper creeper&&creeper.getSwellDir()>0;
+    }
+    private long productDay=-1;
+    /** At its workstation during the profession hour, a resident makes the day's product for the store. */
+    private void professionProduct(Villager e){
+        long dayNumber=v.level.getOverworldClockTime()/24000;
+        if(productDay==dayNumber)return;
+        var site=e.getBrain().getMemory(MemoryModuleType.JOB_SITE).filter(p->p.dimension().equals(v.level.dimension())).map(GlobalPos::pos).orElse(null);
+        if(site==null||site.distSqr(e.blockPosition())>9)return;
+        productDay=dayNumber;
+        var product=Professions.product(e.getVillagerData().profession(),dayNumber);
+        if(product.isEmpty())return;
+        String label=Professions.label(product);int count=product.getCount();
+        if(!bot().inventory().insert(product).isEmpty())return;
+        v.chronicle.add("profession:"+label,count);
+        v.level.sendParticles(net.minecraft.core.particles.ParticleTypes.HAPPY_VILLAGER,e.getX(),e.getY()+2.1,e.getZ(),4,.3,.2,.3,0);
     }
     private long fleeStarted;
     private boolean danger(){

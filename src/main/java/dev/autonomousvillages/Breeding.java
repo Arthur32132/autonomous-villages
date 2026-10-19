@@ -24,8 +24,10 @@ final class Breeding {
         return v.level.getPoiManager().getInSquare(h->h.is(PoiTypes.HOME),center,r,PoiManager.Occupancy.HAS_SPACE)
                 .map(p->p.getPos()).filter(v.state::contains).toList();
     }
-    /** Bread-equivalents in the store: a bread or an apple from the felled oaks feeds as much as four vegetables. */
-    int food(){return v.stock.count(s->s.is(Items.BREAD)||s.is(Items.APPLE))+v.stock.count(s->s.is(Items.CARROT)||s.is(Items.POTATO)||s.is(Items.BEETROOT))/4;}
+    /** Meals in the store (bread, apples from felled oaks, cooked fish or meat), four vegetables counting as one. */
+    static final java.util.function.Predicate<net.minecraft.world.item.ItemStack> MEAL=s->s.is(Items.BREAD)||s.is(Items.APPLE)||s.is(Items.COOKED_COD)
+            ||s.is(Items.COOKED_SALMON)||s.is(Items.COOKED_PORKCHOP)||s.is(Items.COOKED_BEEF)||s.is(Items.COOKED_MUTTON)||s.is(Items.COOKED_CHICKEN);
+    int food(){return v.stock.count(MEAL)+v.stock.count(s->s.is(Items.CARROT)||s.is(Items.POTATO)||s.is(Items.BEETROOT))/4;}
     String blocker(){
         if(v.state.residents.size()>=MAX_RESIDENTS)return "предел населения";
         if(freeBeds()<1)return "нет свободной кровати";
@@ -50,7 +52,7 @@ final class Breeding {
                 .filter(v::safeFeet).findFirst().orElse(null);
         if(crib==null)return;
         int eaten=v.stock.consume(s->s.is(Items.BREAD),3);
-        if(eaten<3)eaten+=v.stock.consume(s->s.is(Items.APPLE),3-eaten);
+        if(eaten<3)eaten+=v.stock.consume(MEAL,3-eaten);
         if(eaten<3)v.stock.consume(s->s.is(Items.CARROT)||s.is(Items.POTATO)||s.is(Items.BEETROOT),(3-eaten)*4);
         Villager baby=first.getBreedOffspring(v.level,second);
         if(baby==null)return;

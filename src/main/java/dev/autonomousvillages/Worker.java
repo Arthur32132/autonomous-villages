@@ -296,8 +296,9 @@ final class Worker {
             return false;
         }
         if(combat!=null&&!combat.completion().isDone())return true;
-        // Asleep or sheltering under a roof: running out into the dark is worse than staying put.
-        if((e.isSleeping()||job instanceof ShelterJob&&!e.level().canSeeSky(e.blockPosition()))&&e.distanceToSqr(enemy)>36){
+        // Asleep, or under a roof at night: running out into the dark is worse than staying put
+        // (rc13, seed 42: three residents killed outdoors at night while fleeing).
+        if((e.isSleeping()||(job instanceof ShelterJob||nightRest())&&!e.level().canSeeSky(e.blockPosition()))&&e.distanceToSqr(enemy)>36){
             if(!(enemy instanceof Creeper))v.raiseAlarm(this,enemy);
             return false;
         }

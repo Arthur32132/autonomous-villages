@@ -24,6 +24,10 @@ final class Chronicle {
     /** An event worth telling: recorded, and shown in chat to players near the village. */
     void announce(String message){
         event(message);
+        tell(message);
+    }
+    /** Shown in chat to players near the village, but not kept among the events. */
+    void tell(String message){
         var text=net.minecraft.network.chat.Component.literal("["+v.state.name+"] ").withStyle(net.minecraft.ChatFormatting.GOLD)
                 .append(net.minecraft.network.chat.Component.literal(message).withStyle(net.minecraft.ChatFormatting.YELLOW));
         var area=VillageDiscovery.area(v.state,64);

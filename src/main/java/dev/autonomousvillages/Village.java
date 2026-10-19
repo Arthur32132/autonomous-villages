@@ -130,6 +130,7 @@ final class Village {
         // At dusk a village short of golems calls one before the zombies come, not after.
         if(time%200==13&&Math.floorMod(level.getOverworldClockTime(),24000)>=11500&&Math.floorMod(level.getOverworldClockTime(),24000)<13000)summonGolem(time);
         if(time%6000==1234)writeChronicleBook();
+        if(time%100==61)MorningNews.tick(this);
         presentation.tick();
         if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
         if(time%200==0){

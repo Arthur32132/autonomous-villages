@@ -28,6 +28,8 @@ public final class ModConfig {
     public boolean watchtower=true;
     /** A torch in every dark bedroom, so that zombies do not spawn beside the sleepers. */
     public boolean lightHomes=true;
+    /** At sunrise, players near the village hear what it did since the last morning. */
+    public boolean morningNews=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

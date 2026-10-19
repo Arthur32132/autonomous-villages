@@ -35,6 +35,10 @@ public final class VillageState {
     public Map<UUID,Long> productDays=new LinkedHashMap<>();
     /** Game time the residents last called an iron golem to their defence. */
     public long lastGolem;
+    /** The morning the news was last told (overworld day), with the totals and population of that morning. */
+    public long newsDay=-1;
+    public Map<String,Long> newsTotals;
+    public int newsResidents=-1;
     static final int MAX_TICKET_CHUNKS=1024;
     static long footprintChunks(Bounds b){return ((long)(b.maxX>>4)-(b.minX>>4)+1)*((long)(b.maxZ>>4)-(b.minZ>>4)+1);}
     static <T> void trimOldest(Set<T> values,int limit){while(values.size()>limit)values.remove(values.iterator().next());}

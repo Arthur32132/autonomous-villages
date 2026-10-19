@@ -38,7 +38,7 @@ final class ShelterJob extends Job {
     @Override BlockPos target(){return cell;}
     @Override int timeLimit(){return 14_000;}
     @Override boolean tick(){
-        if(!Worker.nightRestWindow(v.level.getOverworldClockTime(),v.level.isDarkOutside()))return false;
+        if(!w.hiding())return false;
         Vec3 point=v.feetPosition(cell);
         // Under the same roof a step or two away is shelter enough: the exact cell is often one a route
         // cannot end in (a slab, a bed edge), and failing there sent residents back out (rc13, seed 42).

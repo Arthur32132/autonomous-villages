@@ -26,7 +26,7 @@ final class BreathingSafety {
             if(body.getAirSupply()<280){if(task!=null){bot.stopAll();task=null;}bot.actions().stop();resident.status="отдышивается у поверхности";return true;}
             active=false;task=null;target=null;rejected.clear();resident.cancel();
             // Washed out of the village: walk back before taking new work.
-            if(!resident.v.state.contains(body.blockPosition()))resident.start(new HomeJob(resident));
+            if(!resident.v.state.contains(body.blockPosition()))resident.start(new HomeJob(resident,false));
             return true;
         }
         if(!active&&body.getAirSupply()>=260)return false;

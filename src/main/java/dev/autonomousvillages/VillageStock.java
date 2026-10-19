@@ -17,9 +17,17 @@ final class VillageStock {
     private final Map<Predicate<ItemStack>,Integer> counts=new IdentityHashMap<>();
     VillageStock(Village v){this.v=v;}
 
+    /**
+     * The chests a route currently reaches. One that no route reached a moment ago (Job.unreachable)
+     * is left out for a while, so the planner neither counts its items nor its free slots: otherwise
+     * jobs are planned for goods nobody can fetch and fail at once, over and over.
+     */
     List<ChestBlockEntity> chests(){
         long now=v.level.getGameTime();
-        if(now!=cachedTick){cachedTick=now;chests=v.chests();counts.clear();}
+        if(now!=cachedTick){
+            cachedTick=now;counts.clear();
+            chests=v.chests().stream().filter(c->v.rejected.getOrDefault(c.getBlockPos().asLong(),0L)<=now).toList();
+        }
         return chests;
     }
     void invalidate(){cachedTick=Long.MIN_VALUE;}

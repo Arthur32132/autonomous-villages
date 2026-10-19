@@ -54,7 +54,7 @@ abstract class Job {
      * A store block no route reaches (a chest or workbench behind a house wall) is skipped by everyone
      * for two minutes, so jobs stop walking there one after another.
      */
-    void unreachable(BlockPos p){if(navReason.equals("unreachable")||navReason.equals("no_stand"))v.rejected.put(p.asLong(),now()+2400);}
+    void unreachable(BlockPos p){if(navReason.equals("unreachable")||navReason.equals("no_stand"))v.unreachableFrom(p,w.id);}
     boolean reachable(BlockPos p){return v.rejected.getOrDefault(p.asLong(),0L)<=now();}
     /** Chests no route reaches are left out of the search as if they had been tried. */
     private void skipUnreachable(Set<BlockPos> tried){for(var c:v.stock.chests())if(!reachable(c.getBlockPos()))tried.add(c.getBlockPos());}

@@ -26,6 +26,22 @@ final class Village {
     final VillageIndex index=new VillageIndex();
     final Reservations reservations=new Reservations();
     final Map<Long,Long> rejected=new HashMap<>();
+    private final Map<Long,Map<UUID,Long>> unreachableVotes=new HashMap<>();
+    /**
+     * A worker could not reach a chest or workbench. It is skipped by everyone for two minutes only
+     * when two different residents failed (or the only one): a single trapped resident fails to reach
+     * everything and must not hide the whole store from the village.
+     */
+    void unreachableFrom(BlockPos p,UUID worker){
+        long now=level.getGameTime();
+        var votes=unreachableVotes.computeIfAbsent(p.asLong(),k->new HashMap<>());
+        votes.values().removeIf(expiry->expiry<=now);
+        votes.put(worker,now+2400);
+        if(votes.size()>=Math.min(2,Math.max(1,workers.size()))){rejected.put(p.asLong(),now+2400);unreachableVotes.remove(p.asLong());}
+        if(unreachableVotes.size()>256)unreachableVotes.clear();
+    }
+    /** When each visiting player may next receive a gift (game time). */
+    final Map<UUID,Long> gifted=new HashMap<>();
     /** Why jobs ended early since the server started, by "kind: reason"; diagnostics only. */
     final Map<String,Integer> failures=new TreeMap<>();
     final Map<UUID,Worker> workers=new LinkedHashMap<>();
@@ -205,6 +221,10 @@ final class Village {
                     ||s.getValue(net.minecraft.world.level.block.DoorBlock.HALF)!=net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER
                     ||!s.getValue(net.minecraft.world.level.block.DoorBlock.OPEN))continue;
             if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new AABB(p).expandTowards(0,1,0).inflate(.2),net.minecraft.world.entity.LivingEntity::isAlive).isEmpty())continue;
+            // A villager or player about to pass is not shut out: closing the door in front of a
+            // resident on its way home broke its route on the doorstep every hundred ticks.
+            if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,new AABB(p).expandTowards(0,1,0).inflate(2.5),
+                    e->e.isAlive()&&(e instanceof Villager||e instanceof net.minecraft.world.entity.player.Player)).isEmpty())continue;
             door.setOpen(null,level,s,p,false);
         }
     }
@@ -247,6 +267,7 @@ final class Village {
         if(state.contains(enemy.blockPosition())){
             if(alarmUntil<now)chronicle.add("alarms",1);
             alarmUntil=now+400;
+            summonGolem(now);
             if(now>=nextBell&&!level.isDarkOutside()){
                 var hub=meetingPoint();
                 if(level.getBlockState(hub).getBlock() instanceof net.minecraft.world.level.block.BellBlock bell
@@ -257,6 +278,22 @@ final class Village {
                         &&w.body().distanceToSqr(enemy)<24*24&&w.body().hasLineOfSight(enemy)
                         &&(w.combat==null||w.combat.completion().isDone())&&w.armed())
                 .sorted(Comparator.comparingDouble(w->w.body().distanceToSqr(enemy))).limit(2).toList().forEach(w->w.defend(enemy));
+    }
+
+    private long nextGolemAttempt;
+    /**
+     * A village of five or more under attack with no iron golem nearby calls one, as frightened
+     * vanilla villagers do, at most once a day.
+     */
+    private void summonGolem(long now){
+        if(now<nextGolemAttempt||now-state.lastGolem<24000||state.residents.size()<5)return;
+        nextGolemAttempt=now+1200;
+        BlockPos hub=meetingPoint();
+        if(!level.getEntitiesOfClass(net.minecraft.world.entity.animal.golem.IronGolem.class,new AABB(hub).inflate(48),net.minecraft.world.entity.LivingEntity::isAlive).isEmpty())return;
+        net.minecraft.util.SpawnUtil.trySpawnMob(net.minecraft.world.entity.EntityTypes.IRON_GOLEM,net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED,level,hub,10,8,6,
+                net.minecraft.util.SpawnUtil.Strategy.LEGACY_IRON_GOLEM,false).ifPresent(golem->{
+            state.lastGolem=now;chronicle.add("golems",1);chronicle.announce("Жители позвали на помощь железного голема!");runtime.save();
+        });
     }
 
     // --- geometry ----------------------------------------------------------------------------------

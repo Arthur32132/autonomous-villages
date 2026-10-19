@@ -118,7 +118,9 @@ final class Projects {
         var active=unfinished.isEmpty()?null:unfinished.getFirst();
         if(active!=null){
             stage=(waiting(active)?"ждут материалы: ":"строят ")+label(active)+" "+built(active)+"/"+size(active);
-            if(unfinished.size()>=3||!unfinished.stream().allMatch(this::waiting))return;
+            // Only houses hold up the next house: a half-built watchtower never keeps a family homeless.
+            var houses=unfinished.stream().filter(b->b.kind.equals("house")).toList();
+            if(houses.size()>=3||!houses.stream().allMatch(this::waiting))return;
         }
         if(v.state.buildings.size()>=256||v.state.completedShelters>=64){stage="все проекты завершены";return;}
         int beds=v.index.beds.size();
@@ -132,7 +134,20 @@ final class Projects {
             v.state.buildings.add(house);v.state.completedShelters++;invalidate();
             v.chronicle.announce("Заложен "+label(house)+" у "+BlockPos.of(house.origin).toShortString());v.runtime.save();
             stage="заложен "+label(house);
-        }else stage="жилья хватает; копят запасы";
+        }else if(unfinished.isEmpty()&&v.state.residents.size()>=4&&tower()==null){
+            // With every family housed the village puts up a watchtower by the bell for its guards.
+            BlockPos site=findSite(TOWER,TOWER);
+            if(site==null){stage="жилья хватает; ищут место для вышки";return;}
+            var built=tower(site);v.state.buildings.add(built);invalidate();
+            v.chronicle.announce("Заложена "+label(built)+" у "+site.toShortString());v.runtime.save();
+            stage="заложена "+label(built);
+        }else if(active==null)stage="жилья хватает; копят запасы";
+    }
+    TownBuilding tower(){return v.state.buildings.stream().filter(b->b.kind.equals("tower")).findFirst().orElse(null);}
+    /** Where a guard stands on the finished watchtower's lookout, if there is one. */
+    BlockPos lookout(){
+        var t=tower();
+        return t==null||!t.completed?null:BlockPos.of(t.origin).offset(1,5,1);
     }
     TownBuilding active(){
         return v.state.buildings.stream().filter(b->!b.completed&&!b.kind.equals("native_house")).findFirst().orElse(null);
@@ -156,7 +171,7 @@ final class Projects {
         return idle>24000||idle>3000&&missing(b).keySet().stream().noneMatch(EVERYDAY::contains);
     }
     static String label(TownBuilding b){
-        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";default->b.kind;};
+        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";default->b.kind;};
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";
     }
     /** Structural blocks of the plan; decoration does not count toward progress. */
@@ -249,15 +264,19 @@ final class Projects {
             if(dx>=0&&dx<width&&dz>=0&&dz<depth){low=Math.min(low,h);high=Math.max(high,h);heights.add(h);}
         }
         if(high-low>1)return null;
-        heights.sort(null);int y=heights.get(heights.size()/2);
+        // The floor (layer 0) replaces the top layer of ground, as in a generated village: the door
+        // then opens level with the street instead of a block above it.
+        heights.sort(null);int y=heights.get(heights.size()/2)-1;
         BlockPos base=new BlockPos(x,y,z);
-        for(int dx=-2;dx<=width+1;dx++)for(int dz=-3;dz<=depth+1;dz++)for(int dy=-1;dy<=5;dy++){
+        for(int dx=-2;dx<=width+1;dx++)for(int dz=-3;dz<=depth+1;dz++)for(int dy=0;dy<=6;dy++){
             BlockPos p=base.offset(dx,dy,dz);var s=v.level.getBlockState(p);
             if(protects(p)||s.getBlock() instanceof BedBlock||s.is(Blocks.FARMLAND)||s.getBlock() instanceof CropBlock||!s.getFluidState().isEmpty()
                     ||s.is(BlockTags.LOGS)||s.getBlock() instanceof net.minecraft.world.level.block.ChestBlock||!v.state.policy.allows("build",p))return null;
             boolean inside=dx>=0&&dx<width&&dz>=0&&dz<depth;
-            if(inside&&dy>=0&&!Construction.clear(s)&&!removable(s))return null;
-            if(inside&&dy==-1&&s.isAir()&&!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP))return null;
+            // Above ground the cells must be clearable; in the ground layer a foreign block (a cobblestone
+            // street tile) simply stays as a tile of the floor.
+            if(inside&&dy>=1&&!Construction.clear(s)&&!removable(s))return null;
+            if(inside&&dy==0&&s.isAir()&&!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP))return null;
         }
         if(v.state.buildings.stream().filter(b->b.kind.equals("house")||b.kind.equals("native_house")).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
         return base;
@@ -292,7 +311,10 @@ final class Projects {
             var rotation=Blueprints.facing(design.front(),toHub);
             var footprint=Blueprints.footprint(design.size(),rotation);
             BlockPos base=siteAt(cx-footprint.getX()/2,cz-footprint.getZ()/2,footprint.getX(),footprint.getZ());
-            if(base!=null)return fromTemplate(design,base,rotation);
+            if(base==null)continue;
+            // A template whose door stands higher than layer 1 sinks further, so the door is at street level.
+            var house=fromTemplate(design,base.below(design.doorLevel()-1),rotation);
+            if(doorwayOpen(house))return house;
         }
         return null;
     }
@@ -312,6 +334,37 @@ final class Projects {
         for(BlockPos rel:t.clear()){BlockPos p=base.offset(Blueprints.turn(rel,t.size(),rotation));if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());}
         b.blocks.removeIf(p->!v.state.contains(p.position()));b.cuts.removeIf(p->!v.state.contains(BlockPos.of(p)));
         return b;
+    }
+    /**
+     * The front door opens onto two walkable cells outside the house, at the door's level or a step
+     * up or down. A door facing a lamp post or a well traps whoever stands in the doorway.
+     */
+    boolean doorwayOpen(TownBuilding b){
+        // The template's own doorstep and porch are part of its blocks, so "outside" is told by
+        // direction: the door's neighbour farther from the middle of the building.
+        double cx=b.blocks.stream().mapToInt(p->p.position().getX()).average().orElse(0),cz=b.blocks.stream().mapToInt(p->p.position().getZ()).average().orElse(0);
+        boolean anyDoor=false;
+        for(var plan:b.blocks){
+            if(!(plan.block().getBlock() instanceof DoorBlock))continue;
+            anyDoor=true;BlockPos door=plan.position();
+            Direction out=null;double best=0;
+            for(Direction d:Direction.Plane.HORIZONTAL){
+                double away=d.getStepX()*(door.getX()+.5-cx)+d.getStepZ()*(door.getZ()+.5-cz);
+                if(away>best){best=away;out=d;}
+            }
+            if(out!=null&&walkable(door.relative(out))&&walkable(door.relative(out,2)))return true;
+        }
+        return !anyDoor;
+    }
+    private boolean walkable(BlockPos feet){
+        for(int dy:new int[]{0,1,-1}){
+            BlockPos f=feet.above(dy);
+            if(!v.level.hasChunkAt(f)||protects(f)||protects(f.above()))continue;
+            var at=v.level.getBlockState(f);var head=v.level.getBlockState(f.above());var ground=v.level.getBlockState(f.below());
+            if(at.getCollisionShape(v.level,f).isEmpty()&&at.getFluidState().isEmpty()&&head.getCollisionShape(v.level,f.above()).isEmpty()
+                    &&!ground.getCollisionShape(v.level,f.below()).isEmpty()&&!VillageIndex.hazard(ground))return true;
+        }
+        return false;
     }
     /**
      * Ground cells from the door of a building toward the bell: grass and dirt on the way become a
@@ -364,6 +417,36 @@ final class Projects {
         return out;
     }
     /** A small timber cottage: log corners, plank walls with window gaps, flat roof, two beds, door and lights. */
+    static final int TOWER=5;
+    /**
+     * A watchtower: a 3×3 cobblestone shaft with a door and a ladder up the middle, a 5×5 plank
+     * lookout four blocks up with a fence railing, and torches on the railing's corners when the store
+     * has them.
+     */
+    TownBuilding tower(BlockPos base){
+        var b=new TownBuilding("tower",base);
+        var cobble=Blocks.COBBLESTONE.defaultBlockState();
+        for(int x=1;x<=3;x++)for(int z=1;z<=3;z++){
+            BlockPos floor=base.offset(x,0,z);
+            for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,cobble);}
+            b.add(floor,cobble);
+        }
+        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)for(int y=1;y<=6;y++){
+            BlockPos p=base.offset(x,y,z);if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());
+        }
+        for(int y=1;y<=3;y++)for(int x=1;x<=3;x++)for(int z=1;z<=3;z++){
+            if(x==2&&z==2||x==2&&z==1&&y<=2)continue; // the ladder shaft and the doorway
+            b.add(base.offset(x,y,z),cobble);
+        }
+        b.add(base.offset(2,1,1),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.SOUTH));
+        for(int y=1;y<=4;y++)b.add(base.offset(2,y,2),Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING,Direction.WEST));
+        // Every block is within a builder's reach from the ground around the tower.
+        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)if(x!=2||z!=2)b.add(base.offset(x,4,z),Blocks.OAK_PLANKS.defaultBlockState());
+        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)if(x==0||z==0||x==TOWER-1||z==TOWER-1)b.add(base.offset(x,5,z),Blocks.OAK_FENCE.defaultBlockState());
+        for(int[] c:new int[][]{{0,0},{0,4},{4,0},{4,4}})b.decorate(base.offset(c[0],6,c[1]),Blocks.TORCH.defaultBlockState());
+        b.blocks.removeIf(p->!v.state.contains(p.position()));
+        return b;
+    }
     TownBuilding cottage(BlockPos base){
         var b=new TownBuilding("house",base);
         int w=HOUSE_W,d=HOUSE_D;

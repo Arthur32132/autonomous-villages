@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Top-down picture of a soak village: start and end side by side, changed columns outlined.
 
-    python3 tools/soak/map.py build/soak-reports/<batch>/<seed>-<difficulty> [--scale 4] [--out village.png]
+    python3 tools/soak/map.py build/soak-reports/<batch>/<seed>-<difficulty> [--scale 4] [--out village.png] [--gif]
 """
 import argparse
 import json
@@ -69,13 +69,38 @@ def render(data, cells, heights, scale, changed=None):
     return img
 
 
+def timelapse(folder, scale, out):
+    """Every saved frame (start, every half day, end) as an animated GIF, changes since the start outlined."""
+    frames = [folder / 'map-start.json'] + sorted(folder.glob('map-t*.json')) + [folder / 'map-end.json']
+    frames = [f for f in frames if f.exists()]
+    start = load(frames[0])
+    images = []
+    for frame in frames:
+        data, cells, heights = load(frame)
+        changed = {i for i, (a, b) in enumerate(zip(start[1], cells)) if start[0]['palette'][a] != data['palette'][b]}
+        img = render(data, cells, heights, scale, changed)
+        label = 'start' if frame.name == 'map-start.json' else 'end' if frame.name == 'map-end.json' else \
+            f"day {int(frame.stem[5:]) / 24000:.1f}"
+        draw = ImageDraw.Draw(img)
+        draw.rectangle([0, 0, 90, 16], fill=(0, 0, 0))
+        draw.text((4, 2), f'{label}  villagers {len(data.get("villagers", []))}', fill=(255, 255, 255))
+        images.append(img)
+    target = Path(out) if out else folder / 'village-timelapse.gif'
+    images[0].save(target, save_all=True, append_images=images[1:], duration=900, loop=0)
+    print(f'{target}: {len(images)} frames')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('report')
     parser.add_argument('--scale', type=int, default=4)
     parser.add_argument('--out', default=None)
+    parser.add_argument('--gif', action='store_true', help='timelapse of every saved frame instead of a before/after picture')
     args = parser.parse_args()
     folder = Path(args.report)
+    if args.gif:
+        timelapse(folder, args.scale, args.out)
+        return
     start = load(folder / 'map-start.json')
     end = load(folder / 'map-end.json')
     changed = {i for i, (a, b) in enumerate(zip(start[1], end[1])) if start[0]['palette'][a] != end[0]['palette'][b]}

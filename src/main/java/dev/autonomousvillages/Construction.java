@@ -28,10 +28,10 @@ final class Construction {
         if(step.state().is(BlockTags.WOODEN_SLABS))return actual.is(BlockTags.WOODEN_SLABS);
         if(step.state().is(BlockTags.WOODEN_FENCES))return actual.is(BlockTags.WOODEN_FENCES);
         if(step.state().is(BlockTags.LOGS))return actual.is(BlockTags.LOGS);
-        if(masonry(step.state())&&actual.is(Blocks.COBBLESTONE))return true;
-        if(stoneStairs(step.state())&&actual.is(Blocks.COBBLESTONE_STAIRS))return true;
-        if(stoneSlab(step.state())&&actual.is(Blocks.COBBLESTONE_SLAB))return true;
-        if(step.state().is(BlockTags.WALLS)&&actual.is(Blocks.COBBLESTONE_WALL))return true;
+        if((step.state().is(Blocks.COBBLESTONE)||masonry(step.state()))&&rubble(actual))return true;
+        if(stoneStairs(step.state())&&(actual.is(Blocks.COBBLESTONE_STAIRS)||actual.is(Blocks.SANDSTONE_STAIRS)))return true;
+        if(stoneSlab(step.state())&&(actual.is(Blocks.COBBLESTONE_SLAB)||actual.is(Blocks.SANDSTONE_SLAB)))return true;
+        if(step.state().is(BlockTags.WALLS)&&(actual.is(Blocks.COBBLESTONE_WALL)||actual.is(Blocks.SANDSTONE_WALL)))return true;
         if(step.state().is(BlockTags.WOODEN_TRAPDOORS))return actual.is(BlockTags.WOODEN_TRAPDOORS);
         if(step.state().is(BlockTags.WOODEN_PRESSURE_PLATES))return actual.is(BlockTags.WOODEN_PRESSURE_PLATES);
         if(step.state().is(BlockTags.WOODEN_BUTTONS))return actual.is(BlockTags.WOODEN_BUTTONS);
@@ -65,10 +65,10 @@ final class Construction {
                 :step.state().is(BlockTags.WOODEN_SLABS)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_SLABS)
                 :step.state().is(BlockTags.WOODEN_FENCES)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_FENCES)
                 :step.state().is(BlockTags.LOGS)?s->s.is(net.minecraft.tags.ItemTags.LOGS)
-                :masonry(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE)
-                :stoneStairs(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE_STAIRS)
-                :stoneSlab(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE_SLAB)
-                :step.state().is(BlockTags.WALLS)?s->s.is(step.item())||s.is(Items.COBBLESTONE_WALL)
+                :step.state().is(Blocks.COBBLESTONE)||masonry(step.state())?s->s.is(step.item())||VillageCrafting.COBBLE.test(s)||VillageCrafting.RUBBLE.test(s)
+                :stoneStairs(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE_STAIRS)||s.is(Items.SANDSTONE_STAIRS)
+                :stoneSlab(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE_SLAB)||s.is(Items.SANDSTONE_SLAB)
+                :step.state().is(BlockTags.WALLS)?s->s.is(step.item())||s.is(Items.COBBLESTONE_WALL)||s.is(Items.SANDSTONE_WALL)
                 :step.state().is(BlockTags.WOODEN_TRAPDOORS)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_TRAPDOORS)
                 :step.state().is(BlockTags.WOODEN_PRESSURE_PLATES)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_PRESSURE_PLATES)
                 :step.state().is(BlockTags.WOODEN_BUTTONS)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_BUTTONS)
@@ -80,6 +80,10 @@ final class Construction {
             ||s.is(Blocks.PACKED_ICE)||s.is(Blocks.BLUE_ICE)
             ||s.is(Blocks.BRICKS)||s.is(Blocks.SANDSTONE)||s.is(Blocks.CUT_SANDSTONE)||s.is(Blocks.SMOOTH_SANDSTONE)
             ||s.is(Blocks.RED_SANDSTONE)||s.is(Blocks.CUT_RED_SANDSTONE)||s.is(Blocks.SMOOTH_RED_SANDSTONE)||s.is(Blocks.SNOW_BLOCK);}
+    /** Any plain stone a cobblestone plan accepts: mixed rubble makes a rustic foundation. */
+    static boolean rubble(BlockState s){return s.is(Blocks.COBBLESTONE)||s.is(Blocks.COBBLED_DEEPSLATE)||s.is(Blocks.BLACKSTONE)||s.is(Blocks.ANDESITE)
+            ||s.is(Blocks.DIORITE)||s.is(Blocks.GRANITE)||s.is(Blocks.TUFF)||s.is(Blocks.STONE)||s.is(Blocks.MOSSY_COBBLESTONE)||s.is(Blocks.DEEPSLATE)
+            ||s.is(Blocks.SANDSTONE)||s.is(Blocks.RED_SANDSTONE)||s.is(Blocks.SMOOTH_SANDSTONE)||s.is(Blocks.CUT_SANDSTONE);}
     static boolean stoneStairs(BlockState s){return s.is(BlockTags.STAIRS)&&!s.is(BlockTags.WOODEN_STAIRS);}
     static boolean stoneSlab(BlockState s){return s.is(BlockTags.SLABS)&&!s.is(BlockTags.WOODEN_SLABS);}
     @SuppressWarnings({"rawtypes","unchecked"})
@@ -102,11 +106,15 @@ final class Construction {
                     || !v.level.getBlockState(second.below()).isFaceSturdy(v.level,second.below(),Direction.UP)) return false;
         } else if (step.state().getBlock() instanceof DoorBlock) { second=p.above(); secondState=step.state().setValue(DoorBlock.HALF,DoubleBlockHalf.UPPER); }
         if (second != null && (!v.state.contains(second)||!v.level.getBlockState(second).isAir())) return false;
-        if (intersectsActor(v,b,step) || !v.level.getEntities(b.entity(),new AABB(p),e->e.isAlive()&&e.isPickable()).isEmpty()) return false;
+        // Fences, walls, panes and stairs join their neighbours as if a player had placed them;
+        // the joined shape is the one that must not cut into the builder.
+        BlockState placed=step.state().getBlock() instanceof CrossCollisionBlock||step.state().getBlock() instanceof WallBlock||step.state().getBlock() instanceof StairBlock
+                ?Block.updateFromNeighbourShapes(step.state(),v.level,p):step.state();
+        if (intersectsActor(v,b,new Step(p,placed,step.item())) || !v.level.getEntities(b.entity(),new AABB(p),e->e.isAlive()&&e.isPickable()).isEmpty()) return false;
         int selected=Supplies.find(b,s->s.is(step.item()));if(selected>=0)b.inventory().select(selected);
         if (!Supplies.consume(b,step.item(),cost(step))) return false;
         // No callbacks or yielding between item debit and the two vanilla block writes.
-        v.level.setBlock(p,step.state(),second == null ? 3 : 18);
+        v.level.setBlock(p,placed,second == null ? 3 : 18);
         v.town.invalidate();
         if (second != null) { v.level.setBlock(second,secondState,18); v.level.updateNeighborsAt(p,step.state().getBlock()); v.level.updateNeighborsAt(second,secondState.getBlock()); }
         if (step.item()==Items.CHEST) {v.state.storage.add(p.asLong());v.stock.invalidate();v.moved();}

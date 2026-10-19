@@ -163,6 +163,8 @@ public final class SoakProbe implements ModInitializer {
         long elapsed=level.getGameTime()-startGame;
         if(elapsed>0&&elapsed%intConfig("sampleTicks",1200)==0)sample();
         if(elapsed>0&&elapsed%intConfig("censusTicks",6000)==0)lastCensus=census();
+        // Frames for a timelapse of the village (tools/soak/map.py --gif), twice a game day.
+        if(elapsed>0&&elapsed%intConfig("mapTicks",12000)==0)writeMap(String.format("map-t%06d.json",elapsed));
         if(elapsed>=(long)(doubleConfig("days",3)*24000))finish(true,"completed");
     }
 
@@ -255,6 +257,12 @@ public final class SoakProbe implements ModInitializer {
         stock.addProperty("wheat",s.wheat());stock.addProperty("wool",s.wool());stock.addProperty("iron",s.iron());stock.addProperty("torches",s.torches());
         stock.addProperty("chests",s.chests());stock.addProperty("freeSlots",s.freeSlots());stock.addProperty("table",s.table()!=null);stock.addProperty("furnace",s.furnace()!=null);
         out.add("stock",stock);out.add("missing",GSON.toJsonTree(s.missing()));
+        // What fills the store: the fifteen most plentiful items in the village's shared chests.
+        var items=new TreeMap<String,Integer>();
+        for(var c:village.stock.chests())for(int i=0;i<c.getContainerSize();i++){var it=c.getItem(i);if(!it.isEmpty())items.merge(BuiltInRegistries.ITEM.getKey(it.getItem()).getPath(),it.getCount(),Integer::sum);}
+        var top=new JsonObject();
+        items.entrySet().stream().sorted(Map.Entry.<String,Integer>comparingByValue().reversed()).limit(15).forEach(e->top.addProperty(e.getKey(),e.getValue()));
+        out.add("storeItems",top);
         out.addProperty("growth",village.breeding.blocker());
         var people=new com.google.gson.JsonArray();
         for(var w:village.workers.values()){

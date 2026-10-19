@@ -50,6 +50,10 @@ public final class ModConfig {
     public boolean plaza=true;
     /** Particles and sounds only: smoke over lived-in homes in the evening, fireflies at night, residents greeting a player and frowning at a failed task. */
     public boolean ambience=true;
+    /** A book and quill handed to a resident (sneaking) becomes the village ledger, which is current whenever opened. */
+    public boolean ledger=true;
+    /** A stack handed to a resident (sneaking) goes to the store; the village remembers it in trades and honours a generous donor. */
+    public boolean donations=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

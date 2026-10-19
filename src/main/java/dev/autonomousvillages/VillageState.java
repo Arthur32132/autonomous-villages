@@ -44,6 +44,10 @@ public final class VillageState {
     public Long cemetery;
     /** Signs beside home doors (position) and the building each names (origin). */
     public Map<Long,Long> nameplates=new LinkedHashMap<>();
+    /** Items each player has handed to the store, their names as last seen, and who was made an honorary resident. */
+    public Map<UUID,Long> donations=new LinkedHashMap<>();
+    public Map<UUID,String> donorNames=new LinkedHashMap<>();
+    public Set<UUID> honoured=new LinkedHashSet<>();
     static final int MAX_TICKET_CHUNKS=1024;
     static long footprintChunks(Bounds b){return ((long)(b.maxX>>4)-(b.minX>>4)+1)*((long)(b.maxZ>>4)-(b.minZ>>4)+1);}
     static <T> void trimOldest(Set<T> values,int limit){while(values.size()>limit)values.remove(values.iterator().next());}
@@ -69,6 +73,13 @@ public final class VillageState {
         if(newsTotals!=null)newsTotals.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null);
         if(graves==null)graves=new ArrayList<>();
         if(nameplates==null)nameplates=new LinkedHashMap<>();
+        if(donations==null)donations=new LinkedHashMap<>();
+        if(donorNames==null)donorNames=new LinkedHashMap<>();
+        if(honoured==null)honoured=new LinkedHashSet<>();
+        donations.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||e.getValue()<0);
+        while(donations.size()>256)donations.remove(donations.keySet().iterator().next());
+        donorNames.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||e.getValue().length()>32||!donations.containsKey(e.getKey()));
+        honoured.removeIf(Objects::isNull);trimOldest(honoured,256);
         nameplates.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||!contains(BlockPos.of(e.getKey())));
         while(nameplates.size()>256)nameplates.remove(nameplates.keySet().iterator().next());
         graves.removeIf(g->g==null||g.name==null);

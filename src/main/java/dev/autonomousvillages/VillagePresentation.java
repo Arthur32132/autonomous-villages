@@ -52,7 +52,7 @@ final class VillagePresentation {
         }
         return NAMES[Math.floorMod(id.getLeastSignificantBits()^id.getMostSignificantBits(),NAMES.length)];
     }
-    private static final Map<String,String> NEEDS=Map.ofEntries(Map.entry("planks","доски"),Map.entry("logs","брёвна"),Map.entry("cobblestone","булыжник"),
+    static final Map<String,String> NEEDS=Map.ofEntries(Map.entry("planks","доски"),Map.entry("logs","брёвна"),Map.entry("cobblestone","булыжник"),
             Map.entry("stairs","ступени"),Map.entry("slab","плиты"),Map.entry("door","двери"),Map.entry("bed","кровати"),Map.entry("torch","факелы"),
             Map.entry("fence","заборы"),Map.entry("chest","сундук"),Map.entry("crafting_table","верстак"),Map.entry("furnace","печь"));
     private String boardText="";

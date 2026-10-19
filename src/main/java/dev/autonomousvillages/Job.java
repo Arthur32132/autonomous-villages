@@ -16,6 +16,13 @@ import net.minecraft.world.phys.Vec3;
  */
 abstract class Job {
     static final NavigationPolicy TRAVEL=new NavigationPolicy(false,false,true,true,32_000,1024,32,200,2);
+    /**
+     * A few steps to a stand by the work: when the cell is not reachable around the corner, the library
+     * widens its world capture up to the policy radius, and a 32-block capture shared by every resident
+     * kept builders standing for a minute or more before each block (soak 8675309: "строит" with the
+     * route still computing for 1000-1900 ticks). Another stand is tried instead.
+     */
+    static final NavigationPolicy NEAR=new NavigationPolicy(false,false,true,true,32_000,1024,16,200,2);
     final Worker w;
     final Village v;
     final long started;
@@ -110,7 +117,9 @@ abstract class Job {
             stand=v.stand(target,body().position(),reach,sight,rejected);
             if(stand==null){if(navReason.isEmpty())navReason="no_stand";return State.FAILED;}
             attempts++;progress.reset();
-            nav=bot().navigator().goTo(new NavigationGoal.PositionGoal(v.feetPosition(stand),.35),TRAVEL);
+            var feet=v.feetPosition(stand);
+            boolean near=Math.max(Math.abs(feet.x-body().getX()),Math.abs(feet.z-body().getZ()))<=10;
+            nav=bot().navigator().goTo(new NavigationGoal.PositionGoal(feet,.35),near?NEAR:TRAVEL);
             return State.MOVING;
         }
         private State finishEarly(){nav.cancel();nav=null;return State.ARRIVED;}

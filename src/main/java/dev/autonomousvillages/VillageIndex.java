@@ -12,8 +12,11 @@ import net.minecraft.world.level.block.state.BlockState;
 /** Incremental loaded-only survey. At most 12 columns (360 blocks) per village/tick. */
 final class VillageIndex {
     final Set<BlockPos> crops = new LinkedHashSet<>(), soil = new LinkedHashSet<>(), trees = new LinkedHashSet<>(),
-            stone = new LinkedHashSet<>(), ore = new LinkedHashSet<>(), tables = new LinkedHashSet<>(), grass = new LinkedHashSet<>(),sand=new LinkedHashSet<>(),farmSites=new LinkedHashSet<>();
+            stone = new LinkedHashSet<>(), ore = new LinkedHashSet<>(), tables = new LinkedHashSet<>(), grass = new LinkedHashSet<>(),sand=new LinkedHashSet<>(),farmSites=new LinkedHashSet<>(),
+            hazards=new LinkedHashSet<>();
     List<BlockPos> beds = List.of();
+    /** Ore seen next to the village staircase mine: reachable down the stairs at any depth. */
+    final Set<BlockPos> shaftOre = new LinkedHashSet<>();
     private int cursor;
     private int localCursor;
     private List<BlockPos> residents=List.of();
@@ -32,16 +35,21 @@ final class VillageIndex {
                 x=r.getX()+offset.getX();z=r.getZ()+offset.getZ();
             }else cursor++;
             BlockPos column = new BlockPos(x, state.y, z);
-            if (!state.contains(column) || !level.hasChunkAt(column)) continue;
+            // Trees count in the outskirts too; everything else only inside the footprint.
+            boolean inside=state.contains(column);
+            if (!state.nearby(column) || !level.hasChunkAt(column)) continue;
             int surface = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
             for (int y = Math.max(level.getMinY(), surface - 24); y <= Math.min(level.getMaxY()-1, surface + 5); y++) {
-                BlockPos p = new BlockPos(x, y, z); if (!state.contains(p)) continue;
+                BlockPos p = new BlockPos(x, y, z);
                 BlockState b = level.getBlockState(p);
+                update(trees, p, state.fellingTrees.contains(p.asLong()) || VillageIndex.naturalSoil(level.getBlockState(p.below())) && naturalLog(level, p));
+                if (!inside || !state.contains(p)) continue;
                 update(crops, p, b.getBlock() instanceof CropBlock);
                 update(soil, p.above(), b.is(Blocks.FARMLAND));
-                update(trees, p, state.fellingTrees.contains(p.asLong()) || VillageIndex.naturalSoil(level.getBlockState(p.below())) && naturalLog(level, p));
                 update(stone, p, b.is(Blocks.STONE) && exposed(level, p));
                 update(sand,p,b.is(Blocks.SAND)&&exposed(level,p));
+                // Only the top of a powder snow drift is a trap; what lies under it is covered once the top is packed.
+                update(hazards,p,b.is(Blocks.POWDER_SNOW)&&!level.getBlockState(p.above()).is(Blocks.POWDER_SNOW)&&!level.getBlockState(p.above()).isRedstoneConductor(level,p.above()));
                 update(ore, p, oreResource(b) && exposed(level, p));
                 update(tables, p, b.is(Blocks.CRAFTING_TABLE));
                 update(grass, p, b.is(Blocks.SHORT_GRASS) || b.is(Blocks.TALL_GRASS));

@@ -9,12 +9,12 @@ import net.minecraft.world.phys.*;
 /** Interrupt work and swim to actual breathable space; vanilla alone restores the air supply. */
 final class BreathingSafety {
     private static final NavigationPolicy SURFACE=new NavigationPolicy(false,false,true,true,32_000,1024,20,200,0);
-    private final Resident resident;
+    private final Worker resident;
     private final Set<BlockPos> rejected=new HashSet<>();
     private NavigationTask task;
     private BlockPos target;
     private boolean active;
-    BreathingSafety(Resident resident){this.resident=resident;}
+    BreathingSafety(Worker resident){this.resident=resident;}
     boolean tick(){
         var body=resident.body();var bot=resident.bot();
         boolean submerged=body.isEyeInFluid(FluidTags.WATER);
@@ -25,7 +25,8 @@ final class BreathingSafety {
             if(task!=null&&!task.completion().isDone()&&target!=null&&body.getY()<target.getY()-.4)return true;
             if(body.getAirSupply()<280){if(task!=null){bot.stopAll();task=null;}bot.actions().stop();resident.status="отдышивается у поверхности";return true;}
             active=false;task=null;target=null;rejected.clear();resident.cancel();
-            if(!resident.v.state.contains(body.blockPosition()))TerrainRecovery.start(resident,resident.v.meetingPoint());
+            // Washed out of the village: walk back before taking new work.
+            if(!resident.v.state.contains(body.blockPosition()))resident.start(new HomeJob(resident));
             return true;
         }
         if(!active&&body.getAirSupply()>=260)return false;
@@ -35,9 +36,7 @@ final class BreathingSafety {
         if(task!=null&&task.status()!=NavigationStatus.SUCCESS&&target!=null)rejected.add(target);
         target=findAir();task=null;
         if(target!=null){
-            resident.assign("air",target);
             task=bot.navigator().goTo(new NavigationGoal.PositionGoal(Vec3.atBottomCenterOf(target),.3),SURFACE);
-            resident.navigation=task;
         }else bot.actions().setMovement(0,0,true,false,false);
         return true;
     }

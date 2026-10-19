@@ -153,6 +153,7 @@ public final class SoakProbe implements ModInitializer {
         for(var v:villagers()){seen.add(v.getUUID());initial.add(v.getUUID());lastPos.put(v.getUUID(),v.position());}
         startVillagers=initial.size();startBeds=beds(PoiManager.Occupancy.ANY);
         startCensus=census();lastCensus=startCensus;
+        writeMap("map-start.json");
         startGame=level.getGameTime();lastSampleGame=startGame;runNanos=System.nanoTime();lastSampleNanos=runNanos;
         try{timeline=Files.newBufferedWriter(Path.of(config.getProperty("timeline","soak-timeline.jsonl")),StandardCharsets.UTF_8);}catch(IOException error){throw new UncheckedIOException(error);}
         stage=Stage.RUN;server.tickRateManager().setTickRate((float)doubleConfig("tickRate",400));
@@ -216,13 +217,21 @@ public final class SoakProbe implements ModInitializer {
         line.addProperty("sleeping",sleeping);line.addProperty("idle",idle);
         line.addProperty("beds",beds(PoiManager.Occupancy.ANY));line.addProperty("births",births.size());line.addProperty("deaths",deaths.size());
         line.add("mod",modView());
+        var m=dev.navigationai.NavigationAiMod.runtime(server).metrics();
+        var nav=new JsonObject();
+        nav.addProperty("snapshots",m.snapshots());nav.addProperty("snapshotMs",Math.round(m.averageSnapshotMillis()*100)/100.0);
+        nav.addProperty("searches",m.pathSearchesCompleted());nav.addProperty("searchMs",Math.round(m.averagePathSearchMillis()*100)/100.0);
+        nav.addProperty("submitted",m.pathSearchesSubmitted());nav.addProperty("rejected",m.pathSearchesRejected());nav.addProperty("cancelled",m.pathSearchesCancelled());
+        nav.addProperty("backpressure",m.backpressureDeferrals());nav.addProperty("nodeBudget",m.nodeBudgetDeferrals());nav.addProperty("replans",m.replans());
+        nav.addProperty("queued",m.queuedSearches());nav.addProperty("active",m.activeSearches());nav.addProperty("botTickMs",Math.round(m.averageTickMillis()*100)/100.0);
+        line.add("nav",nav);
         try{timeline.write(LINE.toJson(line));timeline.write('\n');timeline.flush();}catch(IOException error){throw new UncheckedIOException(error);}
         log("day="+line.get("day")+" tps="+line.get("tps")+" villagers="+villagers.size()+" beds="+line.get("beds")+" births="+births.size()+" deaths="+deaths.size()+" idle="+idle);
     }
     /** Implementation-specific view of the mod. Kept in one place so a rewrite only touches this method. */
     static Map<UUID,String> jobs(){
         var out=new HashMap<UUID,String>();var village=village();if(village==null)return out;
-        for(var r:village.workers.values())out.put(r.id,r.job==null?"none":r.job);
+        for(var w:village.workers.values())out.put(w.id,w.job==null?"none":w.job.kind());
         return out;
     }
     static JsonObject modView(){
@@ -230,12 +239,36 @@ public final class SoakProbe implements ModInitializer {
         if(village==null){out.addProperty("claimed",false);return out;}
         out.addProperty("stage",village.town.stage);out.addProperty("problem",village.problem);
         out.addProperty("residents",village.state.residents.size());out.addProperty("workers",village.workers.size());
-        var histogram=new TreeMap<String,Integer>();for(var r:village.workers.values())histogram.merge(r.job==null?"none":r.job,1,Integer::sum);
-        out.add("jobs",GSON.toJsonTree(histogram));
+        var kinds=new TreeMap<String,Integer>();var statuses=new TreeMap<String,Integer>();var failures=new TreeMap<String,Integer>();
+        for(var w:village.workers.values()){
+            kinds.merge(w.job==null?"none":w.job.kind(),1,Integer::sum);statuses.merge(w.status,1,Integer::sum);
+            if(!w.lastFailure.isEmpty())failures.merge(w.lastFailure,1,Integer::sum);
+        }
+        out.add("jobs",GSON.toJsonTree(kinds));out.add("statuses",GSON.toJsonTree(statuses));out.add("lastFailures",GSON.toJsonTree(failures));
+        out.add("failures",GSON.toJsonTree(village.failures));
         int buildings=0,completed=0,planned=0,built=0;
-        for(var b:village.state.buildings){if(b.kind.equals("native_house"))continue;buildings++;if(b.completed)completed++;planned+=b.blocks.size();built+=b.built(village);}
+        for(var b:village.state.buildings){if(b.kind.equals("native_house"))continue;buildings++;if(b.completed)completed++;planned+=village.town.size(b);built+=village.town.built(b);}
         out.addProperty("projects",buildings);out.addProperty("projectsCompleted",completed);out.addProperty("projectBlocks",built+"/"+planned);
-        out.addProperty("orders",village.state.orders.size());
+        var s=village.planner.snapshot();
+        var stock=new JsonObject();
+        stock.addProperty("planks",s.planks());stock.addProperty("logs",s.logs());stock.addProperty("cobble",s.cobble());stock.addProperty("bread",s.bread());
+        stock.addProperty("wheat",s.wheat());stock.addProperty("wool",s.wool());stock.addProperty("iron",s.iron());stock.addProperty("torches",s.torches());
+        stock.addProperty("chests",s.chests());stock.addProperty("freeSlots",s.freeSlots());stock.addProperty("table",s.table()!=null);stock.addProperty("furnace",s.furnace()!=null);
+        out.add("stock",stock);out.add("missing",GSON.toJsonTree(s.missing()));
+        out.addProperty("growth",village.breeding.blocker());
+        var people=new com.google.gson.JsonArray();
+        for(var w:village.workers.values()){
+            var b=w.bot();if(b==null)continue;
+            var row=new JsonObject();
+            row.addProperty("name",village.presentation.personName(w.id));row.addProperty("role",village.role(w.id));
+            row.addProperty("job",w.job==null?"none":w.job.kind());row.addProperty("age",w.job==null?0:level.getGameTime()-w.job.started);
+            row.addProperty("status",w.status);row.addProperty("nav",String.valueOf(b.navigator().status()));
+            row.addProperty("pos",b.entity().blockPosition().toShortString());
+            if(w.job!=null&&w.job.target()!=null)row.addProperty("target",w.job.target().toShortString());
+            people.add(row);
+        }
+        out.add("workers",people);
+        out.add("chronicle",GSON.toJsonTree(village.state.chronicle.totals));
         return out;
     }
 
@@ -280,6 +313,46 @@ public final class SoakProbe implements ModInitializer {
         return "other";
     }
     /** Surface blocks by category plus the content of every chest in the area. */
+    /** Runs "/avillage <args>" with server permissions and returns what it printed. */
+    static String command(String args){
+        var out=new StringBuilder();
+        var sink=new net.minecraft.commands.CommandSource(){
+            public void sendSystemMessage(net.minecraft.network.chat.Component message){out.append(message.getString()).append('\n');}
+            public boolean acceptsSuccess(){return true;}
+            public boolean acceptsFailure(){return true;}
+            public boolean shouldInformAdmins(){return false;}
+        };
+        try{server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withSource(sink),"avillage "+args);}
+        catch(RuntimeException error){out.append("EXCEPTION ").append(error);}
+        return out.toString();
+    }
+    /** Top block of every column in the area (palette + indices + heights) and villager positions, for map.py. */
+    static void writeMap(String file){
+        try{
+            var palette=new LinkedHashMap<String,Integer>();int w=maxX-minX+1,d=maxZ-minZ+1;
+            var cells=new StringBuilder();var heights=new StringBuilder();
+            for(int z=minZ;z<=maxZ;z++)for(int x=minX;x<=maxX;x++){
+                int y=level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,x,z)-1;
+                var state=level.getBlockState(new BlockPos(x,y,z));
+                String id=BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+                int index=palette.computeIfAbsent(id,k->palette.size());
+                cells.append(index).append(',');heights.append(y).append(',');
+            }
+            var out=new JsonObject();out.addProperty("minX",minX);out.addProperty("minZ",minZ);out.addProperty("width",w);out.addProperty("depth",d);
+            out.add("palette",GSON.toJsonTree(palette.keySet()));out.addProperty("cells",cells.toString());out.addProperty("heights",heights.toString());
+            var people=new com.google.gson.JsonArray();
+            for(var v:villagers()){var row=new com.google.gson.JsonArray();row.add(v.getX());row.add(v.getZ());row.add(v.isBaby());people.add(row);}
+            out.add("villagers",people);
+            var village=village();
+            if(village!=null){
+                var bell=village.meetingPoint();var hub=new com.google.gson.JsonArray();hub.add(bell.getX());hub.add(bell.getZ());out.add("bell",hub);
+                var projects=new com.google.gson.JsonArray();
+                for(var b:village.state.buildings)if(!b.kind.equals("native_house")){var o=BlockPos.of(b.origin);var row=new com.google.gson.JsonArray();row.add(o.getX());row.add(o.getZ());row.add(b.kind+" "+b.design);row.add(b.completed);projects.add(row);}
+                out.add("projects",projects);
+            }
+            Files.writeString(Path.of(file),GSON.toJson(out),StandardCharsets.UTF_8);
+        }catch(IOException|RuntimeException error){log("map failed: "+error);}
+    }
     static JsonObject census(){
         long started=System.nanoTime();
         var blocks=new TreeMap<String,Integer>();var stock=new TreeMap<String,Integer>();int columns=0;
@@ -327,6 +400,7 @@ public final class SoakProbe implements ModInitializer {
                 summary.addProperty("avgTps",tpsSamples==0?0:Math.round(tpsSum/tpsSamples*10)/10.0);
                 summary.addProperty("runRealSeconds",Math.round((System.nanoTime()-runNanos)/1e7)/100.0);
                 var endCensus=census();var villagers=villagers();
+                writeMap("map-end.json");
                 var start=new JsonObject();start.addProperty("villagers",startVillagers);start.addProperty("beds",startBeds);start.add("census",startCensus);
                 var end=new JsonObject();end.addProperty("villagers",villagers.size());end.addProperty("beds",beds(PoiManager.Occupancy.ANY));
                 end.addProperty("occupiedBeds",beds(PoiManager.Occupancy.IS_OCCUPIED));end.add("census",endCensus);
@@ -353,6 +427,10 @@ public final class SoakProbe implements ModInitializer {
                 summary.add("births",births);summary.add("deaths",deaths);
                 summary.add("modFinal",modView());
                 try{summary.addProperty("modStatus",AutonomousVillagesMod.runtime(server).status(null));}catch(RuntimeException ignored){}
+                // Player commands as an operator would type them; the last one releases the village.
+                var commands=new JsonObject();
+                for(String command:List.of("status Soak","plan Soak","chronicle Soak","chronicle Soak 2","release Soak","status"))commands.addProperty(command,command(command));
+                summary.add("commands",commands);
             }
         }catch(Throwable error){summary.addProperty("summaryError",error.toString());}
         stage=Stage.DONE;

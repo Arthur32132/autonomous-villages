@@ -9,7 +9,6 @@ final class ForestWork {
     static List<Long> remaining(Village v,BlockPos base){
         var work=v.state.treeWork.get(base.asLong());
         if(work==null){
-            if(!v.state.rememberWorksite(base.asLong()))return new ArrayList<>();
             BlockPos seed=base;
             for(int dy=0;dy<32;dy++)if(v.level.getBlockState(base.above(dy)).is(BlockTags.LOGS)){seed=base.above(dy);break;}
             var todo=new ArrayDeque<BlockPos>();var seen=new HashSet<Long>();var found=new ArrayList<Long>();todo.add(seed);
@@ -25,6 +24,6 @@ final class ForestWork {
         work.sort(Comparator.comparingInt(p->BlockPos.of(p).getY()));return work;
     }
     static BlockPos next(Village v,BlockPos base){var left=remaining(v,base);return left.isEmpty()?null:BlockPos.of(left.getFirst());}
-    static void complete(Village v,BlockPos base){if(v.state.fellingTrees.contains(base.asLong()))ManagedLand.felled(v,base);v.state.treeWork.remove(base.asLong());v.state.fellingTrees.remove(base.asLong());
+    static void complete(Village v,BlockPos base){v.state.treeWork.remove(base.asLong());v.state.fellingTrees.remove(base.asLong());
         if(Construction.clear(v.level.getBlockState(base)))v.state.reforestation.add(base.asLong());v.runtime.save();}
 }

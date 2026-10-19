@@ -12,38 +12,17 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
 }
 sourceSets {
-    validation {
-        java.srcDir('tools/validation/java')
-        resources.srcDir('tools/validation/resources')
-        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
-        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
-    }
     soak {
         java.srcDir('tools/soak/java')
         resources.srcDir('tools/soak/resources')
         compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
         runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
     }
-    clientValidation {
-        java.srcDir('tools/client-validation/java')
-        resources.srcDir('tools/client-validation/resources')
-        compileClasspath += sourceSets.client.compileClasspath + sourceSets.main.output
-    }
-}
-tasks.register('validationJar', Jar) {
-    dependsOn tasks.validationClasses
-    from sourceSets.validation.output
-    archiveBaseName = 'autonomous-villages-validation'
 }
 tasks.register('soakJar', Jar) {
     dependsOn tasks.soakClasses
     from sourceSets.soak.output
     archiveBaseName = 'autonomous-villages-soak'
-}
-tasks.register('clientValidationJar', Jar) {
-    dependsOn tasks.clientValidationClasses
-    from sourceSets.clientValidation.output
-    archiveBaseName = 'autonomous-villages-client-validation'
 }
 processResources {
     inputs.property 'version', project.version

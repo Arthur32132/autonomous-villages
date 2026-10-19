@@ -305,7 +305,10 @@ final class Village {
      */
     void raiseAlarm(Worker caller,Monster enemy){
         long now=level.getGameTime();if(now<nextAlarm)return;nextAlarm=now+40;
-        if(state.contains(enemy.blockPosition())){
+        // Only a monster on the village's own ground: one in water or high on a mountainside (seen from
+        // a mine up there) cannot come down to the houses, yet sent every unarmed resident home again
+        // and again for as long as someone looked at it.
+        if(state.contains(enemy.blockPosition())&&!enemy.isInWater()&&Math.abs(enemy.getY()-state.y)<=10){
             if(alarmUntil<now)chronicle.add("alarms",1);
             alarmUntil=now+400;
             summonGolem(now);

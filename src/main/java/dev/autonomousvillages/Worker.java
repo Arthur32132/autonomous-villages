@@ -107,7 +107,10 @@ final class Worker {
 
         long day=Math.floorMod(v.level.getOverworldClockTime(),24_000);
         // During an alarm the unarmed take cover as at night; the armed keep their posts.
-        boolean night=nightRest()||v.alarm()&&!armed();
+        boolean night=hiding();
+        // By day a roof already overhead is cover enough: walking across the village to the own bed
+        // and back out after every alarm kept residents going in and out of houses.
+        boolean covered=!nightRest()&&ShelterJob.indoor(v,e.blockPosition());
         boolean social=day>=socialStart()&&day<socialStart()+1000;
         boolean profession=day>=professionStart()&&day<professionStart()+600
                 &&e.getBrain().getMemory(MemoryModuleType.JOB_SITE).filter(p->p.dimension().equals(v.level.dimension())).isPresent();
@@ -115,8 +118,8 @@ final class Worker {
             if(job!=null&&!nightJob(job)&&!job.atomic()){endJob();}
             if(job==null&&trapped())start(new EscapeJob(this));
             if(job==null&&night&&watchman()&&ready("patrol"))start(new PatrolJob(this));
-            if(job==null&&night&&!hasBed()&&ready("shelter")){var shelter=ShelterJob.find(this);if(shelter!=null)start(shelter);else cooldown("shelter",600);}
-            if(job==null&&night&&!atHome()&&ready("home"))start(new HomeJob(this));
+            if(job==null&&night&&!covered&&!hasBed()&&ready("shelter")){var shelter=ShelterJob.find(this);if(shelter!=null)start(shelter);else cooldown("shelter",600);}
+            if(job==null&&night&&!covered&&!atHome()&&ready("home"))start(new HomeJob(this));
             // No way home tonight: any roof is better than a doorstep (rc13: residents stood all night
             // at a door after "не нашёл дорогу домой" and were killed there).
             if(job==null&&night&&!atHome()&&!ready("home")&&!e.isSleeping()&&!ShelterJob.indoor(v,e.blockPosition())&&ready("shelter")){
@@ -207,6 +210,8 @@ final class Worker {
     int professionStart(){return 2000+v.roleIndex(id)%8*600;}
     static boolean nightRestWindow(long clock,boolean dark){long day=Math.floorMod(clock,24000);return dark||day<1000||day>=11500;}
     boolean nightRest(){return nightRestWindow(v.level.getOverworldClockTime(),v.level.isDarkOutside());}
+    /** Rest time, or an alarm that sends the unarmed indoors. */
+    boolean hiding(){return nightRest()||v.alarm()&&!armed();}
 
     // --- inventory -------------------------------------------------------------------------
     List<ItemStack> bag(){return bot().inventory().snapshot().slots();}
@@ -282,7 +287,9 @@ final class Worker {
 
     // --- threats -------------------------------------------------------------------------------
     private boolean threat(Monster m){
-        return m.getType()==EntityTypes.ZOMBIE||m.getType()==EntityTypes.ZOMBIE_VILLAGER||m.getType()==EntityTypes.HUSK||m.getType()==EntityTypes.DROWNED
+        return m.getType()==EntityTypes.ZOMBIE||m.getType()==EntityTypes.ZOMBIE_VILLAGER||m.getType()==EntityTypes.HUSK
+                // A drowned swimming in the river stays there by day; only one ashore or after someone counts.
+                ||m.getType()==EntityTypes.DROWNED&&!m.isInWater()
                 ||m.getTarget() instanceof Villager target&&v.state.residents.contains(target.getUUID())
                 ||m instanceof Creeper creeper&&creeper.getSwellDir()>0;
     }

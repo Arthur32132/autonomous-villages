@@ -106,7 +106,10 @@ final class Construction {
         int selected=Supplies.find(b,s->s.is(step.item()));if(selected>=0)b.inventory().select(selected);
         if (!Supplies.consume(b,step.item(),cost(step))) return false;
         // No callbacks or yielding between item debit and the two vanilla block writes.
-        v.level.setBlock(p,step.state(),second == null ? 3 : 18);
+        // Fences, walls, panes and stairs join their neighbours as if a player had placed them.
+        BlockState placed=step.state().getBlock() instanceof CrossCollisionBlock||step.state().getBlock() instanceof WallBlock||step.state().getBlock() instanceof StairBlock
+                ?Block.updateFromNeighbourShapes(step.state(),v.level,p):step.state();
+        v.level.setBlock(p,placed,second == null ? 3 : 18);
         v.town.invalidate();
         if (second != null) { v.level.setBlock(second,secondState,18); v.level.updateNeighborsAt(p,step.state().getBlock()); v.level.updateNeighborsAt(second,secondState.getBlock()); }
         if (step.item()==Items.CHEST) {v.state.storage.add(p.asLong());v.stock.invalidate();v.moved();}

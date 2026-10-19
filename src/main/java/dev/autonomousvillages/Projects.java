@@ -118,7 +118,9 @@ final class Projects {
         var active=unfinished.isEmpty()?null:unfinished.getFirst();
         if(active!=null){
             stage=(waiting(active)?"ждут материалы: ":"строят ")+label(active)+" "+built(active)+"/"+size(active);
-            if(unfinished.size()>=3||!unfinished.stream().allMatch(this::waiting))return;
+            // Only houses hold up the next house: a half-built watchtower never keeps a family homeless.
+            var houses=unfinished.stream().filter(b->b.kind.equals("house")).toList();
+            if(houses.size()>=3||!houses.stream().allMatch(this::waiting))return;
         }
         if(v.state.buildings.size()>=256||v.state.completedShelters>=64){stage="все проекты завершены";return;}
         int beds=v.index.beds.size();
@@ -132,7 +134,20 @@ final class Projects {
             v.state.buildings.add(house);v.state.completedShelters++;invalidate();
             v.chronicle.announce("Заложен "+label(house)+" у "+BlockPos.of(house.origin).toShortString());v.runtime.save();
             stage="заложен "+label(house);
-        }else stage="жилья хватает; копят запасы";
+        }else if(unfinished.isEmpty()&&v.state.residents.size()>=4&&tower()==null){
+            // With every family housed the village puts up a watchtower by the bell for its guards.
+            BlockPos site=findSite(TOWER,TOWER);
+            if(site==null){stage="жилья хватает; ищут место для вышки";return;}
+            var built=tower(site);v.state.buildings.add(built);invalidate();
+            v.chronicle.announce("Заложена "+label(built)+" у "+site.toShortString());v.runtime.save();
+            stage="заложена "+label(built);
+        }else if(active==null)stage="жилья хватает; копят запасы";
+    }
+    TownBuilding tower(){return v.state.buildings.stream().filter(b->b.kind.equals("tower")).findFirst().orElse(null);}
+    /** Where a guard stands on the finished watchtower's lookout, if there is one. */
+    BlockPos lookout(){
+        var t=tower();
+        return t==null||!t.completed?null:BlockPos.of(t.origin).offset(1,6,1);
     }
     TownBuilding active(){
         return v.state.buildings.stream().filter(b->!b.completed&&!b.kind.equals("native_house")).findFirst().orElse(null);
@@ -156,7 +171,7 @@ final class Projects {
         return idle>24000||idle>3000&&missing(b).keySet().stream().noneMatch(EVERYDAY::contains);
     }
     static String label(TownBuilding b){
-        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";default->b.kind;};
+        String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";default->b.kind;};
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";
     }
     /** Structural blocks of the plan; decoration does not count toward progress. */
@@ -364,6 +379,34 @@ final class Projects {
         return out;
     }
     /** A small timber cottage: log corners, plank walls with window gaps, flat roof, two beds, door and lights. */
+    static final int TOWER=5;
+    /**
+     * A watchtower: a 3×3 cobblestone shaft with a door and a ladder up the middle, a 5×5 plank
+     * lookout on top with a fence railing, and torches on the railing's corners when the store has them.
+     */
+    TownBuilding tower(BlockPos base){
+        var b=new TownBuilding("tower",base);
+        var cobble=Blocks.COBBLESTONE.defaultBlockState();
+        for(int x=1;x<=3;x++)for(int z=1;z<=3;z++){
+            BlockPos floor=base.offset(x,0,z);
+            for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,cobble);}
+            b.add(floor,cobble);
+        }
+        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)for(int y=1;y<=7;y++){
+            BlockPos p=base.offset(x,y,z);if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());
+        }
+        for(int y=1;y<=4;y++)for(int x=1;x<=3;x++)for(int z=1;z<=3;z++){
+            if(x==2&&z==2||x==2&&z==1&&y<=2)continue; // the ladder shaft and the doorway
+            b.add(base.offset(x,y,z),cobble);
+        }
+        b.add(base.offset(2,1,1),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.SOUTH));
+        for(int y=1;y<=5;y++)b.add(base.offset(2,y,2),Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING,Direction.WEST));
+        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)if(x!=2||z!=2)b.add(base.offset(x,5,z),Blocks.OAK_PLANKS.defaultBlockState());
+        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)if(x==0||z==0||x==TOWER-1||z==TOWER-1)b.add(base.offset(x,6,z),Blocks.OAK_FENCE.defaultBlockState());
+        for(int[] c:new int[][]{{0,0},{0,4},{4,0},{4,4}})b.decorate(base.offset(c[0],7,c[1]),Blocks.TORCH.defaultBlockState());
+        b.blocks.removeIf(p->!v.state.contains(p.position()));
+        return b;
+    }
     TownBuilding cottage(BlockPos base){
         var b=new TownBuilding("house",base);
         int w=HOUSE_W,d=HOUSE_D;

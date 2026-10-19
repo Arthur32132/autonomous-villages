@@ -20,7 +20,7 @@ final class Projects {
     String stage="осмотр деревни";
     private boolean captured;
     private final Set<Long> protectedBlocks=new HashSet<>();
-    private final Set<BlockPos> protectedDoors=new HashSet<>();
+    private final Set<BlockPos> protectedDoors=new HashSet<>(),protectedGates=new HashSet<>();
     private int protectedCount=-1;
     private long protectionTick=-1;
     private long nextPlanning;
@@ -33,12 +33,13 @@ final class Projects {
             protectionTick=v.level.getGameTime();
             int count=v.state.buildings.stream().mapToInt(b->b.blocks.size()).sum()+v.state.buildings.size();
             if(count!=protectedCount){
-                protectedBlocks.clear();protectedDoors.clear();
+                protectedBlocks.clear();protectedDoors.clear();protectedGates.clear();
                 for(var b:v.state.buildings)for(var s:b.blocks){
                     protectedBlocks.add(s.pos);
                     var block=s.block();
                     if(block.getBlock() instanceof DoorBlock){protectedDoors.add(s.position());protectedBlocks.add(s.position().above().asLong());}
                     if(block.getBlock() instanceof BedBlock)protectedBlocks.add(s.position().relative(block.getValue(BedBlock.FACING)).asLong());
+                    if(block.getBlock() instanceof FenceGateBlock)protectedGates.add(s.position());
                 }
                 protectedCount=count;
             }
@@ -46,6 +47,8 @@ final class Projects {
         return protectedBlocks.contains(p.asLong());
     }
     Collection<BlockPos> doors(){protects(BlockPos.ZERO);return protectedDoors;}
+    /** Gates of the palisade (and any other plan), shut at night like the doors. */
+    Collection<BlockPos> gates(){protects(BlockPos.ZERO);return protectedGates;}
 
     // --- generated village houses ------------------------------------------------------------
     void capture(VillageDiscovery.Survey survey){
@@ -113,6 +116,7 @@ final class Projects {
             if(b.kind.equals("house")||b.kind.equals("civic")||Landmarks.kind(b.kind))Festivities.housewarming(v,b);
             if(b.kind.equals("civic")||Landmarks.kind(b.kind))furnish(b);
             if(Landmarks.kind(b.kind))signboard(b);
+            if(b.kind.equals("stable"))stableHorses(b);
             if(b.kind.equals("well"))fillWell(b);
             if(b.kind.equals("pen")){furnish(b);stockPen(b);}
             if(b.path.isEmpty())b.path.addAll(footpath(b));
@@ -176,6 +180,13 @@ final class Projects {
             var built=pen(site);v.state.buildings.add(built);invalidate();
             v.chronicle.announce("Заложен "+label(built)+" у "+site.toShortString());v.runtime.save();
             stage="заложен "+label(built);
+        }else if(AutonomousVillagesMod.CONFIG.palisade&&unfinished.isEmpty()&&tower()!=null&&v.state.residents.size()>=6&&wall()==null&&now>=palisadeRetry){
+            // Zombies walking in from the dark killed most residents lost in soak: the village fences itself in.
+            var built=palisade();
+            if(built==null){palisadeRetry=now+24000;stage="жилья хватает; частокол не замкнуть";return;}
+            v.state.buildings.add(built);invalidate();
+            v.chronicle.announce("Заложен частокол: "+built.blocks.stream().filter(p->p.block().getBlock() instanceof FenceGateBlock).count()+" ворот");v.runtime.save();
+            stage="заложен частокол";
         }else if(landmark!=null&&(planned=landmark(landmark))!=null){
             // Then the village's own big buildings, one at a time as it grows: forge, market, tavern.
             v.state.buildings.add(planned);invalidate();
@@ -190,6 +201,53 @@ final class Projects {
             v.chronicle.announce("Заложена "+label(built));v.runtime.save();
             stage="заложена "+label(built);
         }else if(active==null)stage="жилья хватает; копят запасы";
+    }
+    TownBuilding wall(){return v.state.buildings.stream().filter(b->b.kind.equals("wall")).findFirst().orElse(null);}
+    private long palisadeRetry;
+    /**
+     * A fence ring {@link Palisade#MARGIN} blocks outside every building: a gate where a street or a
+     * footpath crosses, a higher course where the ground beside is higher, a torch on every eighth post.
+     * Water, fields, trees and other buildings stay as they are (a gap the guards watch).
+     */
+    TownBuilding palisade(){
+        int minX=Integer.MAX_VALUE,minZ=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE,maxZ=Integer.MIN_VALUE;
+        var paths=new HashSet<Long>();
+        for(var b:v.state.buildings){
+            if(b.kind.equals("dock"))continue;
+            for(var p:b.blocks){BlockPos q=p.position();minX=Math.min(minX,q.getX());maxX=Math.max(maxX,q.getX());minZ=Math.min(minZ,q.getZ());maxZ=Math.max(maxZ,q.getZ());}
+            paths.addAll(b.path);
+        }
+        if(minX>maxX)return null;
+        BlockPos hub=v.meetingPoint();
+        minX=Math.min(minX,hub.getX())-Palisade.MARGIN;maxX=Math.max(maxX,hub.getX())+Palisade.MARGIN;
+        minZ=Math.min(minZ,hub.getZ())-Palisade.MARGIN;maxZ=Math.max(maxZ,hub.getZ())+Palisade.MARGIN;
+        var ring=Palisade.ring(minX,minZ,maxX,maxZ);
+        if(ring.size()>Palisade.MAX_COLUMNS)return null;
+        var b=new TownBuilding("wall",new BlockPos(minX,v.state.y,minZ));
+        for(int i=0;i<ring.size();i++){
+            var c=ring.get(i);
+            BlockPos column=new BlockPos(c.x(),v.state.y,c.z());
+            if(!v.level.hasChunkAt(column)||!v.state.contains(column))continue;
+            BlockPos ground=new BlockPos(c.x(),v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,c.x(),c.z())-1,c.z());
+            BlockPos foot=ground.above();var under=v.level.getBlockState(ground);var at=v.level.getBlockState(foot);
+            if(!under.getFluidState().isEmpty()||!at.getFluidState().isEmpty()||under.is(Blocks.FARMLAND)||under.getBlock() instanceof CropBlock||under.is(BlockTags.LEAVES)
+                    ||!under.isFaceSturdy(v.level,ground,Direction.UP)&&!under.is(Blocks.DIRT_PATH)
+                    ||protects(ground)||protects(foot)||!v.state.policy.allows("build",foot)||!Construction.clear(at)&&!removable(at))continue;
+            if(under.is(Blocks.DIRT_PATH)||paths.contains(ground.asLong())){
+                b.add(foot,Blocks.OAK_FENCE_GATE.defaultBlockState().setValue(FenceGateBlock.FACING,c.gateFacing()));
+                continue;
+            }
+            int highest=ground.getY();
+            for(Direction d:Direction.Plane.HORIZONTAL)highest=Math.max(highest,v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,c.x()+d.getStepX(),c.z()+d.getStepZ())-1);
+            int courses=Palisade.courses(ground.getY(),highest);
+            for(int k=0;k<courses;k++){
+                BlockPos p=foot.above(k);var s=v.level.getBlockState(p);
+                if(k>0&&!Construction.clear(s)&&!removable(s))break;
+                b.add(p,Blocks.OAK_FENCE.defaultBlockState());
+            }
+            if(Palisade.torch(i)&&Construction.clear(v.level.getBlockState(foot.above(courses))))b.add(foot.above(courses),Blocks.TORCH.defaultBlockState());
+        }
+        return b.blocks.isEmpty()?null:b;
     }
     Set<String> kinds(){var out=new HashSet<String>();for(var b:v.state.buildings)out.add(b.kind);return out;}
     /** When a landmark without a site may look for one again (by kind). */
@@ -253,6 +311,22 @@ final class Projects {
         }
         b.blocks.removeIf(p->!v.state.contains(p.position()));b.cuts.removeIf(p->!v.state.contains(BlockPos.of(p)));
         return b;
+    }
+    /** Two horses move into the stalls of a new stable, behind the first and the last gate. */
+    void stableHorses(TownBuilding b){
+        double cx=b.blocks.stream().mapToInt(p->p.position().getX()).average().orElse(0),cz=b.blocks.stream().mapToInt(p->p.position().getZ()).average().orElse(0);
+        var gates=b.blocks.stream().filter(p->p.block().getBlock() instanceof FenceGateBlock).map(TownBuilding.Plan::position).toList();
+        for(int i=0;i<gates.size();i+=Math.max(1,gates.size()-1)){
+            BlockPos gate=gates.get(i),stall=null;double best=Double.MAX_VALUE;
+            for(Direction d:Direction.Plane.HORIZONTAL){BlockPos q=gate.relative(d);double dist=Math.pow(q.getX()+.5-cx,2)+Math.pow(q.getZ()+.5-cz,2);if(dist<best){best=dist;stall=q;}}
+            if(stall==null||!v.level.getBlockState(stall).getCollisionShape(v.level,stall).isEmpty())continue;
+            var horse=net.minecraft.world.entity.EntityTypes.HORSE.create(v.level,net.minecraft.world.entity.EntitySpawnReason.EVENT);
+            if(horse==null)continue;
+            horse.snapTo(stall.getX()+.5,stall.getY(),stall.getZ()+.5,v.level.getRandom().nextFloat()*360,0);
+            horse.setPersistenceRequired();
+            v.level.addFreshEntity(horse);
+        }
+        v.chronicle.announce("В конюшню привели лошадей");
     }
     /** The landmark's sign names it and the village, whoever placed it. */
     void signboard(TownBuilding b){
@@ -421,7 +495,7 @@ final class Projects {
     void paid(TownBuilding b){unpaidSince.remove(b.origin);}
     /** Materials the village makes from wood, stone and sand; a shortage of these is only a matter of time. */
     static final Set<String> EVERYDAY=Set.of("planks","logs","door","torch","cobblestone","stairs","slab","fence","trapdoor","stone_stairs",
-            "stone_slab","stone_wall","glass_pane","ladder","chest","crafting_table","furnace");
+            "stone_slab","stone_wall","glass_pane","ladder","chest","crafting_table","furnace","fence_gate");
     /**
      * A house waiting for something the village cannot make yet (a bed without wool) does not block the
      * next one. Short of planks or cobble it does: a second site would only split the same wood. After a
@@ -434,7 +508,7 @@ final class Projects {
     }
     static String label(TownBuilding b){
         String base=switch(b.kind){case "house"->"дом";case "native_house"->"дом деревни";case "doors"->"двери для домов";case "tower"->"сторожевая вышка";case "civic"->trade(b.design);case "storehouse"->"амбар";case "well"->"колодец";case "pen"->"загон для овец";
-            case "forge","market","tavern","mill","dock"->Landmarks.label(b.kind);default->b.kind;};
+            case "forge","market","tavern","mill","dock","chapel","stable"->Landmarks.label(b.kind);case "wall"->"частокол";default->b.kind;};
         if(b.kind.equals("civic"))return base;
         return b.design==null||b.design.isEmpty()?base:base+" «"+b.design+"»";
     }
@@ -510,6 +584,7 @@ final class Projects {
         if(s.is(Blocks.CHEST))return "chest";
         if(s.is(Blocks.CRAFTING_TABLE))return "crafting_table";
         if(s.is(Blocks.FURNACE))return "furnace";
+        if(s.getBlock() instanceof FenceGateBlock)return "fence_gate";
         return s.getBlock().asItem().toString();
     }
 

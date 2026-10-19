@@ -56,8 +56,13 @@ def ensure_template(java):
     for name in ['fabric-server-launch.jar', 'eula.txt']:
         shutil.copy2(TEMPLATE / name, boot / name)
     (boot / 'server.properties').write_text('online-mode=false\nserver-port=25599\nlevel-type=minecraft:flat\n')
-    subprocess.run([str(java / 'bin/java'), '-Xmx2G', '-jar', 'fabric-server-launch.jar', 'nogui'], cwd=boot, input=b'stop\n',
-                   stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=900)
+    try:
+        subprocess.run([str(java / 'bin/java'), '-Xmx2G', '-jar', 'fabric-server-launch.jar', 'nogui'], cwd=boot, input=b'stop\n',
+                       stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, timeout=900)
+    except subprocess.TimeoutExpired:
+        # 26.2 can fail the piped "stop" ("unexpected error") and idle on; the download is done by then.
+        if not all((boot / n).exists() for n in ['libraries', 'versions', '.fabric']):
+            raise
     for name in ['libraries', 'versions', '.fabric']:
         shutil.rmtree(TEMPLATE / name, ignore_errors=True)
         shutil.move(boot / name, TEMPLATE / name)

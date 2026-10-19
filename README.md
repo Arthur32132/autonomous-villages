@@ -113,7 +113,7 @@ Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java 
 
 `config/autonomous_villages.json` создаётся при первом запуске; все переключатели включены:
 `celebrations` (фейерверки и сердечки), `summonGolems`, `gifts`, `chronicleBook`,
-`professionProducts`, `compost`, `watchtower`, `lightHomes` (факел в тёмной спальне), `morningNews`, `spareBeds` (вторая кровать в доме), `graves` (кладбище), `nameplates` (таблички на домах), `flowers` (цветники), `dayBells` (колокол на рассвете и закате), `civicBuildings` (общественные здания), `storehouse` (амбар), `pen` (загон для овец), `landmarks` (кузница, рынок, мельница, таверна и пристань). Основная работа деревни (добыча, стройка, поля,
+`professionProducts`, `compost`, `watchtower`, `lightHomes` (факел в тёмной спальне), `morningNews`, `spareBeds` (вторая кровать в доме), `graves` (кладбище), `nameplates` (таблички на домах), `flowers` (цветники), `dayBells` (колокол на рассвете и закате), `civicBuildings` (общественные здания), `storehouse` (амбар), `pen` (загон для овец), `landmarks` (кузница, рынок, мельница, часовня, таверна, конюшня и пристань), `palisade` (частокол с воротами). Основная работа деревни (добыча, стройка, поля,
 оборона) не отключается.
 
 ## Сохранения

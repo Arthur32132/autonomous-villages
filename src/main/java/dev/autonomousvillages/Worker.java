@@ -65,6 +65,10 @@ final class Worker {
         BlockPos here=body().blockPosition();BlockPos best=null;double score=Double.MAX_VALUE;
         for(BlockPos q:BlockPos.betweenClosed(here.offset(-3,-2,-3),here.offset(3,2,3))){
             if(q.equals(here)||!v.safeFeet(q))continue;
+            // Only a step in plain sight: never through a wall, out of a player's trading cell or into another room.
+            var eye=body().getEyePosition();var there=v.feetPosition(q).add(0,body().getEyeHeight(),0);
+            if(v.level.clip(new net.minecraft.world.level.ClipContext(eye,there,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,body())).getType()
+                    !=net.minecraft.world.phys.HitResult.Type.MISS)continue;
             int open=0;for(var d:net.minecraft.core.Direction.Plane.HORIZONTAL)if(v.safeFeet(q.relative(d)))open++;
             if(open<2)continue;
             double d=q.distSqr(here);if(d<score){score=d;best=q.immutable();}
@@ -263,18 +267,20 @@ final class Worker {
                 ||m.getTarget() instanceof Villager target&&v.state.residents.contains(target.getUUID())
                 ||m instanceof Creeper creeper&&creeper.getSwellDir()>0;
     }
-    private long productDay=-1;
     /** At its workstation during the profession hour, a resident makes the day's product for the store. */
     private void professionProduct(Villager e){
         long dayNumber=v.level.getOverworldClockTime()/24000;
-        if(productDay==dayNumber)return;
+        // The day is kept in the save: a pause, a resume or a restart does not pay twice.
+        if(v.state.productDays.getOrDefault(id,-1L)>=dayNumber)return;
         var site=e.getBrain().getMemory(MemoryModuleType.JOB_SITE).filter(p->p.dimension().equals(v.level.dimension())).map(GlobalPos::pos).orElse(null);
         if(site==null||site.distSqr(e.blockPosition())>9)return;
-        productDay=dayNumber;
+        v.state.productDays.put(id,dayNumber);
         var product=Professions.product(e.getVillagerData().profession(),dayNumber);
         if(product.isEmpty())return;
         String label=Professions.label(product);int count=product.getCount();
-        if(!bot().inventory().insert(product).isEmpty())return;
+        // Straight into the shared store, so a farmer's daily loaf never stays in its own food pocket.
+        var rest=v.stock.put(product);
+        if(!rest.isEmpty()&&!bot().inventory().insert(rest).isEmpty())return;
         v.chronicle.add("profession:"+label,count);
         v.level.sendParticles(net.minecraft.core.particles.ParticleTypes.HAPPY_VILLAGER,e.getX(),e.getY()+2.1,e.getZ(),4,.3,.2,.3,0);
     }

@@ -31,6 +31,8 @@ public final class VillageState {
     public Set<Long> lights=new LinkedHashSet<>();
     public Chronicle.Data chronicle=new Chronicle.Data();
     public long lastBirth;
+    /** The last game day each resident brought home its profession's product. */
+    public Map<UUID,Long> productDays=new LinkedHashMap<>();
     /** Game time the residents last called an iron golem to their defence. */
     public long lastGolem;
     static final int MAX_TICKET_CHUNKS=1024;
@@ -54,6 +56,8 @@ public final class VillageState {
         if(policy==null)policy=new VillagePolicy();
         if(lights==null)lights=new LinkedHashSet<>();
         if(chronicle==null)chronicle=new Chronicle.Data();
+        if(productDays==null)productDays=new LinkedHashMap<>();
+        productDays.keySet().retainAll(residents);
         chronicle.sanitize();
         trimOldest(plantedCrops,512);trimOldest(reforestation,2048);trimOldest(capturedPieces,4096);trimOldest(lights,1024);trimOldest(plantedTrees,512);
         while(treeWork.size()>256)treeWork.remove(treeWork.keySet().iterator().next());

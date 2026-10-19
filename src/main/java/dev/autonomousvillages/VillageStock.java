@@ -53,6 +53,19 @@ final class VillageStock {
         for(int i=0;i<c.getContainerSize();i++){var s=c.getItem(i);if(!s.isEmpty()&&test.test(s))return true;}
         return false;
     }
+    /** Puts items straight into the shared chests; returns what did not fit. */
+    ItemStack put(ItemStack stack){
+        var left=stack.copy();
+        for(var c:chests()){
+            if(left.isEmpty())break;
+            var slots=new ArrayList<ItemStack>(c.getContainerSize());for(int i=0;i<c.getContainerSize();i++)slots.add(c.getItem(i).copy());
+            int moved=Supplies.insertPartial(slots,left);
+            if(moved==0)continue;
+            for(int i=0;i<slots.size();i++)c.setItem(i,slots.get(i));
+            c.setChanged();left.shrink(moved);
+        }
+        invalidate();return left;
+    }
     /** Removes matching items straight from the chests (used when the household itself eats). */
     int consume(Predicate<ItemStack> test,int amount){
         int left=amount;

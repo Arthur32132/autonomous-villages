@@ -146,7 +146,7 @@ final class Village {
     void rescueFromPowderSnow(){
         for(UUID id:state.residents){
             // Pricked by a cactus it is wedged against: step to the nearest safe cell clear of cacti.
-            if(level.getEntity(id) instanceof Villager hurt&&hurt.isAlive()&&hurt.hurtTime>0&&hurt.getLastDamageSource()!=null
+            if(level.getEntity(id) instanceof Villager hurt&&hurt.isAlive()&&hurt.hurtTime>5&&hurt.getLastDamageSource()!=null
                     &&hurt.getLastDamageSource().is(net.minecraft.world.damagesource.DamageTypes.CACTUS))stepAwayFromCactus(hurt);
             if(!(level.getEntity(id) instanceof Villager v)||!v.isAlive()||!v.isInPowderSnow&&v.getTicksFrozen()==0)continue;
             BlockPos feet=v.blockPosition();boolean dug=false;
@@ -172,7 +172,13 @@ final class Village {
         }
         if(best==null)return;
         var to=feetPosition(best);
-        var w=workers.get(body.getUUID());if(w!=null)w.cancel();
+        var w=workers.get(body.getUUID());
+        if(w!=null){
+            // Whatever it was doing there is not worth another prick for a while.
+            if(w.job!=null&&w.job.target()!=null)rejected.put(w.job.target().asLong(),level.getGameTime()+2400);
+            if(w.job!=null)w.cooldown(w.job.kind(),600);
+            w.cancel();
+        }
         body.teleportTo(to.x,to.y,to.z);chronicle.add("rescued",1);
     }
     void sync(){
@@ -302,6 +308,7 @@ final class Village {
      * The chronicle as a written book on the lectern nearest the bell (a librarian's), for players to
      * read. Only an empty lectern or one holding the village's own book is used; a player's book stays.
      */
+    private final Set<Long> booksPlaced=new HashSet<>();
     void writeChronicleBook(){
         BlockPos hub=meetingPoint();
         var lectern=level.getPoiManager().getInRange(h->h.is(PoiTypes.LIBRARIAN),hub,Math.min(256,state.radius+16),PoiManager.Occupancy.ANY)
@@ -310,6 +317,8 @@ final class Village {
                 .min(Comparator.comparingDouble(hub::distSqr)).orElse(null);
         if(lectern==null||!(level.getBlockEntity(lectern) instanceof net.minecraft.world.level.block.entity.LecternBlockEntity l))return;
         boolean first=!l.hasBook();
+        // A player took the book: one copy is a gift, not a stream of them.
+        if(first&&!booksPlaced.add(lectern.asLong()))return;
         var bs=level.getBlockState(lectern);
         if(first){
             if(!net.minecraft.world.level.block.LecternBlock.tryPlaceBook(null,level,lectern,bs,chronicle.book()))return;

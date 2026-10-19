@@ -28,7 +28,7 @@ final class Construction {
         if(step.state().is(BlockTags.WOODEN_SLABS))return actual.is(BlockTags.WOODEN_SLABS);
         if(step.state().is(BlockTags.WOODEN_FENCES))return actual.is(BlockTags.WOODEN_FENCES);
         if(step.state().is(BlockTags.LOGS))return actual.is(BlockTags.LOGS);
-        if(masonry(step.state())&&actual.is(Blocks.COBBLESTONE))return true;
+        if((step.state().is(Blocks.COBBLESTONE)||masonry(step.state()))&&rubble(actual))return true;
         if(stoneStairs(step.state())&&actual.is(Blocks.COBBLESTONE_STAIRS))return true;
         if(stoneSlab(step.state())&&actual.is(Blocks.COBBLESTONE_SLAB))return true;
         if(step.state().is(BlockTags.WALLS)&&actual.is(Blocks.COBBLESTONE_WALL))return true;
@@ -65,7 +65,7 @@ final class Construction {
                 :step.state().is(BlockTags.WOODEN_SLABS)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_SLABS)
                 :step.state().is(BlockTags.WOODEN_FENCES)?s->s.is(net.minecraft.tags.ItemTags.WOODEN_FENCES)
                 :step.state().is(BlockTags.LOGS)?s->s.is(net.minecraft.tags.ItemTags.LOGS)
-                :masonry(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE)
+                :step.state().is(Blocks.COBBLESTONE)||masonry(step.state())?s->s.is(step.item())||VillageCrafting.COBBLE.test(s)||VillageCrafting.RUBBLE.test(s)
                 :stoneStairs(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE_STAIRS)
                 :stoneSlab(step.state())?s->s.is(step.item())||s.is(Items.COBBLESTONE_SLAB)
                 :step.state().is(BlockTags.WALLS)?s->s.is(step.item())||s.is(Items.COBBLESTONE_WALL)
@@ -80,6 +80,9 @@ final class Construction {
             ||s.is(Blocks.PACKED_ICE)||s.is(Blocks.BLUE_ICE)
             ||s.is(Blocks.BRICKS)||s.is(Blocks.SANDSTONE)||s.is(Blocks.CUT_SANDSTONE)||s.is(Blocks.SMOOTH_SANDSTONE)
             ||s.is(Blocks.RED_SANDSTONE)||s.is(Blocks.CUT_RED_SANDSTONE)||s.is(Blocks.SMOOTH_RED_SANDSTONE)||s.is(Blocks.SNOW_BLOCK);}
+    /** Any plain stone a cobblestone plan accepts: mixed rubble makes a rustic foundation. */
+    static boolean rubble(BlockState s){return s.is(Blocks.COBBLESTONE)||s.is(Blocks.COBBLED_DEEPSLATE)||s.is(Blocks.BLACKSTONE)||s.is(Blocks.ANDESITE)
+            ||s.is(Blocks.DIORITE)||s.is(Blocks.GRANITE)||s.is(Blocks.TUFF)||s.is(Blocks.STONE)||s.is(Blocks.MOSSY_COBBLESTONE)||s.is(Blocks.DEEPSLATE);}
     static boolean stoneStairs(BlockState s){return s.is(BlockTags.STAIRS)&&!s.is(BlockTags.WOODEN_STAIRS);}
     static boolean stoneSlab(BlockState s){return s.is(BlockTags.SLABS)&&!s.is(BlockTags.WOODEN_SLABS);}
     @SuppressWarnings({"rawtypes","unchecked"})

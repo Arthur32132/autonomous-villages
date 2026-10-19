@@ -21,6 +21,9 @@ final class VillageCrafting {
     static final Predicate<ItemStack> LOG=s->s.is(ItemTags.LOGS_THAT_BURN);
     static final Predicate<ItemStack> STICK=s->s.is(Items.STICK);
     static final Predicate<ItemStack> COBBLE=s->s.is(ItemTags.STONE_TOOL_MATERIALS);
+    /** Stone the mine brings up besides cobblestone; it builds foundations and walls just as well. */
+    static final Predicate<ItemStack> RUBBLE=s->s.is(Items.ANDESITE)||s.is(Items.DIORITE)||s.is(Items.GRANITE)||s.is(Items.TUFF)||s.is(Items.STONE)
+            ||s.is(Items.MOSSY_COBBLESTONE)||s.is(Items.DEEPSLATE);
     static final Predicate<ItemStack> IRON=s->s.is(Items.IRON_INGOT);
     static final Predicate<ItemStack> FUEL=s->s.is(Items.COAL)||s.is(Items.CHARCOAL);
     static final Predicate<ItemStack> WHEAT=s->s.is(Items.WHEAT);

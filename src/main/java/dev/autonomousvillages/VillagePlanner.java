@@ -26,7 +26,7 @@ final class VillagePlanner {
     VillagePlanner(Village v){this.v=v;}
 
     /** Store totals and project needs, refreshed at most every 40 ticks. */
-    record Snapshot(int planks,int logs,int sticks,int cobble,int bread,int wheat,int seeds,int doors,int bedItems,int torches,int fuel,int iron,int rawIron,
+    record Snapshot(int planks,int logs,int sticks,int cobble,int rubble,int bread,int wheat,int seeds,int doors,int bedItems,int torches,int fuel,int iron,int rawIron,
                     int freeSlots,int chests,Item woolColour,int wool,boolean shears,TownBuilding project,Map<String,Integer> missing,List<BlockPos> dark,
                     BlockPos table,BlockPos furnace,boolean furnaceOutput){
         int wood(){return planks+logs*4;}
@@ -53,7 +53,7 @@ final class VillagePlanner {
         }
         boolean shears=st.count(x->x.is(Items.SHEARS)&&Supplies.usable(x))>0||v.workers.values().stream().anyMatch(w->w.active()&&w.has(x->x.is(Items.SHEARS)&&Supplies.usable(x)));
         s=new Snapshot(st.count(VillageCrafting.PLANK),st.count(VillageCrafting.LOG),st.count(VillageCrafting.STICK),st.count(VillageCrafting.COBBLE),
-                st.count(x->x.is(Items.BREAD)),st.count(VillageCrafting.WHEAT),st.count(x->x.is(Items.WHEAT_SEEDS)||x.is(Items.BEETROOT_SEEDS)),
+                st.count(VillageCrafting.RUBBLE),st.count(x->x.is(Items.BREAD)),st.count(VillageCrafting.WHEAT),st.count(x->x.is(Items.WHEAT_SEEDS)||x.is(Items.BEETROOT_SEEDS)),
                 st.count(x->x.is(ItemTags.WOODEN_DOORS)),st.count(x->x.is(ItemTags.BEDS)),st.count(x->x.is(Items.TORCH)),st.count(VillageCrafting.FUEL),
                 st.count(VillageCrafting.IRON),st.count(x->x.is(Items.RAW_IRON)),st.freeSlots(),st.chests().size(),colour,wool,shears,project,missing,dark,table,furnace,output);
         return s;
@@ -332,7 +332,8 @@ final class VillagePlanner {
     private Job mine(Worker w,Snapshot s,boolean helping){
         boolean ironWanted=s.need("bed")>0&&!s.shears()&&s.iron()+s.rawIron()<2;
         // Stone shapes are cut from cobblestone: 6 make 4 stairs, 3 make 6 slabs, 6 make 6 walls.
-        int wanted=STONE_RESERVE+s.need("cobblestone")+(s.need("stone_stairs")*3+1)/2+(s.need("stone_slab")+1)/2+s.need("stone_wall");
+        // Rubble (andesite, diorite...) stands in for cobblestone blocks; stairs, slabs and walls need real cobblestone.
+        int wanted=STONE_RESERVE+Math.max(0,s.need("cobblestone")-s.rubble())+(s.need("stone_stairs")*3+1)/2+(s.need("stone_slab")+1)/2+s.need("stone_wall");
         if(s.cobble()>=wanted&&!ironWanted)return null;
         if(!w.ready("mine")||!w.hasTool(ItemTags.PICKAXES))return null;
         BlockPos from=w.body().blockPosition();

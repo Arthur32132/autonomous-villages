@@ -85,6 +85,13 @@ Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java 
 
 Имена — до 32 букв, цифр, `_`, `-`; кириллицу заключайте в кавычки. До четырёх деревень в обычном мире.
 
+## Настройки
+
+`config/autonomous_villages.json` создаётся при первом запуске; все переключатели включены:
+`celebrations` (фейерверки и сердечки), `summonGolems`, `gifts`, `chronicleBook`,
+`professionProducts`, `compost`, `watchtower`. Основная работа деревни (добыча, стройка, поля,
+оборона) не отключается.
+
 ## Сохранения
 
 `autonomous_villages.json` в корне мира (формат v4), рабочие рюкзаки — NBT жителей.

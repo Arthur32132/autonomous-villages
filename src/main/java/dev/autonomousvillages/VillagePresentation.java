@@ -67,7 +67,7 @@ final class VillagePresentation {
         }
         if(player!=null&&text!=null){resident.setCustomName(decode(record.json));return;}
         if(player!=null)record.json="";
-        resident.setCustomName(Component.literal(personName(w.id)+", "+v.role(w.id)+" • "+w.status));resident.setCustomNameVisible(true);
+        resident.setCustomName(Component.literal(personName(w.id)+", "+MasteryFeature.withTitle(v,w.id,v.role(w.id))+" • "+w.status));resident.setCustomNameVisible(true);
     }
     private static final String[] NAMES={"Иван","Пётр","Мария","Анна","Борис","Глеб","Дарья","Елена","Фёдор","Злата","Игорь","Ксения",
             "Лев","Мирон","Ника","Остап","Полина","Роман","Савва","Тимофей","Ульяна","Фрол","Степан","Вера","Любава","Милана","Добрыня",

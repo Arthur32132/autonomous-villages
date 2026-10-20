@@ -1,3 +1,6 @@
+> **Архив 0.2.x.** Документ перенесён сюда 20 октября 2026 (было: `docs/ROADMAP.md`) и больше не обновляется.
+> Описано состояние до 0.3.0-dev; актуально — [README](../../README.md), [PLAN-v0.3](../PLAN-v0.3.md), [ARCHITECTURE](../ARCHITECTURE.md).
+
 # Roadmap автономной деревни
 
 Актуальный план: 17 октября 2026 года. Пункты расположены по зависимостям: согласованное хозяйство → воспроизводство и безопасность → развитие поселения → взаимодействие деревень.
@@ -6,7 +9,7 @@
 
 ## 1. Единый план потребностей деревни — реализован в исходниках
 
-Статус на 17 октября: код реализован, компиляция успешна. Тесты и игровая приёмка текущих изменений не выполнялись. Описание и ограничения: [отчёт](validation/2026-10-17-roadmap-1/REPORT.md).
+Статус на 17 октября: код реализован, компиляция успешна. Тесты и игровая приёмка текущих изменений не выполнялись. Описание и ограничения: [отчёт](../validation/2026-10-17-roadmap-1/REPORT.md).
 
 Сделано:
 
@@ -28,7 +31,7 @@
 сборка прошла 78 unit-тестов мода и 10 коротких серверных проверок PASS.
 После исправлений сборка, тесты и игровые запуски не выполнялись по указанию пользователя.
 Дальние автономные маршруты и полный цикл деревни не приняты.
-Подробности и контрольные суммы: [отчёт](validation/2026-10-17-roadmap-2/REPORT.md).
+Подробности и контрольные суммы: [отчёт](../validation/2026-10-17-roadmap-2/REPORT.md).
 
 Результат ревью:
 
@@ -39,21 +42,21 @@
 - [x] Выгрузка использует ту же защиту комплекта и учитывает `cargoKits`, поэтому
   инструмент отменённого заказа не становится личным автоматически.
 
-- [DeliveryRuns.java](../src/main/java/dev/autonomousvillages/DeliveryRuns.java):
+- [DeliveryRuns.java](../../src/main/java/dev/autonomousvillages/DeliveryRuns.java):
   договор передачи, проверка вместимости и излишка, ожидание участников,
   ограничение срока договора, получение из сундука и регулярное снабжение рабочих сундуков.
-- [Resident.java](../src/main/java/dev/autonomousvillages/Resident.java):
+- [Resident.java](../../src/main/java/dev/autonomousvillages/Resident.java):
   переходы получения/доставки, обмен на свободной границе действия, защита личного
   запаса и освобождение договора при завершении или прерывании работы.
-- [PersonalKits.java](../src/main/java/dev/autonomousvillages/PersonalKits.java):
+- [PersonalKits.java](../../src/main/java/dev/autonomousvillages/PersonalKits.java):
   рабочий и запасной инструмент по роли, выбор по прочности, защита именных предметов.
-- [VillageState.java](../src/main/java/dev/autonomousvillages/VillageState.java),
-  [Village.java](../src/main/java/dev/autonomousvillages/Village.java),
-  [Orders.java](../src/main/java/dev/autonomousvillages/Orders.java) и
-  [VillageControls.java](../src/main/java/dev/autonomousvillages/VillageControls.java):
+- [VillageState.java](../../src/main/java/dev/autonomousvillages/VillageState.java),
+  [Village.java](../../src/main/java/dev/autonomousvillages/Village.java),
+  [Orders.java](../../src/main/java/dev/autonomousvillages/Orders.java) и
+  [VillageControls.java](../../src/main/java/dev/autonomousvillages/VillageControls.java):
   сохранение и проверка `cargoKits`, обработка потери жителя, причины ожидания и диагностика.
-- Проверки: [LogisticsRulesTest.java](../src/test/java/dev/autonomousvillages/LogisticsRulesTest.java),
-  [LogisticsRegression.java](../tools/validation/java/dev/autonomousvillages/LogisticsRegression.java).
+- Проверки: [LogisticsRulesTest.java](../../src/test/java/dev/autonomousvillages/LogisticsRulesTest.java),
+  [LogisticsRegression.java](../../tools/validation/java/dev/autonomousvillages/LogisticsRegression.java).
   Подключение короткой сцены — в `VillageSelfTest.java` и `tools/validation/run.py`
   (`--logistics-only`); в `OrdersTest.java` уточнена допустимость нулевого заказа roadmap 1.
 
@@ -75,7 +78,7 @@ PASS относятся к прежнему JAR из отчёта. Подгот�
 ## 3. Планирование застройки от доступности территории
 
 Статус на 17 октября: реализовано в исходниках; статическое code-review выявило три дефекта, исправления внесены. После ревью сборка и тесты не запускались; игровая приёмка открыта.
-Подробности и границы статической проверки: [отчёт](validation/2026-10-17-roadmap-3/REPORT.md).
+Подробности и границы статической проверки: [отчёт](../validation/2026-10-17-roadmap-3/REPORT.md).
 
 - [x] Вместо двух прямоугольников используется ограниченный граф проходимых клеток от общего выхода; учитываются готовые дороги, открываемые деревянные двери, калитки и перепады высоты.
 - [x] Площадка оценивается по стоимости подключения, длине снабжения и земляным работам; трассы сохраняются даже без новых строительных блоков.

@@ -1,3 +1,6 @@
+> **Archived (0.2.x).** Moved here on 20 October 2026 (was `MODDING_PLAN.md`); no longer maintained.
+> It describes the mod before 0.3.0-dev; current docs: [README](../../README.md), [PLAN-v0.3](../PLAN-v0.3.md), [ARCHITECTURE](../ARCHITECTURE.md).
+
 # Autonomous Villages — implementation plan
 
 Current review-fix candidate: 0.2.1 (2026-10-16). The nine review findings and additional night-shelter/wool issues are addressed; the current immutable pair passed 29 mod unit tests, 103 Navigation AI tests and 88 full server checks. The fresh Normal/growth client was stopped at the user’s request after 51065 ticks; full acceptance remains unconfirmed. No further tests are authorized by the latest instruction; package, commit and push the current build. See VALIDATION.md for current results and exact hashes; older milestones below describe earlier builds and do not certify this candidate.

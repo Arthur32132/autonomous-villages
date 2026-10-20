@@ -34,13 +34,13 @@ tasks.withType(JavaCompile).configureEach { options.release = 25; options.encodi
 java { withSourcesJar(); sourceCompatibility = JavaVersion.VERSION_25; targetCompatibility = JavaVersion.VERSION_25 }
 tasks.test { useJUnitPlatform() }
 // Release docs keep their repo paths in build/distribution; a missing one fails sourceTree and assembleDistribution.
-def releaseDocs = ['README.md','LICENSE','CHANGELOG.md','CONTRIBUTING.md','SECURITY.md','MODDING_PLAN.md','VALIDATION.md','docs/ROADMAP.md','docs/PLAN-v0.3.md','docs/STATIC_AUDIT_2026-10-17.md',
-    'docs/release/0.2.2.md','docs/release/0.2.2-build-manifest.json','docs/release/REVIEW-FIXES.md','docs/release/client-result.json','docs/release/client-summary.json','docs/release/server-summary.json']
+// 0.2-era documents live in docs/archive and are not shipped; ReleaseMetadataTest reads this list.
+def releaseDocs = ['README.md','LICENSE','CHANGELOG.md','CONTRIBUTING.md','SECURITY.md','docs/PLAN-v0.3.md','docs/ARCHITECTURE.md','tools/soak/README.md']
 def navDir = project(':navigationAi').projectDir
 def navReleaseDocs = ['docs/RELEASE_0.2.2.md']
 def requireFiles = { Collection<File> fs -> def missing = fs.findAll { !it.isFile() }; if (missing) throw new GradleException("Distribution files missing: ${missing.join(', ')}") }
 tasks.register('sourceTree', Zip) {
-    def avFiles = ['gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','AGENTS.md','MODLOG.md','docs/WORKLOG.md'] + releaseDocs
+    def avFiles = ['gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','AGENTS.md','docs/WORKLOG.md'] + releaseDocs
     def navFiles = ['gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','LICENSE','README.md']
     def required = avFiles.collect { file(it) } + navFiles.collect { new File(navDir, it) }
     archiveFileName = "autonomous-villages-${project.version}-source.zip"

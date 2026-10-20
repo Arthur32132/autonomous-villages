@@ -5,16 +5,17 @@ safety-town-jobs, construction, life-presentation, tooling-tests, docs-product, 
 сверенный с кодом. Там, где карты расходились, решение принято по коду; такие места помечены
 «(проверено по коду)».
 
-> **О номерах строк.** Ссылки вида `Класс:N` относятся к ревизии master `5781aae` (слияние PR #12;
-> смотреть через `git show 5781aae:<путь>`). Текст обновлён для ветки 0.3.0-dev (`claude/max-upgrade`,
-> 20 октября 2026): описано текущее поведение, исправленное с тех пор отмечено в §11 и перечислено в
-> §12. Реестр найденных проблем со статусами —
-> [reviews/2026-10-20-static-review.md](reviews/2026-10-20-static-review.md).
+> **Ревизия.** Текст сверен с веткой 0.3.0-dev `claude/max-upgrade` на `9ea5c7c` (20 октября 2026);
+> хаб механик `Features` и §13 — на `000fd86`. Код указан как `Класс.метод` (найти:
+> `git grep -n "метод(" -- src`), без номеров строк, которые устаревают с каждой правкой. «На `5781aae`»
+> — состояние master до этой сессии (слияние PR #12). Исправленное с тех пор отмечено в §11 и
+> перечислено в §12; как добавить работу, постройку, механику или переключатель — §13. Реестр
+> найденных проблем со статусами — [reviews/2026-10-20-static-review.md](reviews/2026-10-20-static-review.md).
 
-Все классы лежат в одном пакете `dev.autonomousvillages` (70 файлов вместе с миксином в подпакете
-`mixin`, ~9 400 строк; на `5781aae` было 67 файлов и ~7 400 строк); крупнейшие: `Projects` 938,
-`VillagePlanner` 623, `Village` 567, `Worker` 365, `Blueprints` 310, `Landmarks` 273, `PlayerGoods` 260,
-`Job` 257, `MineJob` 246, `VillageRuntime` 228, `LandmarkGoods` 227.
+Все классы лежат в одном пакете `dev.autonomousvillages` (89 файлов вместе с миксином в подпакете
+`mixin`, ~12 000 строк на `000fd86`; на `5781aae` было 67 файлов и ~7 400 строк); крупнейшие: `Projects`
+938, `VillagePlanner` 625, `Village` 585, `Worker` 380, `Blueprints` 310, `OrchardFeature` 289, `Job`
+280, `Landmarks` 273, `StormFeature` 265, `PlayerGoods` 260, `VillageRuntime` 252, `MineJob` 246.
 
 ---
 
@@ -41,7 +42,7 @@ safety-town-jobs, construction, life-presentation, tooling-tests, docs-product, 
   помощник и тестируют его. Классы, которым нужны реестры Minecraft, сами вызывают
   `Bootstrap.bootStrap()`. Запуск: `./gradlew :test` (мод), `./gradlew test` (мод и библиотека); то же
   делает CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)). Тесты soak-скриптов:
-  `python3 -m unittest discover -s tools/soak/tests`.
+  `python3 -m unittest discover -s tools/soak/tests` (их тоже гоняет CI).
 - **Soak — не юнит-тест.** Юнит-тест проверяет одно правило за миллисекунды и детерминирован. Soak
   ([tools/soak/README.md](../tools/soak/README.md)) поднимает настоящий безголовый выделенный сервер с
   модом, библиотекой и пробой `SoakProbe` (source set `soak`), «забирает» ближайшую сгенерированную
@@ -70,7 +71,8 @@ Fabric-мод для Minecraft 26.2: оператор командой `/avillag
 ## 2. Карта модулей
 
 **Жизненный цикл (lifecycle).** `AutonomousVillagesMod.onInitialize` читает `ModConfig`
-(`config/autonomous_villages.json`, 28 булевых переключателей — с 20.10 добавлен `chatAnnouncements`;
+(`config/autonomous_villages.json`, 34 булевых переключателя — с 20.10 добавлены `chatAnnouncements` и
+шесть переключателей механик;
 файл перезаписывается при каждом старте), регистрирует тип чанк-тикета, хук разрешения ломать блоки
 (`BlockBreakPermissions` → `VillageRuntime.mayBreak`), события `SERVER_STARTED`/`SERVER_STOPPING`/
 `ENTITY_LOAD`/`ENTITY_UNLOAD`/`AFTER_DEATH`/`END_SERVER_TICK`, колбэки взаимодействия игрока и дерево
@@ -141,25 +143,48 @@ NBT-шаблоны: замена камня/песчаника/терракот�
 страницу; пожертвования только полезных предметов с резервом 9 слотов склада; грамота за 128
 предметов).
 
+**Механики (features).** Самостоятельные надстройки над ядром собраны в хабе `Features`: интерфейс
+`Features.Feature` (`key()`, `enabled()`, `tick(v, time)`, `job(v, w, role)`), список `Features.ALL`,
+свой переключатель в `ModConfig` у каждой (имя поля = `key()`), своё JSON-место в
+`VillageState.features` (`Features.load/store`; больше `Features.MAX_STATE_CHARS` = 32 768 символов —
+слот выбрасывается). `Features.tick` зовётся из `LifeEvents.tick` каждый серверный тик (независимо от
+`lifeEvents`), `Features.job` — из `VillagePlanner.next` шагом 4d: после разгрузки, склада, инструмента,
+света, снега и подарка, до работы роли. Исключение механики логируется не чаще раза в 1200 тиков и не
+останавливает ни другие механики, ни деревню. Как добавить свою — §13.
+
+- `CampfireFeature` (`campfire`) — костёр со склада в 3–6 блоках от колокола и вечерний круг жителей у огня до ночного отбоя.
+- `OrchardFeature` (`orchard`) — сад 3×3 дуба на краю деревни, ежедневный обход с костной мукой, яблоки на склад; его деревья не рубят (`OrchardFeature.isOrchardTree` в `ForestWork.usable` и `VillagePlanner`).
+- `HeraldryFeature` (`heraldry`) — герб из имени деревни (`CoatOfArms`) в летописи и знамёна из лишней шерсти на вышке, амбаре, у колокола и над воротами (`BannerJob`, по одному; не пока дом ждёт кроватей).
+- `StormFeature` (`storm`) — в грозу жители под открытым небом уходят под крышу (`StormShelterJob`, в темноте — обычный `ShelterJob`), на вышке (иначе на амбаре) громоотвод из трёх медных слитков склада (`LightningRodJob`).
+- `MasteryFeature` (`mastery`) — звания (ученик, подмастерье, мастер) за долгую работу одним ремеслом (`Mastery`): строка в летописи и звание в подписи над головой (`VillagePresentation`); на работу и экономику не влияет.
+- `LivestockFeature` (`livestock`) — скотный двор: разведение коров и кур кормом со склада, сбор яиц, забой излишка при нехватке еды (не ниже двух взрослых; именных, привязанных и чужих не трогает).
+
 **Инструменты и тесты (tooling-tests).** Gradle: основной jar, отдельный source set `soak`
 (`tools/soak/java`, упакован в `autonomous-villages-soak.jar`; с 20.10 `check` зависит от
 `soakClasses`, так что сломанная проба валит сборку), задачи дистрибутива с явным списком документов
 (отсутствующий файл — ошибка). Версия `0.3.0-dev`. CI — GitHub Actions
-([.github/workflows](../.github/workflows/README.md)): `test :navigationAi:test build` рядом с
-клоном navigation-ai. Хук `.claude/hooks/session-start.sh` (JDK 25 с запасными источниками, клон
-navigation-ai, прогрев Gradle вместе с `testRuntimeClasspath`, повторы при HTTP 429, шаблон
-soak-сервера; таймаут 1800 с). `tools/soak`: `run.py`, `SoakProbe.java`, `digest.py`, `compare.py`,
-`map.py`, тесты `tools/soak/tests`; `tools/showcase/make_timelapse.py`. 29 JUnit-классов (~2 400
-строк, 181 тест) для чистых функций и формата сохранения.
+([.github/workflows](../.github/workflows/README.md)): `py_compile` и `unittest` Python-скриптов,
+затем `test :navigationAi:test build` рядом с клоном navigation-ai. Хук
+`.claude/hooks/session-start.sh` (JDK 25 с запасными источниками, клон navigation-ai, прогрев Gradle
+вместе с `testRuntimeClasspath`, повторы при HTTP 429, шаблон soak-сервера; таймаут 1800 с).
+`tools/soak`: `run.py`, `SoakProbe.java`, `digest.py`, `compare.py`, `map.py`, тесты
+`tools/soak/tests`; `tools/showcase/make_timelapse.py`. 39 JUnit-классов (~3 800 строк, 266 тестов:
+`000fd86` плюс `ReleaseMetadataTest`) для чистых функций, формата сохранения и метаданных релиза
+(`ReleaseMetadataTest`: диапазон `navigation_ai` `>=0.2.2 <0.3.0-` — без пре-релизов 0.3.0 вроде
+`0.3.0-dev` — и контакты в `fabric.mod.json`, файлы `releaseDocs` на месте, баннеры и ссылки архива). В комплект релиза (`assembleDistribution`) идут только `releaseDocs` из `build.gradle`:
+README, LICENSE, CHANGELOG, CONTRIBUTING, SECURITY, PLAN-v0.3, это руководство и
+`tools/soak/README.md`; архив исходников (`sourceTree`) добавляет AGENTS.md и WORKLOG.
 
 **Документация и продукт (docs-product).** Актуальны: [README.md](../README.md), верх
 [CHANGELOG.md](../CHANGELOG.md), [PLAN-v0.3.md](PLAN-v0.3.md), [WORKLOG.md](WORKLOG.md),
 [AGENTS.md](../AGENTS.md), [CONTRIBUTING.md](../CONTRIBUTING.md) (частично),
 [tools/soak/README.md](../tools/soak/README.md), это руководство и
-[статический обзор](reviews/2026-10-20-static-review.md). Исторические (0.1/0.2, без баннера, но
-попадают в дистрибутив): [MODDING_PLAN.md](../MODDING_PLAN.md), [VALIDATION.md](../VALIDATION.md),
-[MODLOG.md](../MODLOG.md), [ROADMAP.md](ROADMAP.md),
-[STATIC_AUDIT_2026-10-17.md](STATIC_AUDIT_2026-10-17.md),
+[статический обзор](reviews/2026-10-20-static-review.md). Исторические (0.1/0.2) с 20.10 лежат в
+[docs/archive](archive/README.md) с баннером и в дистрибутив не попадают:
+[MODDING_PLAN.md](archive/MODDING_PLAN.md), [VALIDATION.md](archive/VALIDATION.md),
+[MODLOG.md](archive/MODLOG.md), [ROADMAP-0.2.md](archive/ROADMAP-0.2.md),
+[STATIC_AUDIT_2026-10-17.md](archive/STATIC_AUDIT_2026-10-17.md); свидетельства 0.2.2 —
+[docs/release](release/0.2.2.md) и [docs/validation](validation/); там же по смыслу
 [reviews/2026-10-19-external-review.md](reviews/2026-10-19-external-review.md).
 
 **Использование навигации (navigation-usage).** Тонкий слой `Job.Approach/Walk/Harvest/Fetch/Deposit/
@@ -170,7 +195,7 @@ collect` и `Worker` поверх `BotHandle` (navigator, miner, inventory, comb
 
 ## 3. Цикл тика и каденции
 
-### 3.1 `VillageRuntime.tick` (каждый серверный тик, `VillageRuntime:135`)
+### 3.1 `VillageRuntime.tick` (каждый серверный тик)
 
 1. `ticks++`; первые 5 тиков пропускаются.
 2. `residentDecisionRemainingNanos = TickWorkBudget.residentDecisionNanos(nanosPerTick)` —
@@ -181,7 +206,7 @@ collect` и `Worker` поверх `BotHandle` (navigator, miner, inventory, comb
 4. `writer.takeFailure()` → `persistenceWriteFailed` (флаг никто не читает).
 5. Каждые 1200 тиков `writeSave(true)` — сериализация на потоке сервера, запись на демон-потоке.
 
-### 3.2 `Village.tick` (`Village:111`) — порядок и частоты
+### 3.2 `Village.tick` — порядок и частоты
 
 | Что | Когда | Стоимость / заметки |
 |---|---|---|
@@ -205,14 +230,14 @@ collect` и `Worker` поверх `BotHandle` (navigator, miner, inventory, comb
 | `ambience.tick` | `%20==9`, при игроке в 48 блоках | |
 | `LandmarkGoods` | `%200==77` | раз в день на вид здания |
 | `VillageRequests` | `%200==137` | `Projects.missing` + скан сундуков на каждый ключ |
-| `lifeEvents.tick` | каждый тик | очередь нот; `watchCompletions/watchBirths` раз в 20 |
+| `lifeEvents.tick` | каждый тик | очередь нот; `Features.tick` (каждый тик, сами механики решают, когда работать); `watchCompletions/watchBirths` раз в 20 |
 | `clearDoorways` | `%10==4` | |
 | `closeDoors` | `%100==50` ночью | |
 | чистка метаданных | `%200==0` | `plantedTrees`, `furnaces`, `lights`, истёкшие `rejected`, `problem` |
 
 Все деревни живут в одной фазе игрового времени: их `%100`/`%200` работа ложится на один тик.
 
-### 3.3 `Worker.tick(mayPlan)` (`Worker:96`)
+### 3.3 `Worker.tick(mayPlan)`
 
 Порядок: бот отсутствует/не ACTIVE → статус «не загружен», **выход с сохранённой `job`** → другое
 измерение → `cancel()` → `breathing.tick()` (если активен, больше ничего) → `restRecovery` (раз в
@@ -238,7 +263,7 @@ collect` и `Worker` поверх `BotHandle` (navigator, miner, inventory, comb
 
 ## 4. Жизненный цикл работы (`Job`)
 
-**База (`Job:25`).** `kind()` (ключ кулдауна и `activeJobs`), `target()` (аренда, отображение,
+**База (`abstract class Job`).** `kind()` (ключ кулдауна и `activeJobs`), `target()` (аренда, отображение,
 отклонение), `timeLimit()` (по умолчанию 2400; Farm 1200, Gift 1600, Home 3000, Build/Chop/Compost
 3600, Craft 4800, Shaft 6000; Patrol и Shelter — до утра: `PatrolJob.nightLeft(clock)+600`), `tick()` →
 `false` когда завершена или провалена, `stop()`, `atomic()` (расписание ждёт), `keeps(stack)` (не
@@ -276,10 +301,13 @@ FAILED подхода — `unreachable(chest)` и следующий сунду�
 сейчас пропускает (`FetchJob` пишет «не добраться до склада» вместо «нет на складе»). **`Deposit`** —
 то же с `nearestWithRoom`, переносит все слоты вне `keptSlots()`.
 
-**Поток провала (`Worker.endJob`, `Worker:170`).** `job.stop()`; если `failure` непуст:
-`lastFailure`; `v.rejected.put(target, now+600)` (**перезаписывает** более длинные сроки,
-выставленные самой работой); `cooldown(kind(), 200)`; эвристика застревания **по русским строкам**
-(«не подойти», «не нашёл дорогу», «не дойти», «уложился», «(unreachable)», «(stuck») → `stuckCount`
+**Поток провала (`Worker.endJob`).** `job.stop()`; если `failure` непуст:
+`lastFailure`; `NavHygiene.reject(v.rejected, target, now+600)` (берёт больший срок: более длинный
+отказ, выставленный самой работой, сохраняется — до w2-nav-hygiene был `put`, перезаписывавший его);
+`cooldown(kind(), 200)`; эвристика застревания `NavHygiene.stuck` **по русским строкам** («не подойти»,
+«не нашёл дорогу», «не дойти», «(unreachable)», «(stuck»; «уложился» — только если превышен лимит без
+ожидания планировщика; провалы планировщика `planning_timeout`/`search_queue_full`/
+`chunk_loading_timeout` не считаются) → `stuckCount`
 около одного места; 3 → лог `TRAPPED` и `forgetBy(id)` памяти недосягаемых (виноват житель, а не
 цели), затем `trapped()` → `EscapeJob` (кулдаун escape 1200), после `EscapeJob` → телепорт `unstick()`
 (тоже `forgetBy`); `v.failures` (диагностика), `ambience.frown`, лог `JOB_FAILED` раз в 600 тиков.
@@ -322,7 +350,7 @@ Lighting.lightCap(v)`, 160…960 по площади и числу жителе�
 отклонённый и не скрытый памятью недосягаемых — тот же тест, что у `CraftJob`), печь (+флаг выхода;
 `getBlockEntity` без проверки загрузки чанка).
 
-**`next(w)`** (`VillagePlanner:76`) — фиксированный порядок, без кэша:
+**`VillagePlanner.next(w)`** — фиксированный порядок, без кэша:
 1. Разгрузка: после chop/quarry/shaft/shear при ≥4 лишних, либо ≥16 лишних, либо ≤4 свободных слотов —
    `DepositJob`, если `chests>0 && freeSlots>0 && ready("deposit")`.
 2. `storeJob`: верстак → сундук (при `noChest` в 10 блоках от колокола или `full`: <9 свободных слотов
@@ -330,7 +358,7 @@ Lighting.lightCap(v)`, 160…960 по площади и числу жителе�
    (`boardCarried` опрашивает `o.has(...)` **всех** работников, в т.ч. без бота).
 3. `toolJob` — инструмент роли.
 4. `LightJob` (стражи и малая бригада — всегда, остальные после clock 8000; один на деревню),
-   4b `HazardJob`, 4c `GiftJob` (хлеб ≥24).
+   4b `HazardJob`, 4c `GiftJob` (хлеб ≥24), 4d `Features.job` — первая механика, предложившая работу.
 5. Ветка роли (при `smallCrew`, т.е. <3 ролей, роль = null): BUILDER build→craftForProject→chop(помощь);
    STEWARD craftForProject→spareBed→workshop→build; LOGGER chop; MINER mine→sand; FARMER
    farm→bread→compost→shear→herd; GUARD chop(помощь).
@@ -393,7 +421,7 @@ stable — дома бронника, лучника, каменщика, пас
 сгенерированного куска деревни без «меток игрока» (`Projects.adoptable(inPiece, marked)`; метки —
 `foreign()`: таблички, кроме еловых настенных из шаблона тайги, редстоун, наковальни, шалкеры, …).
 
-**`Projects.tick`** (раз в 100 тиков, `Projects:108`; на ветке 0.3.0-dev переписан):
+**`Projects.tick`** (раз в 100 тиков; на ветке 0.3.0-dev переписан):
 1. Завершение: `remaining(b)==0` → `completed=true`, объявление, хуки (`housewarming`, `furnish`,
    `signboard`, `stableHorses`, `fillWell`, `stockPen`, `footpath`) — каждый в своём `try/catch`
    (`hook()`, ошибка логируется один раз), затем `save()`.
@@ -427,7 +455,7 @@ stable — дома бронника, лучника, каменщика, пас
 ячеек планов (+верхние половины дверей, изголовья кроватей), пересобирается при `invalidate()` —
 **вызывается из `Construction.place` после каждого блока**.
 
-**`BuildJob`** (`BuildJob:44`): вырубки (`Approach 4.5` → `Harvest`; провал подхода → ячейка
+**`BuildJob.tick`**: вырубки (`Approach 4.5` → `Harvest`; провал подхода → ячейка
 запоминается как недосягаемая) → `affordable(16)` без ячеек из памяти недосягаемых (пусто → «стройке не
 хватает материалов: …») → `Fetch` (один раз; что склад дал, то и есть) → установка снизу вверх:
 `Approach(4.2, без видимости)`, `Construction.available` (подмены: щебень вместо булыжника, любые доски,
@@ -436,7 +464,7 @@ stable — дома бронника, лучника, каменщика, пас
 блока → «не подойти к стройке» (если мешали подходы) или «материалы не донесены». Отказы `place`
 (canSurvive, лимиты, зоны) между работами не запоминаются.
 
-**`Construction.place`** (`Construction:95`): политика зон; **лимиты метаданных — сундук при
+**`Construction.place`**: политика зон; **лимиты метаданных — сундук при
 `storage ≥128` и печь при `furnaces ≥16` не ставятся вовсе** (проверено по коду; карта docs-product
 ошибочно утверждает обратное); `canWork`, дистанция глаза ≤4,5, `clear()` (только воздух, трава,
 папоротник, снег), предмет в рюкзаке, граница мира, `canSurvive`; вторая половина кровати/двери;
@@ -601,7 +629,8 @@ births, villagers, avgTps, logErrors, score), команды status/plan/chronic
 `Supplies` (сохранение количества предметов), `VillageCrafting.craft`, `Breeding` (кроме правила еды),
 `VillageDiscovery/VillageIndex`, пути ошибок `load/writeSave`, миксины и события Fabric. В остальных
 тестах теги предметов не связаны, так что предикаты по тегам (доски, кирки) проверяются только в soak.
-С 20.10 есть CI (GitHub Actions: `test :navigationAi:test build` на push в master и PR), `check`
+С 20.10 есть CI (GitHub Actions на push в master и PR: `py_compile` и `unittest` скриптов soak, затем
+`test :navigationAi:test build`), `check`
 компилирует пробу soak, хук прогревает `testRuntimeClasspath`, а Gradle повторяет загрузки при HTTP
 429 (6 попыток с удвоением паузы); на `5781aae` CI не было, и базовый `./gradlew test` в контейнере
 падал на разрешении `junit-jupiter-engine`. Поведение в мире проверяется только многочасовым soak,
@@ -610,7 +639,7 @@ births, villagers, avgTps, logErrors, score), команды status/plan/chronic
 
 ---
 
-## 11. Известные слабые места (сквозные темы)
+## 11. Известные ограничения
 
 Состояние на 20 октября 2026 указано после каждого пункта; подробности и статус каждой находки — в
 [реестре](reviews/2026-10-20-static-review.md).
@@ -660,7 +689,7 @@ births, villagers, avgTps, logErrors, score), команды status/plan/chronic
    vs 128, README vs код (8 из 27 переключателей не описаны, «не создают ресурсы из воздуха»).
    *20.10:* `Food` для рождений и босс-бара (E6; статус, `restRecovery` и `keptSlots` всё ещё на
    `Supplies.food`), настоящее «под крышей» (G3), один номер дня для летописи и новостей (E6; могилы —
-   по gameTime); лимит 16 vs 128 и README открыты (переключателей теперь 28).
+   по gameTime); лимит 16 vs 128 и README открыты (переключателей теперь 34).
 10. **Порядок проектов**: дома-первыми + `free` + `return` при неудаче площадки → после домов ничего
     не строится; видимые изменения (принцип 1) не наступают. *20.10:* исправлено (C1): общественная
     цепочка идёт параллельно с домами, площадки ищутся с кулдауном и переходом к следующему виду.
@@ -685,5 +714,79 @@ births, villagers, avgTps, logErrors, score), команды status/plan/chronic
 - `task/g5-blueprints-goods` (ef2b1a5, 84f9894) — кэш списка шаблонов, все мастерские профессий, аудит досягаемости шаблонов (152 ванильных), `LandmarkGoods` не уничтожает товары при полном складе.
 - `task/g4-forest-farm-craft` (dc8f00f, 6fdf6af) — согласованное состояние валки и подсадка пней, деревья не из построек, окно сбора 20 тиков, овцы с пропуском и парой, топливо одного вида на партию, однородные доски в крафтах, кэш воды полей.
 - `task/c1-projects-flow` (3dedf07, 4d0a2a6) — общественная цепочка параллельно с домами (`Projects.decide`), кулдауны и курсоры площадок, улицы и крыши не площадки, амбар дверью к колоколу, необязательные высокие вырубки, частокол в границах, захват только новых кусков без меток игрока, изолированные хуки завершения.
+- `task/d0-arch-docs` (3d92c48) — это руководство и реестр статического обзора со статусами.
+- `3f68a21` — хаб механик `Features`: интерфейс, переключатели, слот `VillageState.features`, изоляция ошибок.
+- `task/f5-mastery` (b1e0f39, fdce416) — звания мастерства, запись в летописи, звание в подписи жителя.
+- `task/f6-livestock` (c0725eb) — скотный двор: разведение коров и кур, яйца, забой излишка.
+- `task/f1-campfire` (dd88c30) — костёр на площади и вечерний круг.
+- `task/f2-orchard` (abf959a, 4197bf0) — яблоневый сад, обход и яблоки на склад; лесорубы не трогают его деревья.
+- `task/f3-heraldry` (160ad2b) — герб деревни из её имени, знамёна на вышке, амбаре, у колокола и над воротами.
+- `task/f4-storm` (2ccf842, 25b430e) — укрытие жителей в грозу, громоотвод на вышке, строка в летописи.
 
-В работе (ветки `task/*`, не слитые в `claude/max-upgrade`) на момент обновления — нет.
+Слияния `task/w2-*` и более поздние здесь не перечислены — см. `git log --first-parent master..claude/max-upgrade`.
+
+---
+
+## 13. Как добавить работу, постройку, механику или переключатель
+
+Общие правила для любого нового кода: предметы не появляются из воздуха (берутся со склада или из
+рюкзака через `Supplies`/`VillageStock.consume`; остаток `VillageStock.put` кладётся предметом в мир,
+а не теряется), исключение не уходит в серверный тик, мир читается только в загруженных чанках
+(`v.level.hasChunkAt(p)`), игровые строки — на русском. Решение выносится в статический помощник без
+`ServerLevel`, и на него пишется тест в `src/test/java/dev/autonomousvillages/` (§0, §10).
+
+**Работа жителя.**
+1. Класс `XxxJob extends Job`: `kind()` — ключ кулдауна (`Worker.cooldown/ready`) и счётчика
+   `Village.activeJobs`; `target()` — на него `Worker.start` берёт аренду `Reservations` (цель занята —
+   работа молча отбрасывается); при нужде `timeLimit()`, `keeps(stack)` (что не сдавать на склад),
+   `atomic()`, `activity()/mayBreak(p)` (если ломает блоки библиотечным майнером).
+2. `tick()` возвращает `true`, пока работа идёт, и `false` по окончании; провал — `return fail("…")`.
+   Строка причины — статус жителя и вход эвристики застревания `Worker.endJob` («не подойти», «не
+   дойти», «уложился» считаются застреванием), её выбирают сознательно. Ходьба — `Approach`/`Walk`,
+   ломание — `Harvest`, склад — `Fetch`/`Deposit`; их `cancel()` вызывается из `stop()`. Блоки ставятся
+   только через `Construction.place` (зоны, досягаемость, списание предмета из рюкзака).
+3. Недосягаемую цель отметить `Job.unreachable(p)` (память и голоса) или
+   `NavHygiene.reject(v.rejected, p.asLong(), now()+…)` (не `put`: он укоротил бы более длинный отказ),
+   иначе планировщик выберет её снова.
+4. Подключить в `VillagePlanner.next` — в ветку роли или в общий хвост (порядок = приоритет) — с
+   проверками `w.ready(kind)`, `v.activeJobs(kind)` и `v.ready(p, w.id)`. Работа, которую владелец может
+   не хотеть, получает переключатель (ниже) или становится механикой.
+5. Тест — предикаты выбора цели и вердикты (как `SafetyJobsTest`, `GatheringTest`); поведение в мире —
+   soak ([tools/soak/README.md](../tools/soak/README.md)), строки `JOB_FAILED` в `events.log`.
+
+**Постройка.**
+- Своя достопримечательность: вид в `Landmarks.ORDER` (порядок) и `Landmarks.residents` (сколько
+  жителей нужно), `label/title/feminine`, план в `Landmarks.design` из `Piece` (слой 0 — пол, вход на
+  стороне z=0). `LandmarksTest` проверяет каждый дизайн на материалы, которые деревня делает сама,
+  досягаемость строителя и опоры — новый вид проходит те же тесты. Суточный эффект готового здания —
+  `LandmarkGoods.tick` (только то, что влезает: `room()`/`keep()`).
+- Общественная постройка по ручному плану: вид в `Projects.CHAIN` (место в цепочке), условие в
+  `Projects.eligible` (переключатель и число жителей), закладка в `Projects.lay` (площадка —
+  `findSite`/`place`, без площадки вид ждёт `retryTicks`, строка — `seeking`), хуки завершения — в
+  `Projects.complete` через `hook(...)`. Очередь решает чистая `Projects.decide(Queue)` — тест в
+  `ProjectsTest`.
+- Ванильные шаблоны подхватываются сами (`Blueprints.houses/civic`) и проходят `Blueprints.audit`
+  (`BlueprintsAuditTest`).
+- Строятся все виды одинаково — `TownBuilding` → `BuildJob` → `Construction.place`; материалы считаются
+  по плану (`Projects.missing`), отдельный учёт не нужен.
+
+**Механика (feature)** — самостоятельная надстройка со своим состоянием (§2, «Механики»).
+1. Класс `XxxFeature implements Features.Feature`: `key()`, `enabled()` →
+   `AutonomousVillagesMod.CONFIG.<key>`; экземпляр добавить в `Features.ALL`.
+2. Переключатель `public boolean <key>=true;` в `ModConfig` — `FeaturesTest` требует поле с именем
+   `key()`, `boolean`, включённое по умолчанию.
+3. Состояние — класс для GSON: `Features.load(v, KEY, State.class, State::new)` и
+   `Features.store(v, KEY, state)`, кэш на деревню — `WeakHashMap<Village, …>`. На диск его пишет
+   периодический снимок: `runtime.save()` не вызывать; размер — до `Features.MAX_STATE_CHARS`.
+4. `tick(v, time)` идёт каждый серверный тик — частоту механика ограничивает сама (`time % N`,
+   `Features.throttled`). `job(v, w, role)` спрашивается у каждого простаивающего жителя на шаге 4d
+   планировщика и почти всегда должен возвращать `null` (окна времени, `w.ready`, предел
+   `v.activeJobs`), иначе механика съест работу ядра. `role == null` — малая бригада, где все делают всё.
+5. Тесты — чистые правила механики (`CampfireFeatureTest`, `OrchardFeatureTest`, `LivestockTest`,
+   `MasteryTest`).
+
+**Переключатель.** `public boolean <имя>=true;` с однострочным javadoc в `ModConfig`; читается как
+`AutonomousVillagesMod.CONFIG.<имя>` там, где решается поведение. `ModConfig.load` переписывает
+`config/autonomous_villages.json` при каждом старте, поэтому новый ключ появляется у владельцев со
+значением по умолчанию, а их прежний выбор сохраняется (`ModConfigTest`). Описание — в таблице
+переключателей README.

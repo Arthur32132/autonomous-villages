@@ -13,7 +13,7 @@ final class FetchJob extends Job {
     @Override boolean tick(){
         return switch(fetch.tick()){
             // Part of the amount is still useful: seeds for a few cells, a stack of torches.
-            case FAILED->w.count(need.test())>0?false:fail("нет на складе: "+fetch.missing);
+            case FAILED->w.count(need.test())>0?false:fail((fetch.hidden?"не добраться до склада: ":"нет на складе: ")+fetch.missing);
             case MOVING->true;
             default->false;
         };

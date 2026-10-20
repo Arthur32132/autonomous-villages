@@ -17,6 +17,8 @@ final class BuildJob extends Job {
     private Approach approach;
     private Harvest harvest;
     private int placed,misses;
+    /** Steps skipped because nobody reached them lately (shown in the status), and cells this job failed to approach. */
+    private int deferred,unreached;
     private boolean fetched;
     BuildJob(Worker w,TownBuilding project){
         super(w,"строит: "+Projects.label(project));this.project=project;
@@ -31,10 +33,11 @@ final class BuildJob extends Job {
     @Override boolean atomic(){return harvest!=null;}
     @Override boolean keeps(ItemStack s){return steps.stream().anyMatch(p->Construction.material(p.step()).test(s));}
 
-    /** What one batch of the project needs, limited to steps the store (plus the bag) can pay for. */
+    /** What one batch of the project needs, limited to steps the store (plus the bag) can pay for; cells nobody reached lately wait. */
     List<TownBuilding.Plan> affordable(int limit){
         var out=new ArrayList<TownBuilding.Plan>();var reserved=new IdentityHashMap<Predicate<ItemStack>,Integer>();var tests=new HashMap<String,Predicate<ItemStack>>();
-        for(var p:v.town.nextSteps(project,48)){
+        var steps=v.town.nextSteps(project,48);var open=Construction.deferUnreachable(steps,TownBuilding.Plan::position,v.stock.unreachable,now());deferred=steps.size()-open.size();
+        for(var p:open){
             var test=tests.computeIfAbsent(Projects.materialKey(p.block()),k->Construction.material(p.step()));
             int cost=Construction.cost(p.step()),used=reserved.getOrDefault(test,0);
             if(v.stock.count(test)+w.count(test)>=used+cost){reserved.put(test,used+cost);out.add(p);if(out.size()>=limit)break;}
@@ -53,7 +56,8 @@ final class BuildJob extends Job {
             if(approach==null)approach=new Approach(cuts.peek(),4.5,false);
             var state=approach.tick();
             if(state==Approach.State.MOVING)return true;
-            if(state==Approach.State.FAILED){cuts.poll();approach=null;return true;}
+            // A cut cell nobody stands at is remembered too, or every BuildJob would walk to it again.
+            if(state==Approach.State.FAILED){unreachableCell(cuts.peek());cuts.poll();approach=null;return true;}
             harvest=new Harvest(cuts.peek());approach=null;return true;
         }
         if(fetch==null){
@@ -71,14 +75,16 @@ final class BuildJob extends Job {
             if(fetch.tick()==Approach.State.MOVING){status="берёт материалы на складе";return true;}
             fetched=true; // whatever the store had; placing uses it up and must not trigger new fetches
         }
-        while(!steps.isEmpty()&&(steps.peek().matches(v)||Construction.available(bot(),steps.peek().step())==null||!Construction.clear(v.level.getBlockState(steps.peek().position())))){steps.poll();approach=null;}
-        if(steps.isEmpty())return placed>0?false:fail("материалы не донесены");
+        while(!steps.isEmpty()&&(steps.peek().matches(v)||Construction.available(bot(),steps.peek().step())==null||!Construction.clear(v.level.getBlockState(steps.peek().position()))
+                ||v.stock.unreachable.isUnreachable(steps.peek().position(),now()))){steps.poll();approach=null;}
+        if(steps.isEmpty())return placed>0?false:fail(unreached>0?"не подойти к стройке":"материалы не донесены");
         var plan=steps.peek();
-        status="строит: "+Projects.label(project)+" "+v.town.built(project)+"/"+v.town.size(project);
+        status="строит: "+Projects.label(project)+" "+v.town.built(project)+"/"+v.town.size(project)+(deferred>0?", недосягаемых блоков "+deferred:"");
         if(approach==null)approach=new Approach(plan.position(),4.2,false);
         var state=approach.tick();
         if(state==Approach.State.MOVING)return true;
-        if(state==Approach.State.FAILED){steps.poll();approach=null;if(++misses>=6)return placed>0?false:fail("не подойти к стройке");return true;}
+        // The cell is remembered and the batch goes on with the next one; the cell is tried again in an hour.
+        if(state==Approach.State.FAILED){unreachableCell(plan.position());deferred++;unreached++;steps.poll();approach=null;if(++misses>=6)return placed>0?false:fail("не подойти к стройке");return true;}
         var step=Construction.available(bot(),plan.step());
         if(step!=null&&Construction.place(v,bot(),step)){placed++;v.chronicle.placed();}
         else if(++misses>=6)return placed>0?false:fail("не удаётся поставить блоки");

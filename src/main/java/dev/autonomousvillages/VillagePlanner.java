@@ -54,8 +54,9 @@ final class VillagePlanner {
             for(var p:Lighting.darkSpots(v,8))if(dark.size()<8)dark.add(p);
         }
         BlockPos hub=v.meetingPoint();
-        // The workbench nearest the bell that a route reaches; none such and the village makes its own by the bell.
-        BlockPos table=v.index.tables.stream().filter(p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)&&p.distSqr(hub)<32*32&&v.rejected.getOrDefault(p.asLong(),0L)<=now)
+        // The workbench nearest the bell that a route reaches (the same test as CraftJob's); none such and the village makes its own by the bell.
+        int quorum=v.stock.quorum();
+        BlockPos table=v.index.tables.stream().filter(p->v.level.getBlockState(p).is(Blocks.CRAFTING_TABLE)&&p.distSqr(hub)<32*32&&v.rejected.getOrDefault(p.asLong(),0L)<=now&&!v.stock.unreachable.isUnreachable(p,now,quorum))
                 .min(Comparator.comparingDouble(p->p.distSqr(hub))).orElse(null);
         BlockPos furnace=null;boolean output=false;
         for(long packed:v.state.furnaces)if(v.level.getBlockEntity(BlockPos.of(packed)) instanceof FurnaceBlockEntity f&&!f.isLocked()){
@@ -592,6 +593,7 @@ final class VillagePlanner {
         if(s.project()!=null)lines.add("Стройка: "+Projects.label(s.project())+" "+v.town.built(s.project())+"/"+v.town.size(s.project())+"; не хватает "+s.missing());
         else lines.add("Стройка: нет активной ("+v.town.stage+")");
         lines.add("Тёмных мест рядом с домами: "+s.dark().size()+(s.dark().isEmpty()?"":", ближайшее "+s.dark().getFirst().toShortString()));
+        lines.add("Недосягаемых целей (временно пропускаются): "+v.stock.unreachableCount());
         lines.add("Рост: свободных кроватей "+v.breeding.freeBeds()+(v.breeding.blocker().isEmpty()?", ждут пару":", "+v.breeding.blocker()));
         return lines;
     }

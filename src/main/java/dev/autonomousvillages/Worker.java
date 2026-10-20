@@ -76,7 +76,7 @@ final class Worker {
         if(best==null)return;
         var to=v.feetPosition(best);
         AutonomousVillagesMod.LOG.info("UNSTUCK {} {} {} -> {}",v.state.name,v.presentation.personName(id),here.toShortString(),best.toShortString());
-        bot().stopAll();body().teleportTo(to.x,to.y,to.z);stuckCount=0;
+        bot().stopAll();body().teleportTo(to.x,to.y,to.z);stuckCount=0;v.stock.unreachable.forgetBy(id);
     }
     private boolean nearStuckSpot(){return BlockPos.of(stuckAt).distSqr(body().blockPosition())<=9;}
     boolean released;
@@ -178,7 +178,8 @@ final class Worker {
             if(job.failure.startsWith("не подойти")||job.failure.startsWith("не нашёл дорогу")||job.failure.startsWith("не дойти")||job.failure.contains("уложился")
                     ||job.failure.endsWith("(unreachable)")||job.failure.contains("(stuck")){
                 stuckCount=nearStuckSpot()?stuckCount+1:1;if(stuckCount==1)stuckAt=body().blockPosition().asLong();
-                if(stuckCount==3)AutonomousVillagesMod.LOG.info("TRAPPED {} {} at {}: {}",v.state.name,v.presentation.personName(id),body().position(),surroundings());
+                // The targets it could not reach were fine; it is the resident that is stuck, so the store stays open to the others.
+                if(stuckCount==3){AutonomousVillagesMod.LOG.info("TRAPPED {} {} at {}: {}",v.state.name,v.presentation.personName(id),body().position(),surroundings());v.stock.unreachable.forgetBy(id);}
             }
             v.failures.merge(job.kind()+": "+job.failure,1,Integer::sum);
             v.ambience.frown(this);

@@ -32,7 +32,11 @@ final class Features {
             new HeraldryFeature(),
             new StormFeature(),
             new MasteryFeature(),
-            new LivestockFeature());
+            new LivestockFeature(),
+            new ApiaryFeature(),
+            new WeddingFeature(),
+            new SnowGuardFeature(),
+            new ScarecrowFeature());
 
     private static final Gson GSON=new GsonBuilder().disableHtmlEscaping().create();
     private static final Map<String,Long> lastError=new HashMap<>();

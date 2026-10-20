@@ -86,6 +86,14 @@ public final class ModConfig {
     public boolean mastery=true;
     /** Farmers keep chickens and cows by the pen: eggs, milk and meat for the table. */
     public boolean livestock=true;
+    /** Beehives by the flower beds; honey bottles count as meals. */
+    public boolean apiary=true;
+    /** A wedding at the bell before a couple's first child: flowers, music and a feast line in the chronicle. */
+    public boolean weddings=true;
+    /** Snowy villages build snow golems that guard the square at night. */
+    public boolean snowGuards=true;
+    /** Scarecrows (fence, hay and a carved pumpkin) watch over the fields. */
+    public boolean scarecrows=true;
 
     static final String FILE="autonomous_villages.json";
     private static final Gson GSON=new GsonBuilder().setPrettyPrinting().create();

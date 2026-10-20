@@ -24,54 +24,70 @@ tasks.register('soakJar', Jar) {
     from sourceSets.soak.output
     archiveBaseName = 'autonomous-villages-soak'
 }
+tasks.named('check') { dependsOn 'soakClasses' } // 'build' fails when a mod refactor breaks tools/soak/java
 processResources {
-    inputs.property 'version', project.version
-    filesMatching('fabric.mod.json') { expand 'version': project.version }
+    def ver = project.version.toString()
+    inputs.property 'version', ver
+    filesMatching('fabric.mod.json') { expand 'version': ver }
 }
 tasks.withType(JavaCompile).configureEach { options.release = 25; options.encoding = 'UTF-8' }
 java { withSourcesJar(); sourceCompatibility = JavaVersion.VERSION_25; targetCompatibility = JavaVersion.VERSION_25 }
 tasks.test { useJUnitPlatform() }
+// Release docs keep their repo paths in build/distribution; a missing one fails sourceTree and assembleDistribution.
+def releaseDocs = ['README.md','LICENSE','CHANGELOG.md','CONTRIBUTING.md','SECURITY.md','MODDING_PLAN.md','VALIDATION.md','docs/ROADMAP.md','docs/PLAN-v0.3.md','docs/STATIC_AUDIT_2026-10-17.md',
+    'docs/release/0.2.2.md','docs/release/0.2.2-build-manifest.json','docs/release/REVIEW-FIXES.md','docs/release/client-result.json','docs/release/client-summary.json','docs/release/server-summary.json']
+def navDir = project(':navigationAi').projectDir
+def navReleaseDocs = ['docs/RELEASE_0.2.2.md']
+def requireFiles = { Collection<File> fs -> def missing = fs.findAll { !it.isFile() }; if (missing) throw new GradleException("Distribution files missing: ${missing.join(', ')}") }
 tasks.register('sourceTree', Zip) {
+    def avFiles = ['gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','AGENTS.md','MODLOG.md','docs/WORKLOG.md'] + releaseDocs
+    def navFiles = ['gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','LICENSE','README.md']
+    def required = avFiles.collect { file(it) } + navFiles.collect { new File(navDir, it) }
     archiveFileName = "autonomous-villages-${project.version}-source.zip"
     destinationDirectory = layout.buildDirectory.dir('sources')
     reproducibleFileOrder = true
     preserveFileTimestamps = false
     from(projectDir) {
         into 'AutonomousVillages'
-        include 'src/**','tools/**','gradle/**','gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','LICENSE','README.md','MODDING_PLAN.md','VALIDATION.md','AGENTS.md','MODLOG.md','CHANGELOG.md','docs/release/**','docs/ROADMAP.md','docs/STATIC_AUDIT_2026-10-17.md'
+        include(['src/**','tools/**','gradle/**'] + avFiles)
         exclude '**/__pycache__/**','**/lab/**'
     }
-    from(project(':navigationAi').projectDir) {
+    from(navDir) {
         into 'MinecraftmodNavigationAi'
-        include 'src/**','tools/regression/**','gradle/**','gradlew','gradlew.bat','build.gradle','settings.gradle','gradle.properties','LICENSE','README.md','docs/*.md'
+        include(['src/**','tools/regression/**','gradle/**','docs/*.md'] + navFiles)
         exclude '**/__pycache__/**','tools/regression/results/**'
     }
+    doFirst { requireFiles(required) }
 }
 tasks.register('assembleDistribution', Sync) {
+    def distDir = layout.buildDirectory.dir('distribution')
+    def ver = project.version.toString()
+    def required = releaseDocs.collect { file(it) } + navReleaseDocs.collect { new File(navDir, it) }
+    def roots = [AutonomousVillages: projectDir, MinecraftmodNavigationAi: navDir]
+    def srcTrees = roots.collectEntries { prefix, dir -> [(prefix): fileTree(new File(dir, 'src')) { include '**/*.java','**/*.json' }] }
     dependsOn 'jar', 'sourcesJar', ':navigationAi:jar', ':navigationAi:sourcesJar', 'sourceTree'
-    into layout.buildDirectory.dir('distribution')
+    into distDir
     from(tasks.named('jar', Jar).flatMap { it.archiveFile })
     from(project(':navigationAi').tasks.named('jar', Jar).flatMap { it.archiveFile })
-    from('README.md', 'LICENSE', 'MODDING_PLAN.md', 'VALIDATION.md', 'CHANGELOG.md')
-    from(['docs/STATIC_AUDIT_2026-10-17.md','docs/ROADMAP.md']) { into 'docs' }
-    from(project(':navigationAi').file('docs/RELEASE_0.2.2.md')) { into 'docs/navigation-ai' }
-    from('docs/release') { into 'docs/release' }
+    releaseDocs.each { p -> from(p) { if (p.contains('/')) into(p.substring(0, p.lastIndexOf('/'))) } }
+    navReleaseDocs.each { p -> from(new File(navDir, p)) { into 'docs/navigation-ai' } }
     from(tasks.named('sourceTree', Zip).flatMap { it.archiveFile }) { into 'sources' }
     doFirst {
-        def intended = project.layout.buildDirectory.dir('distribution').get().asFile.canonicalFile
-        if (destinationDir.canonicalFile != intended) throw new GradleException('Distribution must stay in build/distribution')
+        requireFiles(required)
+        if (destinationDir.canonicalFile != distDir.get().asFile.canonicalFile) throw new GradleException('Distribution must stay in build/distribution')
     }
     doLast {
         def sha = { File f -> java.security.MessageDigest.getInstance('SHA-256').digest(f.bytes).encodeHex().toString() }
-        def folder = layout.buildDirectory.dir('distribution').get().asFile
-        def artifacts = fileTree(folder).matching { include '*.jar' }.files.sort { it.name }.collectEntries { [(it.name):sha(it)] }
+        def folder = distDir.get().asFile
+        def artifacts = folder.listFiles().findAll { it.name.endsWith('.jar') }.sort { it.name }.collectEntries { [(it.name):sha(it)] }
         def sources = [:]
-        [project,project(':navigationAi')].each { p ->
-            def prefix=p==project?'AutonomousVillages':'MinecraftmodNavigationAi'
-            p.fileTree('src').matching { include '**/*.java','**/*.json' }.files.sort { it.path }.each { f -> sources[prefix+'/'+p.relativePath(f).replace(File.separator,'/')] = sha(f) }
-            ['build.gradle','settings.gradle','gradle.properties'].each { n -> if(p.file(n).exists())sources[prefix+'/'+n]=sha(p.file(n)) }
+        roots.each { prefix, dir ->
+            def found = new TreeMap<String, File>()
+            srcTrees[prefix].visit { d -> if (!d.directory) found['src/' + d.relativePath.pathString] = d.file }
+            found.each { rel, f -> sources[prefix+'/'+rel] = sha(f) }
+            ['build.gradle','settings.gradle','gradle.properties'].each { n -> def f = new File(dir, n); if (f.exists()) sources[prefix+'/'+n] = sha(f) }
         }
-        new File(folder,'build-manifest.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([version:project.version.toString(),jars:artifacts,sources:sources]))
+        new File(folder,'build-manifest.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([version:ver,jars:artifacts,sources:sources]))
     }
 }
 tasks.register('bundleDistribution', Zip) {

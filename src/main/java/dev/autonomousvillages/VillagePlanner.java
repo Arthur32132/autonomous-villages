@@ -459,28 +459,34 @@ final class VillagePlanner {
         // Rubble (andesite, diorite...) stands in for cobblestone blocks; stairs, slabs and walls need real cobblestone.
         int wanted=STONE_RESERVE+Math.max(0,s.need("cobblestone")-s.rubble())+(s.need("stone_stairs")*3+1)/2+(s.need("stone_slab")+1)/2+s.need("stone_wall");
         if(s.cobble()>=wanted&&!ironWanted)return null;
-        if(!w.ready("mine")||!w.hasTool(ItemTags.PICKAXES))return null;
+        // A failed MineJob cools down its own kind ("quarry" or "shaft"); both keys pause that work here, "mine" is the planner's own pause.
+        boolean quarry=w.ready("quarry"),shaft=w.ready("shaft")&&v.activeJobs("shaft")==0;
+        if(!w.ready("mine")||!quarry&&!shaft||!w.hasTool(ItemTags.PICKAXES))return null;
         BlockPos from=w.body().blockPosition();
         // Cave walls far below are seen by the survey but not reachable on foot: stay near the worker's level.
+        // A block beside water or lava is never quarried: breaking it floods the pit or burns the digger.
         Predicate<BlockPos> usable=p->v.ready(p,w.id)&&v.state.policy.allows("mine",p)&&!v.town.protects(p)&&VillageIndex.exposed(v.level,p)
-                &&(Math.abs(p.getY()-from.getY())<=8||v.index.shaftOre.contains(p))&&VillageCrafting.hasPickFor(w.bot(),v.level.getBlockState(p))&&p.distSqr(from)<80*80;
+                &&(Math.abs(p.getY()-from.getY())<=8||v.index.shaftOre.contains(p))&&VillageCrafting.hasPickFor(w.bot(),v.level.getBlockState(p))&&p.distSqr(from)<80*80
+                &&!MineJob.fluidAdjacent(p,MineJob.fluidAt(v));
         Comparator<BlockPos> near=Comparator.comparingDouble(p->{double dy=p.getY()-from.getY();return p.distSqr(from)+15*dy*dy;});
-        var ores=v.index.ore.stream().filter(p->MineKnowledge.iron(v,p)||v.level.getBlockState(p).is(Blocks.COAL_ORE)||v.level.getBlockState(p).is(Blocks.DEEPSLATE_COAL_ORE))
-                .filter(usable).sorted(near).limit(6).toList();
-        if(!ores.isEmpty())return new MineJob(w,ores);
+        if(quarry){
+            var ores=v.index.ore.stream().filter(p->MineKnowledge.iron(v,p)||v.level.getBlockState(p).is(Blocks.COAL_ORE)||v.level.getBlockState(p).is(Blocks.DEEPSLATE_COAL_ORE))
+                    .filter(usable).sorted(near).limit(6).toList();
+            if(!ores.isEmpty())return new MineJob(w,ores);
+        }
         // Iron for shears lies deeper than the surface stone: the staircase mine reaches it and
         // yields cobblestone on the way, so it goes first while no iron ore is known.
-        if(ironWanted&&(!helping||v.smallCrew())&&v.activeJobs("shaft")==0){
+        if(shaft&&ironWanted&&(!helping||v.smallCrew())){
             BlockPos entrance=mineEntrance();
             if(entrance!=null)return new MineJob(w,entrance);
         }
-        if(s.cobble()<wanted){
+        if(quarry&&s.cobble()<wanted){
             var stone=v.index.stone.stream().filter(p->v.level.getBlockState(p).is(Blocks.STONE)).filter(usable).sorted(near).limit(12).toList();
             if(stone.size()>=4)return new MineJob(w,stone);
         }
         if(helping&&v.activeJobs("shaft")>0)return null;
-        BlockPos entrance=mineEntrance();
-        if(entrance==null||v.activeJobs("shaft")>0){w.cooldown("mine",600);return null;}
+        BlockPos entrance=shaft?mineEntrance():null;
+        if(entrance==null){w.cooldown("mine",600);return null;}
         return new MineJob(w,entrance);
     }
     /** Sand for window glass, dug by hand. */
@@ -539,20 +545,31 @@ final class VillagePlanner {
         for(BlockPos q:BlockPos.betweenClosed(p.offset(-2,0,-2),p.offset(2,2,2)))if(v.level.getBlockState(q).is(Blocks.CACTUS))return true;
         return false;
     }
-    /** A staircase mine starts at the edge of the claim on natural ground, away from beds. */
+    /**
+     * A staircase mine starts at the edge of the claim on natural ground, away from beds. A finished
+     * shaft is left alone; a blocked one, or an entrance failed recently (rejected), sends the search
+     * to the other edges. The state is picked up by the periodic save, not saved here.
+     */
     BlockPos mineEntrance(){
-        if(v.state.mineEntrance!=null)return v.state.mineLength>=64?null:BlockPos.of(v.state.mineEntrance);
+        var st=v.state;long now=v.level.getGameTime();
+        if(st.mineEntrance!=null){
+            if(VillageState.MINE_FINISHED.equals(st.mineStatus)||st.mineLength>=MineJob.MAX_DEPTH)return null;
+            if(!VillageState.MINE_BLOCKED.equals(st.mineStatus))return v.rejected.getOrDefault(st.mineEntrance,0L)<=now?BlockPos.of(st.mineEntrance):null;
+        }
         for(Direction d:Direction.Plane.HORIZONTAL){
-            BlockPos column=v.state.localMineColumn(d);
+            BlockPos column=st.localMineColumn(d);
             if(!v.level.hasChunkAt(column))continue;
             BlockPos p=new BlockPos(column.getX(),v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,column.getX(),column.getZ()),column.getZ());
-            if(v.state.contains(p)&&v.state.contains(p.relative(d.getOpposite(),12).below(12))&&v.safeFeet(p)&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))
+            if(st.mineEntrance!=null&&p.asLong()==st.mineEntrance||v.rejected.getOrDefault(p.asLong(),0L)>now)continue;
+            if(st.contains(p)&&st.contains(p.relative(d.getOpposite(),12).below(12))&&v.safeFeet(p)&&VillageIndex.naturalSoil(v.level.getBlockState(p.below()))
                     &&v.index.beds.stream().allMatch(bed->bed.distSqr(p)>100)&&!v.town.protects(p)){
-                v.state.mineEntrance=p.asLong();v.state.mineDirection=d.getOpposite().get2DDataValue();v.state.mineLength=0;
-                v.chronicle.event("Выбрано место для шахты у "+p.toShortString());v.runtime.save();
+                st.mineEntrance=p.asLong();st.mineDirection=d.getOpposite().get2DDataValue();st.mineLength=0;st.mineFailures=0;st.mineStatus=VillageState.MINE_DIGGING;
+                v.chronicle.event("Выбрано место для шахты у "+p.toShortString());
                 return p;
             }
         }
+        // No other edge fits: the blocked shaft is resumed at its depth once its day has passed.
+        if(st.mineEntrance!=null&&v.rejected.getOrDefault(st.mineEntrance,0L)<=now){st.mineStatus=VillageState.MINE_DIGGING;st.mineFailures=0;return BlockPos.of(st.mineEntrance);}
         return null;
     }
     private Job farm(Worker w){

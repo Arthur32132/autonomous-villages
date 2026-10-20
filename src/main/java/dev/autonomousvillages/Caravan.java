@@ -42,21 +42,21 @@ final class Caravan {
     /** What the village pays with: how many the store keeps for itself and what each piece is worth. */
     record Pay(Item item,int keep,int value,Word word){}
     /** Wool, iron, logs: the order the village is served in, and of {@link Wants}. */
-    static final List<Ware> WARES=List.of(new Ware(Items.WOOL.white(),4,Word.mass("шерсти")),new Ware(Items.IRON_INGOT,8,new Word("слиток железа","слитка железа","слитков железа")),
+    static final List<Ware> WARES=List.of(new Ware(Items.WOOL.white(),4,new Word("блок шерсти","блока шерсти","блоков шерсти")),new Ware(Items.IRON_INGOT,8,new Word("слиток железа","слитка железа","слитков железа")),
             new Ware(Items.OAK_LOG,2,new Word("бревно","бревна","брёвен")));
     /** Paid from first to last: the cheap bulk first, emeralds only when nothing else covers the price. */
     static final List<Pay> PAY;
     static{
         Word egg=new Word("яйцо","яйца","яиц"),seed=new Word("семя","семени","семян"),sapling=new Word("саженец","саженца","саженцев");
-        var pay=new ArrayList<>(List.of(new Pay(Items.SAND,32,1,Word.mass("песка")),new Pay(Items.COBBLESTONE,96,1,Word.mass("булыжника")),
-                new Pay(Items.DIRT,16,1,Word.mass("земли")),new Pay(Items.ROTTEN_FLESH,0,1,Word.mass("гнилой плоти")),
+        var pay=new ArrayList<>(List.of(new Pay(Items.SAND,32,1,new Word("блок песка","блока песка","блоков песка")),new Pay(Items.COBBLESTONE,96,1,new Word("булыжник","булыжника","булыжников")),
+                new Pay(Items.DIRT,16,1,new Word("блок земли","блока земли","блоков земли")),new Pay(Items.ROTTEN_FLESH,0,1,new Word("кусок гнилой плоти","куска гнилой плоти","кусков гнилой плоти")),
                 new Pay(Items.FEATHER,0,1,new Word("перо","пера","перьев")),new Pay(Items.EGG,0,1,egg),new Pay(Items.BROWN_EGG,0,1,egg),new Pay(Items.BLUE_EGG,0,1,egg),
-                new Pay(Items.WHEAT_SEEDS,32,1,seed),new Pay(Items.BEETROOT_SEEDS,32,1,seed),new Pay(Items.WHEAT,32,1,Word.mass("пшеницы"))));
+                new Pay(Items.WHEAT_SEEDS,32,1,seed),new Pay(Items.BEETROOT_SEEDS,32,1,seed),new Pay(Items.WHEAT,32,1,new Word("сноп пшеницы","снопа пшеницы","снопов пшеницы"))));
         for(Item s:List.of(Items.OAK_SAPLING,Items.SPRUCE_SAPLING,Items.BIRCH_SAPLING,Items.JUNGLE_SAPLING,Items.ACACIA_SAPLING,Items.DARK_OAK_SAPLING,
                 Items.CHERRY_SAPLING,Items.PALE_OAK_SAPLING))pay.add(new Pay(s,16,1,sapling));
         pay.addAll(List.of(new Pay(Items.CACTUS,8,2,new Word("кактус","кактуса","кактусов")),new Pay(Items.FLINT,0,2,new Word("кремень","кремня","кремней")),
-                new Pay(Items.PAPER,0,2,new Word("лист бумаги","листа бумаги","листов бумаги")),new Pay(Items.BREAD,24,3,Word.mass("хлеба")),
-                new Pay(Items.LEATHER,0,4,Word.mass("кожи")),new Pay(Items.EMERALD,0,16,new Word("изумруд","изумруда","изумрудов"))));
+                new Pay(Items.PAPER,0,2,new Word("лист бумаги","листа бумаги","листов бумаги")),new Pay(Items.BREAD,24,3,new Word("каравай хлеба","каравая хлеба","караваев хлеба")),
+                new Pay(Items.LEATHER,0,4,new Word("кусок кожи","куска кожи","кусков кожи")),new Pay(Items.EMERALD,0,16,new Word("изумруд","изумруда","изумрудов"))));
         PAY=List.copyOf(pay);
     }
     /** Plain stacks only (no name, no enchantment): what is taken is exactly what a rollback puts back. One instance per item for the store's count cache. */

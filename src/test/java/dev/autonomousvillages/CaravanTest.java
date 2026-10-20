@@ -168,10 +168,11 @@ class CaravanTest {
         var goods=new LinkedHashMap<Item,Integer>();goods.put(WOOL,6);goods.put(Items.OAK_LOG,16);
         var deal=new Caravan.Deal(goods,Map.of(Items.SAND,56));
         assertEquals(deal.price(),deal.paid());
-        assertEquals("Пришёл караван: 6 шерсти и 16 брёвен за 56 песка",Caravan.line(deal));
+        assertEquals("Пришёл караван: 6 блоков шерсти и 16 брёвен за 56 блоков песка",Caravan.line(deal));
+        assertEquals("блок шерсти",Caravan.WARES.get(0).word().one());
         var mixed=new LinkedHashMap<Item,Integer>();mixed.put(Items.OAK_SAPLING,3);mixed.put(Items.BIRCH_SAPLING,2);mixed.put(Items.CACTUS,2);mixed.put(Items.EMERALD,1);
         // Goods in the order served, saplings of every kind as one.
-        assertEquals("Пришёл караван: 3 шерсти, 2 слитка железа и 1 бревно за 5 саженцев, 2 кактуса и 1 изумруд",
+        assertEquals("Пришёл караван: 3 блока шерсти, 2 слитка железа и 1 бревно за 5 саженцев, 2 кактуса и 1 изумруд",
                 Caravan.line(new Caravan.Deal(Map.of(Items.OAK_LOG,1,Items.IRON_INGOT,2,WOOL,3),mixed)));
         // An emerald for an ingot: a whole piece, never less than the price.
         var dear=Caravan.deal(store(Items.EMERALD,3),want(0,1,0));

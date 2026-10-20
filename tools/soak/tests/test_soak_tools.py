@@ -339,6 +339,121 @@ class DigestTest(TempDir):
             digest.load(self.tmp)
 
 
+def strip(row):
+    """The same sample as an older probe wrote it: without progress, changed, routeByJob and saveFailed."""
+    return {k: v for k, v in row.items() if k not in ('progress', 'changed', 'routeByJob', 'saveFailed')}
+
+
+def sample(tick, visible=0, beds=4, completed=0, blocks=0, workers=()):
+    return {'tick': tick, 'day': round(tick / 240) / 100, 'beds': beds, 'births': 0,
+            'mod': {'projectBlocks': f'{blocks}/20', 'projectsCompleted': completed, 'chronicle': {'placed': visible, 'crafted': tick},
+                    'workers': [{'job': j, 'nav': n} for j, n in workers]}}
+
+
+class CadenceTest(TempDir):
+    def test_seven_samples_without_change_are_one_long_stall(self):
+        rows = [sample(1200, visible=1)] + [sample(1200 * i, visible=1) for i in range(2, 9)] + [sample(10800, visible=2)] + \
+               [sample(1200 * i, visible=2) for i in range(10, 14)] + [sample(16800, visible=3)]
+        c = digest.cadence(rows)
+        self.assertEqual((c['samples'], c['changed'], c['changeShare']), (14, 3, 0.214))
+        self.assertEqual((c['longestStallMinutes'], c['stallsOver5Minutes']), (7.0, 1))
+        self.assertEqual([(s['from'], s['to'], s['minutes']) for s in c['stalls']], [(0.1, 0.4, 7.0)])
+        self.assertIsNone(c['firstProjectDay'])
+        self.assertEqual(c['source'], 'legacy')
+
+    def test_night_samples_fold_into_the_next_daytime_sample(self):
+        rows = [sample(1200, visible=1), dict(sample(2400, visible=2), night=True), sample(3600, visible=2)] + \
+               [dict(sample(1200 * i, visible=2), night=True) for i in range(4, 9)] + [sample(10800, visible=2), sample(12000, visible=3)]
+        c = digest.cadence(rows)
+        self.assertEqual((c['changed'], c['longestStallMinutes'], c['stallsOver5Minutes']), (3, 7.0, 1))
+        self.assertEqual((c['daySamples'], c['dayChanged'], c['dayChangeShare']), (4, 3, 0.75))
+        self.assertEqual((c['longestDayStallMinutes'], c['dayStallsOver5Minutes'], c['dayStalls']), (1.0, 0, []))
+
+    def test_stall_minutes_follow_sample_spacing(self):
+        rows = [sample(2400 * i, visible=1) for i in range(1, 4)]
+        self.assertEqual(digest.cadence(rows)['longestStallMinutes'], 4.0)
+        self.assertEqual(digest.cadence(rows)['stallsOver5Minutes'], 0)
+
+    def test_older_timeline_uses_the_same_formulas(self):
+        rows = digest.load(FIXTURES / 'report')
+        self.assertEqual(digest.progress(rows[0]), {'projectBlocks': 8, 'projectsCompleted': 0, 'beds': 5, 'births': 0, 'visible': 0})
+        self.assertEqual(digest.progress(rows[1])['projectBlocks'], None)
+        c = digest.cadence(rows)
+        self.assertEqual((c['changed'], c['changeShare'], c['longestStallMinutes'], c['stallsOver5Minutes']), (2, 0.667, 1.0, 0))
+        self.assertEqual(digest.cadence(rows, {'beds': 5})['changed'], 2)
+
+    def test_probe_fields_and_older_keys_agree(self):
+        rows = digest.load(FIXTURES / 'cadence')
+        legacy = [strip(r) for r in rows]
+        self.assertEqual([digest.progress(r) for r in rows], [digest.progress(r) for r in legacy])
+        start = json.loads((FIXTURES / 'cadence/soak-result.json').read_text(encoding='utf-8'))['start']
+        probe, old = digest.cadence(rows), digest.cadence(legacy, start)
+        self.assertEqual((probe['source'], old['source']), ('probe', 'legacy'))
+        for c in (probe, old):
+            c.pop('source')
+        self.assertEqual(probe, old)
+        self.assertEqual((probe['changed'], probe['changeShare'], probe['longestStallMinutes'], probe['stallsOver5Minutes'], probe['firstProjectDay']),
+                         (4, 0.4, 5.0, 1, 0.4))
+        self.assertEqual((probe['daySamples'], probe['dayChanged'], probe['longestDayStallMinutes'], probe['dayStallsOver5Minutes']), (7, 4, 2.0, 0))
+        outcome = json.loads((FIXTURES / 'cadence/soak-result.json').read_text(encoding='utf-8'))['outcome']
+        keys = ('changeShare', 'longestStallMinutes', 'stallsOver5Minutes', 'dayChangeShare', 'longestDayStallMinutes', 'dayStallsOver5Minutes',
+                'firstProjectDay')
+        self.assertEqual({k: probe[k] for k in keys}, {k: outcome[k] for k in keys})
+
+    def test_routes_from_probe_tally_and_from_worker_rows_give_same_shares(self):
+        rows = digest.load(FIXTURES / 'cadence')
+        probe, source = digest.routes(rows)
+        old, old_source = digest.routes([strip(r) for r in rows])
+        self.assertEqual((source, old_source), ('probe', 'legacy'))
+        self.assertEqual(sorted(probe), ['build', 'chop', 'craft', 'deposit', 'none'])
+        self.assertEqual({k: digest.shares(v) for k, v in probe.items()}, {k: digest.shares(v) for k, v in old.items()})
+        self.assertEqual(old['deposit'], {'route': 0, 'walk': 1, 'stuck': 1, 'work': 0})
+        self.assertEqual(old['build']['work'], 2)  # SUCCESS and other states count as work
+        self.assertEqual(digest.route_wait_share(probe), 0.25)
+        self.assertEqual(digest.route_wait_share(old), 0.25)
+        self.assertIsNone(digest.route_wait_share({}))
+
+    def test_nulls_and_missing_mod_are_tolerated(self):
+        rows = [{}, {'tick': None, 'mod': None, 'beds': None}, {'tick': 'x', 'progress': None, 'routeByJob': None,
+                'mod': {'projectBlocks': None, 'projectsCompleted': True, 'chronicle': None, 'workers': [None, {'job': None, 'nav': 'RUNNING'}, {'nav': 5}]}},
+                {'tick': 3600, 'progress': {'projectBlocks': None, 'visible': 'x'}, 'changed': None}]
+        c = digest.cadence(rows)
+        self.assertEqual((c['samples'], c['changed'], c['longestStallMinutes']), (4, 0, 4.0))
+        self.assertEqual(digest.routes(rows), ({'none': {'route': 0, 'walk': 1, 'stuck': 0, 'work': 0}}, 'legacy'))
+        text = '\n'.join(digest.digest(rows))
+        self.assertIn('Видимые изменения', text)
+        self.assertIn('Маршруты по видам работ', text)
+        self.assertIn('нет данных о жителях', '\n'.join(digest.route_lines([{}])))
+
+    def test_digest_prints_both_sections_for_old_and_new_timelines(self):
+        _, old, _ = quiet(digest.main, [str(FIXTURES / 'report')])
+        _, new, _ = quiet(digest.main, [str(FIXTURES / 'cadence' / 'soak-timeline.jsonl')])
+        for text in (old, new):
+            self.assertIn('Видимые изменения', text)
+            self.assertIn('Маршруты по видам работ', text)
+        self.assertIn('по старым полям', old)
+        self.assertIn('изменения в 4 из 10 строк (40 %), самый долгий простой 5 мин, простоев ≥ 5 мин: 1, первый завершённый проект: день 0.4', new)
+        self.assertIn('днём (ночные строки входят в следующую дневную): изменения в 4 из 7 строк (57 %), самый долгий простой 2 мин', new)
+        self.assertIn('ожидание маршрута: 25 %', new)
+        self.assertIn('livestock вкл: записано -, в мире 7', new)
+        self.assertNotIn('Новые механики', old)
+
+    def test_visible_keys_and_route_buckets_match_probe_and_readme(self):
+        probe = (SOAK / 'java/dev/autonomousvillages/SoakProbe.java').read_text(encoding='utf-8')
+        java = re.search(r'VISIBLE=List\.of\(([^)]*)\)', probe).group(1)
+        self.assertEqual(tuple(re.findall(r'"(\w+)"', java)), digest.VISIBLE)
+        readme = (SOAK / 'README.md').read_text(encoding='utf-8')
+        table = readme.split('| Ключ летописи |', 1)[1].split('\n\n', 1)[0]
+        self.assertEqual(tuple(re.findall(r'^\| `(\w+)` \|', table, re.M)), digest.VISIBLE)
+        buckets = re.search(r'ROUTE=\{([^}]*)\}', probe).group(1)
+        self.assertEqual(tuple(re.findall(r'"(\w+)"', buckets)), digest.ROUTE)
+        for status, bucket in digest.ROUTE_OF.items():
+            self.assertIn(f'case "{status}"->{digest.ROUTE.index(bucket)}', probe)
+        for key in ('progress', 'changed', 'routeByJob', 'saveFailed', 'changeShare', 'longestStallMinutes', 'stallsOver5Minutes',
+                    'dayChangeShare', 'longestDayStallMinutes', 'dayStallsOver5Minutes', 'firstProjectDay', 'routeWaitShare', 'features', 'routeTicks'):
+            self.assertRegex(readme, rf'`(outcome\.)?{key}[`.]', key)
+
+
 class MapTest(TempDir):
     def test_frames_load_and_changes_follow_block_names(self):
         start, end = soakmap.load(FIXTURES / 'report/map-start.json'), soakmap.load(FIXTURES / 'report/map-end.json')

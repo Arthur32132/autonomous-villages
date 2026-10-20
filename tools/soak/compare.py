@@ -1,18 +1,29 @@
 #!/usr/bin/env python3
-"""Markdown table comparing soak batches run by seed and difficulty.
+"""Markdown table comparing soak batches run by seed and difficulty, and a verdict table "not worse than base".
 
-    python3 tools/soak/compare.py --base build/soak-reports/baseline-0.2.2-tps100 \\
-        --candidate build/soak-reports/v03-rc2n build/soak-reports/v03-rc2p
+    python3 tools/soak/compare.py --base build/soak-reports/baseline-master \\
+        --candidate build/soak-reports/final-wave3 --fail-if-worse [--tolerance deaths=0 builtBlocks=5%]
 
 The total covers only runs completed in both batches (repeats averaged over their completed runs);
-a missing or failed run is named under the table and never counts as zero. Exit code 1 when no run is comparable.
+a missing or failed run is named under the table and never counts as zero. The verdict compares the totals
+of deaths, births, builtBlocks and newBeds within tolerances. Exit code 1 when no run is comparable,
+2 with --fail-if-worse when a verdict metric is worse, else 0.
 """
 import argparse
 import json
+import math
+import re
 import sys
 from pathlib import Path
 
 KEYS = ('villagers', 'births', 'deaths', 'built')
+# Verdict metrics: outcome key, label, +1 when more is worse (deaths), -1 when less is worse.
+GATE = (('deaths', 'смерти', 1), ('births', 'рождения', -1), ('builtBlocks', 'построено блоков', -1), ('newBeds', 'новых кроватей', -1))
+# Allowed slack per metric: (absolute, percent of the base total); the larger one, percent rounded up.
+TOLERANCE = {'deaths': (1, 20), 'births': (1, 20), 'builtBlocks': (0, 10), 'newBeds': (0, 0)}
+# Shown beside the verdict, never part of it: averages over the comparable runs that have them.
+INFO = (('longestStallMinutes', 'самый долгий простой, мин'), ('longestDayStallMinutes', 'самый долгий дневной простой, мин'),
+        ('changeShare', 'доля строк с изменениями'), ('routeWaitShare', 'доля ожидания маршрута'))
 
 
 def load_json(path):
@@ -150,17 +161,114 @@ def table(base, cand, base_name='0.2.2', cand_name='v0.3'):
     return lines, c
 
 
+def number(x):
+    return x if isinstance(x, (int, float)) and not isinstance(x, bool) else None
+
+
+def parse_tolerance(text):
+    """'deaths=0', 'builtBlocks=5%', 'births=max(1,20%)' -> ('deaths', (absolute, percent)); ValueError when unreadable."""
+    key, sep, value = text.partition('=')
+    key, value = key.strip(), value.replace(' ', '')
+    if not sep or key not in TOLERANCE:
+        raise ValueError(f"{text!r}: expected key=value with key one of {', '.join(TOLERANCE)}")
+    inner = re.fullmatch(r'max\((.*)\)', value)
+    absolute, percent = 0.0, 0.0
+    for part in (inner.group(1) if inner else value).split(','):
+        match = re.fullmatch(r'(\d+(?:\.\d+)?)(%?)', part)
+        if not match:
+            raise ValueError(f'{text!r}: tolerance is a number, a percent or max(number,percent%)')
+        if match.group(2):
+            percent = float(match.group(1))
+        else:
+            absolute = float(match.group(1))
+    return key, (absolute, percent)
+
+
+def allowance(base, tolerance):
+    """Slack for a base total: max(absolute, percent of |base| rounded up)."""
+    absolute, percent = tolerance
+    return max(absolute, math.ceil(round(percent * abs(base) / 100, 9)))
+
+
+def describe(tolerance, direction):
+    absolute, percent = tolerance
+    sign = '+' if direction > 0 else '−'
+    a, p = f'{absolute:g}', f'{percent:g} %'
+    return sign + (f'max({a}, {p})' if absolute and percent else p if percent else a)
+
+
+def side_total(source, labels, key):
+    """Sum over labels of the mean over completed runs; None when a label has no completed run with the key."""
+    total = 0.0
+    for label in labels:
+        found = [number((r.get('outcome') or {}).get(key)) for r in source.get(label, []) if values(r) is not None]
+        found = [v for v in found if v is not None]
+        if not found:
+            return None
+        total += sum(found) / len(found)
+    return total
+
+
+def side_mean(source, labels, key):
+    found = [number((r.get('outcome') or {}).get(key)) for label in labels for r in source.get(label, []) if values(r) is not None]
+    found = [v for v in found if v is not None]
+    return sum(found) / len(found) if found else None
+
+
+def show(x):
+    return '–' if x is None else f'{round(x, 2):g}'
+
+
+def verdict(base, cand, common, tolerances=None, base_name='0.2.2', cand_name='v0.3'):
+    """Markdown verdict over the runs completed on both sides and the metrics that are worse than the tolerance allows."""
+    tolerances = dict(TOLERANCE, **(tolerances or {}))
+    lines = ['', f'| метрика | {cand_name} | {base_name} | допуск | вердикт |', '|---|---|---|---|---|']
+    worse = []
+    for key, label, direction in GATE:
+        c, b = side_total(cand, common, key), side_total(base, common, key)
+        if c is None or b is None:
+            lines.append(f'| {label} (`{key}`) | {show(c)} | {show(b)} | {describe(tolerances[key], direction)} | нет данных |')
+            continue
+        limit = b + direction * allowance(b, tolerances[key])
+        bad = c > limit if direction > 0 else c < limit
+        if bad:
+            worse.append(key)
+        bound = f"{'≤' if direction > 0 else '≥'} {show(limit)}"
+        lines.append(f"| {label} (`{key}`) | {show(c)} | {show(b)} | {bound} ({describe(tolerances[key], direction)}) | {'ХУЖЕ' if bad else 'OK'} |")
+    for key, label in INFO:
+        lines.append(f'| {label} (`{key}`), среднее | {show(side_mean(cand, common, key))} | {show(side_mean(base, common, key))} | – | справочно |')
+    lines.append('')
+    lines.append(f"**Вердикт: хуже базы** ({', '.join(worse)})." if worse else '**Вердикт: не хуже базы.**')
+    lines.append('Допуски от суммы базы по общим завершённым прогонам: '
+                 + ', '.join(f'{key} {describe(tolerances[key], direction)}' for key, _, direction in GATE)
+                 + ' (`--tolerance key=value`).')
+    return lines, worse
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--base', nargs='+', required=True)
     parser.add_argument('--candidate', nargs='+', required=True)
     parser.add_argument('--base-name', default='0.2.2')
     parser.add_argument('--candidate-name', default='v0.3')
+    parser.add_argument('--fail-if-worse', action='store_true', help='exit 2 when a verdict metric is worse than its tolerance')
+    parser.add_argument('--tolerance', nargs='+', action='extend', default=[], metavar='KEY=VALUE',
+                        help=f"override slack: {', '.join(TOLERANCE)}; N, P%% or max(N,P%%)")
     args = parser.parse_args(argv)
-    lines, c = table(runs(args.base), runs(args.candidate), args.base_name, args.candidate_name)
+    try:
+        tolerances = dict(map(parse_tolerance, args.tolerance))
+    except ValueError as error:
+        parser.error(str(error))
+    base, cand = runs(args.base), runs(args.candidate)
+    lines, c = table(base, cand, args.base_name, args.candidate_name)
     print('\n'.join(lines))
     if not c['common']:
         sys.exit('compare.py: no run completed in both batches, nothing to compare')
+    lines, worse = verdict(base, cand, c['common'], tolerances, args.base_name, args.candidate_name)
+    print('\n'.join(lines))
+    if worse and args.fail_if_worse:
+        print(f"compare.py: worse than base: {', '.join(worse)}", file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == '__main__':

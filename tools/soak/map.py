@@ -5,10 +5,14 @@
 """
 import argparse
 import json
+import sys
 import zlib
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+try:
+    from PIL import Image, ImageDraw
+except ImportError:  # loading and diffing frames work without Pillow; drawing needs it
+    Image = ImageDraw = None
 
 COLOURS = {
     'grass_block': (95, 159, 53), 'short_grass': (110, 170, 60), 'tall_grass': (110, 170, 60), 'fern': (90, 150, 60),
@@ -37,11 +41,78 @@ def colour(block):
     return (80 + h % 120, 80 + (h >> 8) % 120, 80 + (h >> 16) % 120)
 
 
+def explain(folder):
+    """Why a report folder has no map frames: a failed run's reason, or the runs of a batch folder."""
+    if not folder.is_dir():
+        return ' (no such report folder)'
+    if (folder / 'soak-result.json').exists():
+        try:
+            r = json.loads((folder / 'soak-result.json').read_text(encoding='utf-8'))
+            return f" (soak-result.json: completed={r.get('completed')}, reason={r.get('reason')})"
+        except (ValueError, AttributeError):
+            return ' (soak-result.json is unreadable)'
+    runs = sorted(p.parent.name for p in folder.glob('*/map-start.json'))
+    if runs:
+        return ' (this is a batch folder; pass one run: ' + ', '.join(runs) + ')'
+    return ' (no soak-result.json either: the run failed before the probe started)'
+
+
+def numbers(text, name, path):
+    try:
+        return [int(c) for c in str(text).rstrip(',').split(',') if c.strip()]
+    except ValueError:
+        raise ValueError(f'{path}: "{name}" is not a comma list of integers') from None
+
+
 def load(path):
-    data = json.loads(Path(path).read_text())
-    cells = [int(c) for c in data['cells'].rstrip(',').split(',')]
-    heights = [int(c) for c in data['heights'].rstrip(',').split(',')]
+    """(data, cells, heights) of a map frame; a missing, partial or inconsistent frame raises ValueError saying what is wrong."""
+    path = Path(path)
+    if not path.is_file():
+        raise ValueError(f'{path}: no such map frame{explain(path.parent)}')
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except ValueError as error:
+        raise ValueError(f'{path}: not valid JSON ({error})') from None
+    if not isinstance(data, dict):
+        raise ValueError(f'{path}: not a map frame')
+    absent = [k for k in ('minX', 'minZ', 'width', 'depth', 'palette', 'cells', 'heights') if k not in data]
+    if absent:
+        raise ValueError(f'{path}: missing field(s) {", ".join(absent)}')
+    w, d, palette = data['width'], data['depth'], data['palette']
+    if not (isinstance(w, int) and isinstance(d, int) and w > 0 and d > 0) or not isinstance(palette, list):
+        raise ValueError(f'{path}: bad size {w}x{d} or palette')
+    cells, heights = numbers(data['cells'], 'cells', path), numbers(data['heights'], 'heights', path)
+    if len(cells) != w * d or len(heights) != w * d:
+        raise ValueError(f'{path}: {len(cells)} cells and {len(heights)} heights for a {w}x{d} area')
+    if any(not 0 <= c < len(palette) for c in cells):
+        raise ValueError(f'{path}: a cell points outside the palette of {len(palette)} blocks')
     return data, cells, heights
+
+
+def changed_columns(start, end):
+    """Indices of end-frame columns whose top block differs from the start frame at the same world position."""
+    (a, before, _), (b, after, _) = start, end
+    out = set()
+    for i, index in enumerate(after):
+        x, z = b['minX'] + i % b['width'] - a['minX'], b['minZ'] + i // b['width'] - a['minZ']
+        if 0 <= x < a['width'] and 0 <= z < a['depth'] and a['palette'][before[z * a['width'] + x]] != b['palette'][index]:
+            out.add(i)
+    return out
+
+
+def frames(folder):
+    """Saved frames in time order: start, every half day, end."""
+    found = [folder / 'map-start.json'] + sorted(folder.glob('map-t*.json')) + [folder / 'map-end.json']
+    return [f for f in found if f.is_file()]
+
+
+def frame_label(frame):
+    if frame.name in ('map-start.json', 'map-end.json'):
+        return frame.name[4:-5]
+    try:
+        return f"day {int(frame.stem[5:]) / 24000:.1f}"
+    except ValueError:
+        return frame.stem
 
 
 def render(data, cells, heights, scale, changed=None):
@@ -59,11 +130,11 @@ def render(data, cells, heights, scale, changed=None):
             draw.rectangle([x * scale, z * scale, x * scale + scale - 1, z * scale + scale - 1], outline=(255, 0, 255))
         if 'torch' in block or block == 'lantern':
             draw.ellipse([x * scale - 1, z * scale - 1, x * scale + scale, z * scale + scale], fill=(255, 230, 50))
-    for vx, vz, baby in data.get('villagers', []):
+    for vx, vz, baby in (v for v in data.get('villagers') or [] if isinstance(v, list) and len(v) == 3):
         cx, cz = (vx - data['minX']) * scale, (vz - data['minZ']) * scale
         r = scale * (0.8 if baby else 1.3)
         draw.ellipse([cx - r, cz - r, cx + r, cz + r], fill=(30, 200, 255) if baby else (20, 60, 220), outline=(255, 255, 255))
-    if 'bell' in data:
+    if isinstance(data.get('bell'), list) and len(data['bell']) >= 2:
         bx, bz = (data['bell'][0] - data['minX']) * scale, (data['bell'][1] - data['minZ']) * scale
         draw.rectangle([bx - scale, bz - scale, bx + 2 * scale, bz + 2 * scale], outline=(255, 215, 0), width=2)
     return img
@@ -71,39 +142,43 @@ def render(data, cells, heights, scale, changed=None):
 
 def timelapse(folder, scale, out):
     """Every saved frame (start, every half day, end) as an animated GIF, changes since the start outlined."""
-    frames = [folder / 'map-start.json'] + sorted(folder.glob('map-t*.json')) + [folder / 'map-end.json']
-    frames = [f for f in frames if f.exists()]
-    start = load(frames[0])
+    found = frames(folder)
+    if not found:
+        raise ValueError(f'{folder}: no map frames (map-start.json, map-t*.json, map-end.json){explain(folder)}')
+    start = load(found[0])
     images = []
-    for frame in frames:
+    for frame in found:
         data, cells, heights = load(frame)
-        changed = {i for i, (a, b) in enumerate(zip(start[1], cells)) if start[0]['palette'][a] != data['palette'][b]}
-        img = render(data, cells, heights, scale, changed)
-        label = 'start' if frame.name == 'map-start.json' else 'end' if frame.name == 'map-end.json' else \
-            f"day {int(frame.stem[5:]) / 24000:.1f}"
+        img = render(data, cells, heights, scale, changed_columns(start, (data, cells, heights)))
+        label = frame_label(frame)
         draw = ImageDraw.Draw(img)
         draw.rectangle([0, 0, 90, 16], fill=(0, 0, 0))
-        draw.text((4, 2), f'{label}  villagers {len(data.get("villagers", []))}', fill=(255, 255, 255))
+        draw.text((4, 2), f'{label}  villagers {len(data.get("villagers") or [])}', fill=(255, 255, 255))
         images.append(img)
     target = Path(out) if out else folder / 'village-timelapse.gif'
     images[0].save(target, save_all=True, append_images=images[1:], duration=900, loop=0)
     print(f'{target}: {len(images)} frames')
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('report')
     parser.add_argument('--scale', type=int, default=4)
     parser.add_argument('--out', default=None)
     parser.add_argument('--gif', action='store_true', help='timelapse of every saved frame instead of a before/after picture')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     folder = Path(args.report)
-    if args.gif:
-        timelapse(folder, args.scale, args.out)
-        return
-    start = load(folder / 'map-start.json')
-    end = load(folder / 'map-end.json')
-    changed = {i for i, (a, b) in enumerate(zip(start[1], end[1])) if start[0]['palette'][a] != end[0]['palette'][b]}
+    if Image is None:
+        sys.exit('map.py needs Pillow: python3 -m pip install pillow')
+    try:
+        if args.gif:
+            timelapse(folder, args.scale, args.out)
+            return
+        start = load(folder / 'map-start.json')
+        end = load(folder / 'map-end.json')
+    except (OSError, ValueError) as error:
+        sys.exit(f'map.py: {error}')
+    changed = changed_columns(start, end)
     left = render(*start, args.scale)
     right = render(*end, args.scale, changed)
     gap = 8

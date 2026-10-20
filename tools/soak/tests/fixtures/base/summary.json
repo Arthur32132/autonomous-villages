@@ -1,0 +1,88 @@
+{
+  "batch": "base",
+  "args": {
+    "days": 3.0,
+    "seeds": "1337,42",
+    "tick_rate": 100
+  },
+  "runs": {
+    "1337-normal": {
+      "completed": true,
+      "reason": "completed",
+      "error": null,
+      "gameDays": 3.0,
+      "avgTps": 99.1,
+      "outcome": {
+        "births": 3,
+        "deaths": 2,
+        "netVillagers": 1,
+        "newBeds": 1,
+        "builtBlocks": 26,
+        "logsChange": -12,
+        "farmlandChange": 3,
+        "peakVillagers": 20,
+        "minVillagers": 17,
+        "idleSamples": 40,
+        "score": 22.6
+      },
+      "wallSeconds": null,
+      "logErrors": null,
+      "logErrorsTotal": null,
+      "claimed": true,
+      "claimError": null,
+      "village": "120, 70, -40"
+    },
+    "42-normal": {
+      "completed": true,
+      "reason": "completed",
+      "error": null,
+      "gameDays": 3.0,
+      "avgTps": 99.1,
+      "outcome": {
+        "births": 1,
+        "deaths": 0,
+        "netVillagers": 1,
+        "newBeds": 0,
+        "builtBlocks": 98,
+        "logsChange": -12,
+        "farmlandChange": 3,
+        "peakVillagers": 7,
+        "minVillagers": 6,
+        "idleSamples": 40,
+        "score": 29.8
+      },
+      "wallSeconds": null,
+      "logErrors": null,
+      "logErrorsTotal": null,
+      "claimed": true,
+      "claimError": null,
+      "village": "120, 70, -40"
+    },
+    "42-peaceful": {
+      "completed": true,
+      "reason": "completed",
+      "error": null,
+      "gameDays": 3.0,
+      "avgTps": 99.1,
+      "outcome": {
+        "births": 2,
+        "deaths": 0,
+        "netVillagers": 2,
+        "newBeds": 0,
+        "builtBlocks": 113,
+        "logsChange": -12,
+        "farmlandChange": 3,
+        "peakVillagers": 8,
+        "minVillagers": 6,
+        "idleSamples": 40,
+        "score": 51.3
+      },
+      "wallSeconds": null,
+      "logErrors": null,
+      "logErrorsTotal": null,
+      "claimed": true,
+      "claimError": null,
+      "village": "120, 70, -40"
+    }
+  }
+}

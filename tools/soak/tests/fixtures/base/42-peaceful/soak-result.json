@@ -1,0 +1,37 @@
+{
+  "completed": true,
+  "reason": "completed",
+  "seed": "42",
+  "difficulty": "peaceful",
+  "label": "42-peaceful",
+  "days": 3.0,
+  "requestedTps": 100.0,
+  "realSeconds": 2400.5,
+  "village": "120, 70, -40",
+  "claimed": true,
+  "gameTicks": 72000,
+  "gameDays": 3.0,
+  "avgTps": 99.1,
+  "start": {
+    "villagers": 6,
+    "beds": 5
+  },
+  "end": {
+    "villagers": 8,
+    "beds": 5,
+    "initialSurvivors": 6
+  },
+  "outcome": {
+    "births": 2,
+    "deaths": 0,
+    "netVillagers": 2,
+    "newBeds": 0,
+    "builtBlocks": 113,
+    "logsChange": -12,
+    "farmlandChange": 3,
+    "peakVillagers": 8,
+    "minVillagers": 6,
+    "idleSamples": 40,
+    "score": 51.3
+  }
+}

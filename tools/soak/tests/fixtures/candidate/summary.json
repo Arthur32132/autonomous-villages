@@ -1,0 +1,90 @@
+{
+  "batch": "candidate",
+  "args": {
+    "days": 3.0,
+    "seeds": "1337,42",
+    "tick_rate": 100
+  },
+  "runs": {
+    "1337-normal": {
+      "completed": true,
+      "reason": "completed",
+      "error": null,
+      "gameDays": 3.0,
+      "avgTps": 99.1,
+      "outcome": {
+        "births": 4,
+        "deaths": 1,
+        "netVillagers": 2,
+        "newBeds": 2,
+        "builtBlocks": 40,
+        "logsChange": -12,
+        "farmlandChange": 3,
+        "peakVillagers": 21,
+        "minVillagers": 18,
+        "idleSamples": 40,
+        "score": 79.0
+      },
+      "wallSeconds": null,
+      "logErrors": null,
+      "logErrorsTotal": null,
+      "claimed": true,
+      "claimError": null,
+      "village": "120, 70, -40"
+    },
+    "42-normal": {
+      "completed": false,
+      "reason": "runner_error",
+      "error": "FileNotFoundError: [Errno 2] No such file or directory: 'server.log'",
+      "gameDays": null,
+      "avgTps": null,
+      "outcome": null,
+      "wallSeconds": null,
+      "logErrors": null,
+      "logErrorsTotal": null,
+      "claimed": null,
+      "claimError": null,
+      "village": null
+    },
+    "42-peaceful": {
+      "completed": false,
+      "reason": "real_time_limit_run",
+      "error": null,
+      "gameDays": null,
+      "avgTps": null,
+      "outcome": null,
+      "wallSeconds": null,
+      "logErrors": null,
+      "logErrorsTotal": null,
+      "claimed": true,
+      "claimError": null,
+      "village": "-300, 68, 200"
+    },
+    "8675309-normal": {
+      "completed": true,
+      "reason": "completed",
+      "error": null,
+      "gameDays": 3.0,
+      "avgTps": 99.1,
+      "outcome": {
+        "births": 1,
+        "deaths": 0,
+        "netVillagers": 1,
+        "newBeds": 0,
+        "builtBlocks": 134,
+        "logsChange": -12,
+        "farmlandChange": 3,
+        "peakVillagers": 7,
+        "minVillagers": 6,
+        "idleSamples": 40,
+        "score": 33.4
+      },
+      "wallSeconds": null,
+      "logErrors": null,
+      "logErrorsTotal": null,
+      "claimed": true,
+      "claimError": null,
+      "village": "120, 70, -40"
+    }
+  }
+}

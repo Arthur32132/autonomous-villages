@@ -6,8 +6,9 @@ Example:
 
 Each run writes build/soak-reports/<batch>/<seed>-<difficulty>/{soak-result.json,soak-timeline.jsonl,server-tail.log.gz,events.log}
 and a batch summary.json. Labs are deleted afterwards unless --keep-lab is given.
+Exit code 0 only when every run completed; 1 when any run failed (runner error, no soak-result.json, probe gave up).
 """
-import argparse, gzip, json, os, random, shutil, subprocess, sys, threading, time, urllib.request
+import argparse, gzip, json, os, random, re, shutil, subprocess, sys, threading, time, traceback, urllib.request, zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,6 +16,9 @@ NAV = ROOT.parent / 'MinecraftmodNavigationAi'
 TEMPLATE = Path(os.environ.get('AV_SOAK_TEMPLATE', Path.home() / '.cache/av-soak/template'))
 MC, LOADER, INSTALLER = '26.2', '0.19.5', '1.1.2'
 FABRIC_API = '0.161.0+26.2'
+# events.log: the probe's own SOAK lines plus the village's story (deaths with context, traps, chronicle).
+EVENT_MARKERS = (b'SOAK ', b'DEATH ', b'TRAPPED ', b'UNSTUCK ', b'SETTLEMENT ', b'JOB_FAILED ', b'HUNT ')
+ERROR_CAP = 200
 
 
 def java_home():
@@ -33,22 +37,39 @@ def version(project):
     return next(l.split('=', 1)[1].strip() for l in (project / 'gradle.properties').read_text().splitlines() if l.startswith('version='))
 
 
+def valid_jar(path):
+    """A jar counts only as a complete zip: a cut-off download must not pass the readiness check forever."""
+    return Path(path).is_file() and zipfile.is_zipfile(path)
+
+
+def download(url, target, cached=None):
+    """Fetches into <target>.part (from `cached` when given) and renames it only once it opens as a zip."""
+    target = Path(target)
+    part = target.with_name(target.name + '.part')
+    try:
+        if cached:
+            shutil.copy2(cached, part)
+        else:
+            urllib.request.urlretrieve(url, part)
+        if not zipfile.is_zipfile(part):
+            raise RuntimeError(f'{cached or url}: not a complete jar (truncated download?)')
+        os.replace(part, target)
+    finally:
+        part.unlink(missing_ok=True)
+    return target
+
+
 def ensure_template(java):
     """Download the Fabric server launcher and libraries once; later runs hard-link them."""
-    ready = all((TEMPLATE / p).exists() for p in ['fabric-server-launch.jar', 'libraries', 'versions', '.fabric', f'fabric-api-{FABRIC_API}.jar'])
-    if ready:
+    launcher, api = TEMPLATE / 'fabric-server-launch.jar', TEMPLATE / f'fabric-api-{FABRIC_API}.jar'
+    if valid_jar(launcher) and valid_jar(api) and all((TEMPLATE / p).exists() for p in ['libraries', 'versions', '.fabric']):
         return
     TEMPLATE.mkdir(parents=True, exist_ok=True)
-    launcher = TEMPLATE / 'fabric-server-launch.jar'
-    if not launcher.exists():
-        urllib.request.urlretrieve(f'https://meta.fabricmc.net/v2/versions/loader/{MC}/{LOADER}/{INSTALLER}/server/jar', launcher)
-    api = TEMPLATE / f'fabric-api-{FABRIC_API}.jar'
-    if not api.exists():
-        cached = list(Path.home().glob(f'.gradle/caches/modules-2/files-2.1/net.fabricmc.fabric-api/fabric-api/{FABRIC_API}/*/fabric-api-{FABRIC_API}.jar'))
-        if cached:
-            shutil.copy2(cached[0], api)
-        else:
-            urllib.request.urlretrieve(f'https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/{FABRIC_API}/fabric-api-{FABRIC_API}.jar', api)
+    if not valid_jar(launcher):
+        download(f'https://meta.fabricmc.net/v2/versions/loader/{MC}/{LOADER}/{INSTALLER}/server/jar', launcher)
+    if not valid_jar(api):
+        cached = [p for p in Path.home().glob(f'.gradle/caches/modules-2/files-2.1/net.fabricmc.fabric-api/fabric-api/{FABRIC_API}/*/fabric-api-{FABRIC_API}.jar') if valid_jar(p)]
+        download(f'https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/{FABRIC_API}/fabric-api-{FABRIC_API}.jar', api, cached[0] if cached else None)
     (TEMPLATE / 'eula.txt').write_text('eula=true\n')
     boot = TEMPLATE / 'boot'
     shutil.rmtree(boot, ignore_errors=True)
@@ -75,6 +96,31 @@ def build(java):
                    cwd=ROOT, env=env, check=True)
 
 
+def artifact(jar):
+    """Mod name of a jar without its version: navigation-ai-0.2.2.jar -> navigation-ai."""
+    stem = Path(jar).name.removesuffix('.jar')
+    match = re.match(r'(.+?)-\d', stem)
+    return (match.group(1) if match else stem).lower()
+
+
+def select_jars(primary, defaults):
+    """Every primary jar (--jars folder or build/libs) plus each default whose mod the primary set lacks.
+
+    A folder's navigation-ai (or fabric-api) therefore wins over the build/template copy, and one mod never
+    lands in mods/ twice; two versions of one mod among the primary jars are refused as ambiguous.
+    """
+    chosen = {}
+    for jar in sorted(primary):
+        if jar.name.endswith('-sources.jar'):
+            continue
+        other = chosen.setdefault(artifact(jar), jar)
+        if other != jar:
+            raise ValueError(f'two jars of {artifact(jar)}: {other.name} and {jar.name}; keep one')
+    for jar in defaults:
+        chosen.setdefault(artifact(jar), jar)
+    return list(chosen.values())
+
+
 def snapshot_jars(batch_dir, jars_from=None, mod_version=None):
     """Copies the mod jars once per batch, so a rebuild while the batch runs cannot mix versions."""
     target = batch_dir / 'jars'
@@ -82,13 +128,13 @@ def snapshot_jars(batch_dir, jars_from=None, mod_version=None):
     target.mkdir(parents=True)
     v, nav = mod_version or version(ROOT), version(NAV)
     if jars_from:
-        sources = [p for p in Path(jars_from).glob('*.jar') if not p.name.endswith('-sources.jar')]
+        primary = list(Path(jars_from).glob('*.jar'))
     else:
-        sources = [ROOT / f'build/libs/autonomous-villages-{v}.jar', ROOT / f'build/libs/autonomous-villages-soak-{v}.jar']
-    sources += [NAV / f'build/libs/navigation-ai-{nav}.jar', TEMPLATE / f'fabric-api-{FABRIC_API}.jar']
-    for jar in sources:
-        if not any(jar.name == s.name for s in target.iterdir()):
-            shutil.copy2(jar, target / jar.name)
+        primary = [ROOT / f'build/libs/autonomous-villages-{v}.jar', ROOT / f'build/libs/autonomous-villages-soak-{v}.jar']
+    for jar in select_jars(primary, [NAV / f'build/libs/navigation-ai-{nav}.jar', TEMPLATE / f'fabric-api-{FABRIC_API}.jar']):
+        if not jar.is_file():
+            raise FileNotFoundError(f'jar not found: {jar}')
+        shutil.copy2(jar, target / jar.name)
     return target
 
 
@@ -131,35 +177,87 @@ def run_one(java, batch_dir, seed, difficulty, args, jars):
             process.wait()
     result = {'completed': False, 'reason': 'no_result_file', 'seed': seed, 'difficulty': difficulty}
     if (lab / 'soak-result.json').exists():
-        result = json.loads((lab / 'soak-result.json').read_text())
         shutil.copy2(lab / 'soak-result.json', report / 'soak-result.json')
+        try:
+            result = json.loads((lab / 'soak-result.json').read_text())
+        except ValueError as error:
+            result = dict(result, reason='bad_result_file', error=f'soak-result.json: {error}')
     for name in ['soak-timeline.jsonl', 'map-start.json', 'map-end.json'] + sorted(p.name for p in lab.glob('map-t*.json')):
         if (lab / name).exists():
             shutil.copy2(lab / name, report / name)
     lines = (lab / 'server.log').read_bytes().splitlines()
     with gzip.open(report / 'server-tail.log.gz', 'wb') as tail:
         tail.write(b'\n'.join(lines[-4000:]))
-    # The village's own story for the whole run: deaths with their context, traps, chronicle events.
-    markers = (b'DEATH ', b'TRAPPED ', b'UNSTUCK ', b'SETTLEMENT ', b'JOB_FAILED ', b'HUNT ')
-    (report / 'events.log').write_bytes(b'\n'.join(l for l in lines if any(m in l for m in markers)))
-    problems = [l.decode('utf8', 'replace') for l in lines if b'/ERROR]' in l or b'Exception' in l][:200]
-    (report / 'errors.txt').write_text('\n'.join(problems))
+    events, problems, total = log_digest(lines)
+    (report / 'events.log').write_bytes(b'\n'.join(events))
+    note = [f'... cap of {ERROR_CAP} reached: {total - len(problems)} more error lines not shown ({total} in all)'] if total > len(problems) else []
+    (report / 'errors.txt').write_text('\n'.join(problems + note), encoding='utf-8')
     result['wallSeconds'] = round(time.time() - started, 1)
     result['logErrors'] = len(problems)
+    result['logErrorsTotal'] = total
     if not args.keep_lab:
         shutil.rmtree(lab, ignore_errors=True)
     return label, result
 
 
+def log_digest(lines, cap=ERROR_CAP):
+    """(events.log lines, error lines up to `cap`, total error lines) from the raw server log lines."""
+    events = [l for l in lines if any(m in l for m in EVENT_MARKERS)]
+    problems = [l.decode('utf8', 'replace') for l in lines if b'/ERROR]' in l or b'Exception' in l]
+    return events, problems[:cap], len(problems)
+
+
 def row(label, r):
-    o = r.get('outcome', {})
-    return (f"{label:<22} {'OK ' if r.get('completed') else 'FAIL'} {r.get('reason','')[:28]:<28} days={r.get('gameDays','-'):<5} "
-            f"tps={r.get('avgTps','-'):<6} vill={r.get('start',{}).get('villagers','-')}->{r.get('end',{}).get('villagers','-')} "
+    o = r.get('outcome') or {}
+    errors, total = r.get('logErrors', '-'), r.get('logErrorsTotal')
+    if isinstance(total, int) and isinstance(errors, int) and total > errors:
+        errors = f'{errors} (cap hit: {total} in log)'
+    return (f"{label:<22} {'OK ' if r.get('completed') else 'FAIL'} {str(r.get('reason',''))[:28]:<28} days={str(r.get('gameDays','-')):<5} "
+            f"tps={str(r.get('avgTps','-')):<6} vill={(r.get('start') or {}).get('villagers','-')}->{(r.get('end') or {}).get('villagers','-')} "
             f"births={o.get('births','-')} deaths={o.get('deaths','-')} newBeds={o.get('newBeds','-')} built={o.get('builtBlocks','-')} "
-            f"logs={o.get('logsChange','-')} score={o.get('score','-')} errors={r.get('logErrors','-')}")
+            f"logs={o.get('logsChange','-')} score={o.get('score','-')} errors={errors}" + (f" error={r['error']}" if r.get('error') else ''))
 
 
-def main():
+def run_jobs(jobs, parallel, run, report=lambda label, result: print(row(label, result), flush=True)):
+    """Runs (seed, difficulty) jobs on `parallel` threads; an exception fails only its own run, recorded as {'error': ...}."""
+    results, lock, queue = {}, threading.Lock(), list(jobs)
+
+    def worker():
+        while True:
+            with lock:
+                if not queue:
+                    return
+                seed, difficulty = queue.pop(0)
+            label = f'{seed}-{difficulty}'
+            try:
+                label, result = run(seed, difficulty)
+            except Exception as error:
+                result = {'completed': False, 'reason': 'runner_error', 'seed': seed, 'difficulty': difficulty, 'error': f'{type(error).__name__}: {error}'}
+                with lock:
+                    print(f'{label}: runner error\n{traceback.format_exc()}', file=sys.stderr, flush=True)
+            with lock:
+                results[label] = result
+                try:
+                    report(label, result)
+                except Exception:
+                    traceback.print_exc()
+
+    threads = [threading.Thread(target=worker) for _ in range(max(1, parallel))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    for seed, difficulty in jobs:
+        results.setdefault(f'{seed}-{difficulty}', {'completed': False, 'reason': 'missing', 'seed': seed, 'difficulty': difficulty, 'error': 'no result recorded'})
+    return results
+
+
+def failed_runs(results):
+    """Labels of runs that did not complete: runner error, no or unreadable soak-result.json, probe gave up."""
+    return [label for label, r in sorted(results.items()) if not r.get('completed')]
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--days', type=float, default=3)
     parser.add_argument('--seeds', default='8675309')
@@ -173,10 +271,10 @@ def main():
     parser.add_argument('--no-claim', action='store_true', help='observe the untouched village (control run)')
     parser.add_argument('--skip-build', action='store_true')
     parser.add_argument('--mod-version', default=None, help='version suffix of the mod jars in build/libs, e.g. 0.3.0-dev from -Pversion=0.3.0-dev')
-    parser.add_argument('--jars', default=None, help='folder with the mod and soak jars to test instead of build/libs (e.g. an older release)')
+    parser.add_argument('--jars', default=None, help='folder with the mod and soak jars to test instead of build/libs (e.g. an older release); a navigation-ai or fabric-api jar in it replaces the default one')
     parser.add_argument('--keep-lab', action='store_true')
     parser.add_argument('--prepare-only', action='store_true', help='only download/boot the cached server template')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     java = java_home()
     ensure_template(java)
     if args.prepare_only:
@@ -186,33 +284,24 @@ def main():
         build(java)
     batch_dir = ROOT / 'build/soak-reports' / (args.batch or time.strftime('%Y%m%d-%H%M%S'))
     batch_dir.mkdir(parents=True, exist_ok=True)
-    jars = snapshot_jars(batch_dir, args.jars, args.mod_version)
+    try:
+        jars = snapshot_jars(batch_dir, args.jars, args.mod_version)
+    except (OSError, ValueError) as error:
+        sys.exit(f'jars: {error}')
     jobs = [(s.strip(), d.strip()) for s in args.seeds.split(',') for d in args.difficulty.split(',')]
-    results, lock, queue = {}, threading.Lock(), list(jobs)
-
-    def worker():
-        while True:
-            with lock:
-                if not queue:
-                    return
-                seed, difficulty = queue.pop(0)
-            label, result = run_one(java, batch_dir, seed, difficulty, args, jars)
-            with lock:
-                results[label] = result
-                print(row(label, result), flush=True)
-
-    threads = [threading.Thread(target=worker) for _ in range(max(1, args.parallel))]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    results = run_jobs(jobs, args.parallel, lambda seed, difficulty: run_one(java, batch_dir, seed, difficulty, args, jars))
     summary = {'batch': batch_dir.name, 'args': vars(args), 'runs': {k: {key: v.get(key) for key in
-               ['completed', 'reason', 'gameDays', 'avgTps', 'outcome', 'wallSeconds', 'logErrors', 'claimed', 'claimError', 'village']}
+               ['completed', 'reason', 'error', 'gameDays', 'avgTps', 'outcome', 'wallSeconds', 'logErrors', 'logErrorsTotal', 'claimed', 'claimError', 'village']}
                for k, v in sorted(results.items())}}
     (batch_dir / 'summary.json').write_text(json.dumps(summary, indent=2, ensure_ascii=False))
     print(f'\nreports: {batch_dir}')
     for label in sorted(results):
         print(row(label, results[label]))
+    failed = failed_runs(results)
+    if failed:
+        print(f'\nFAILED {len(failed)} of {len(results)}: ' + ', '.join(f"{l} ({results[l].get('error') or results[l].get('reason')})" for l in failed),
+              file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == '__main__':

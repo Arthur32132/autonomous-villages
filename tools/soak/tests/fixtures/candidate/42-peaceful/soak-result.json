@@ -1,0 +1,12 @@
+{
+  "completed": false,
+  "reason": "real_time_limit_run",
+  "seed": "42",
+  "difficulty": "peaceful",
+  "label": "42-peaceful",
+  "days": 3.0,
+  "requestedTps": 100.0,
+  "realSeconds": 3600.2,
+  "village": "-300, 68, 200",
+  "claimed": true
+}

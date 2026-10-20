@@ -17,7 +17,8 @@ $GITHUB_WORKSPACE/
 ```
 
 Шаги: Python-скрипты `tools/soak/*.py` и `tools/showcase/*.py` проверяются `python3 -m py_compile`,
-затем JDK 25 (Temurin) + кэш Gradle и `./gradlew test :navigationAi:test build --no-daemon --console=plain`.
+тесты скриптов — `python3 -m unittest discover -s tools/soak/tests -v` (stdlib, без сети), затем
+JDK 25 (Temurin) + кэш Gradle и `./gradlew test :navigationAi:test build --no-daemon --console=plain`.
 Ревизии обоих репозиториев пишутся в summary запуска. Артефакты (выкладываются и при падении):
 `jars` — `build/libs/*.jar` мода и библиотеки, `test-reports` — `build/reports/tests` обоих проектов.
 Soak-прогоны в CI не запускаются: им нужен сервер Minecraft (см. `tools/soak/README.md`).
@@ -38,6 +39,7 @@ git clone https://github.com/Arthur32132/autonomous-villages.git AutonomousVilla
 git clone https://github.com/Arthur32132/navigation-ai.git MinecraftmodNavigationAi
 cd AutonomousVillages
 python3 -m py_compile tools/soak/*.py tools/showcase/*.py
+python3 -m unittest discover -s tools/soak/tests -v
 sh ./gradlew test :navigationAi:test build --no-daemon --console=plain
 ```
 

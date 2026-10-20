@@ -5,9 +5,14 @@
   "name": "Autonomous Villages",
   "description": "Player-selected villages with shared supplies, working residents and autonomous infrastructure.",
   "authors": ["minecraftWorkflow"],
+  "contact": {
+    "homepage": "https://github.com/Arthur32132/autonomous-villages",
+    "sources": "https://github.com/Arthur32132/autonomous-villages",
+    "issues": "https://github.com/Arthur32132/autonomous-villages/issues"
+  },
   "license": "MIT",
   "environment": "*",
   "entrypoints": {"main": ["dev.autonomousvillages.AutonomousVillagesMod"]},
   "mixins": ["autonomous_villages.mixins.json"],
-  "depends": {"fabricloader": ">=0.19.5", "minecraft": "~26.2", "java": ">=25", "fabric-api": "*", "navigation_ai": ">=0.2.2"}
+  "depends": {"fabricloader": ">=0.19.5", "minecraft": "~26.2", "java": ">=25", "fabric-api": "*", "navigation_ai": ">=0.2.2 <0.3.0-"}
 }

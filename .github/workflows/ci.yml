@@ -60,6 +60,9 @@ jobs:
       - name: Byte-compile Python tools
         run: python3 -m py_compile tools/soak/*.py tools/showcase/*.py
 
+      - name: Test Python tools
+        run: python3 -m unittest discover -s tools/soak/tests -v
+
       - name: Build and test
         run: |
           ./gradlew test :navigationAi:test build --no-daemon --console=plain

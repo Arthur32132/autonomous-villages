@@ -26,7 +26,7 @@ JDK=""
 LOG=/dev/null
 SUMMARY=()
 CURL_OPTS=(-fsSL --retry 4 --retry-max-time 300 --connect-timeout 20 --max-time 600 --speed-limit 20000 --speed-time 60)
-TRANSIENT='429|Too Many Requests|Could not (download|GET|HEAD|resolve)|Connection (reset|refused|timed out)|Read timed out|Remote host terminated|status code 5[0-9][0-9]|Premature end|UnknownHost|No route to host'
+TRANSIENT='status code 429|Too Many Requests|Could not (download|GET|HEAD|resolve)|Connection (reset|refused|timed out)|Read timed out|Remote host terminated|status code 5[0-9][0-9]|Premature end|UnknownHost|No route to host'
 
 warn() { echo "WARNING: session-start: $*" >&2; }
 note() { SUMMARY+=("$(printf '%-8s %s' "$1" "$2")"); }
@@ -84,7 +84,7 @@ install_jdk_archive() {  # unpacks $1 next to ~/jdk, keeps it only if it is a Ja
   name="$(basename "$top")"
   case "$name" in jdk-25*) ;; *) name="jdk-25-$name" ;; esac
   if [ -e "$JDK_ROOT/$name" ] || [ -L "$JDK_ROOT/$name" ]; then mv "$JDK_ROOT/$name" "$JDK_ROOT/.broken-$name-$$"; fi
-  mv "$top" "$JDK_ROOT/$name" && rm -rf "$tmp" && echo "$JDK_ROOT/$name"
+  mv "$top" "$JDK_ROOT/$name" && rm -rf "$tmp" "$JDK_ROOT/.broken-$name-$$" && echo "$JDK_ROOT/$name"
 }
 
 apt_install_jdk25() {
@@ -103,7 +103,7 @@ step_jdk() {  # sets JDK; returns 1 when no source gave a Java 25 JDK
     JDK="$found"; note ok "JDK 25: reused $found"; return 0
   fi
   mkdir -p "$JDK_ROOT" || { note FAILED "JDK 25: cannot create $JDK_ROOT"; return 1; }
-  rm -rf "$JDK_ROOT"/.extract.*  # leftovers of an interrupted earlier run of this hook
+  rm -rf "$JDK_ROOT"/.extract.* "$JDK_ROOT"/.broken-*  # leftovers of an interrupted earlier run of this hook
   archive="$JDK_ROOT/.jdk25-download.tar.gz"
   for src in adoptium oracle github; do
     while IFS= read -r url; do
@@ -162,7 +162,8 @@ GRADLE
       :navigationAi:compileJava :navigationAi:compileTestJava avWarmTestRuntime) >>"$LOG" 2>&1
     rc=$?
     [ "$rc" = 0 ] && break
-    if [ "$attempt" = 4 ] || ! tail -n "+$start" "$LOG" | grep -Eqi "$TRANSIENT"; then break; fi
+    # no grep -q: an early exit would kill tail with SIGPIPE and pipefail would hide the match
+    if [ "$attempt" = 4 ] || ! tail -n "+$start" "$LOG" | grep -Ei "$TRANSIENT" >/dev/null; then break; fi
     delay=$((20 << (attempt - 1)))
     warn "Gradle warm-up attempt $attempt hit a network error (Maven Central 429?), retrying in ${delay}s"
     sleep "$delay"

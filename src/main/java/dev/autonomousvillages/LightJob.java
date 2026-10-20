@@ -40,11 +40,11 @@ final class LightJob extends Job {
         if(state==Approach.State.FAILED)v.rejected.put(spot.asLong(),now()+2400);
         if(state==Approach.State.ARRIVED){
             int fence=Supplies.find(bot(),s->s.is(net.minecraft.tags.ItemTags.WOODEN_FENCES));
-            BlockPos torch=spot;
-            // A lamp post outside; indoors and by a door the torch stands on the ground.
+            BlockPos torch=spot;net.minecraft.world.item.BlockItem fencePost=null;
+            // A lamp post outside; indoors, by a door, on a path or in a narrow gap the torch stands on the ground.
             if(fence>=0&&!Lighting.indoors(v,spot)&&!Lighting.byDoor(v,spot)&&Construction.clear(v.level.getBlockState(spot.above()))&&v.state.contains(spot.above())
-                    &&bot().inventory().snapshot().slots().get(fence).getItem() instanceof net.minecraft.world.item.BlockItem post
-                    &&Construction.place(v,bot(),new Construction.Step(spot,post.getBlock().defaultBlockState(),post)))torch=spot.above();
+                    &&!Lighting.postInTheWay(v,spot)&&bot().inventory().snapshot().slots().get(fence).getItem() instanceof net.minecraft.world.item.BlockItem post
+                    &&Construction.place(v,bot(),new Construction.Step(spot,post.getBlock().defaultBlockState(),post))){torch=spot.above();fencePost=post;}
             // A lamp post carries a lantern when there is one.
             boolean lantern=!torch.equals(spot)&&w.has(s->s.is(Items.LANTERN))
                     &&Construction.place(v,bot(),new Construction.Step(torch,Blocks.LANTERN.defaultBlockState(),Items.LANTERN));
@@ -53,9 +53,21 @@ final class LightJob extends Job {
                 placed++;v.state.lights.add(torch.asLong());v.chronicle.lit();
                 if(!torch.equals(spot))v.chronicle.add("lamps",1);
                 if(Lighting.indoors(v,spot))v.chronicle.add("roomsLit",1);
-            }else v.rejected.put(spot.asLong(),now()+600); // someone standing there, most likely
+            }else{
+                // A fence without its torch is no lamp post: it comes down and goes back to the bag.
+                if(fencePost!=null)takeBack(spot,fencePost);
+                v.rejected.put(spot.asLong(),now()+600); // someone standing there, most likely
+            }
         }
         return !spots.isEmpty();
+    }
+    /** Lifts a block this job just set back into the bag, or the store, or at worst drops it: never lost. */
+    private void takeBack(BlockPos p,net.minecraft.world.item.BlockItem item){
+        if(!v.level.getBlockState(p).is(item.getBlock()))return;
+        v.level.setBlock(p,Blocks.AIR.defaultBlockState(),3);
+        var rest=bot().inventory().insert(new ItemStack(item));
+        if(!rest.isEmpty())rest=v.stock.put(rest);
+        if(!rest.isEmpty())net.minecraft.world.level.block.Block.popResource(v.level,p,rest);
     }
     @Override void stop(){if(fetch!=null)fetch.cancel();if(approach!=null)approach.cancel();}
 }

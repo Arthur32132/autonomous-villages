@@ -28,13 +28,14 @@ final class PathJob extends Job {
             if(state==Approach.State.FAILED)return fail("нет лопаты");
             return true;
         }
-        while(!cells.isEmpty()&&!pavable(v,cells.peek()))cells.poll();
+        while(!cells.isEmpty()&&(!pavable(v,cells.peek())||Lighting.unreachable(v,cells.peek())))cells.poll();
         if(cells.isEmpty())return false;
         if(approach==null)approach=new Approach(cells.peek(),4.0,false);
         var state=approach.tick();
         if(state==Approach.State.MOVING)return true;
         BlockPos cell=cells.poll();approach=null;
-        if(state==Approach.State.FAILED)return paved>0||!cells.isEmpty();
+        // A cell nobody can walk to is left alone for a game day instead of being offered again at once.
+        if(state==Approach.State.FAILED){v.rejected.put(cell.asLong(),now()+REJECT_TICKS);return paved>0||!cells.isEmpty();}
         if(!v.state.policy.allows("build",cell))return true;
         bot().inventory().select(shovel);
         v.level.setBlock(cell,Blocks.DIRT_PATH.defaultBlockState(),3);
@@ -49,6 +50,9 @@ final class PathJob extends Job {
         return (s.is(Blocks.GRASS_BLOCK)||s.is(Blocks.DIRT)||s.is(Blocks.COARSE_DIRT)||s.is(Blocks.PODZOL))&&Construction.clear(v.level.getBlockState(p.above()));
     }
     static final int PLAZA=3;
+    static final long REJECT_TICKS=24000;
+    /** Path cells worth offering: the ones nobody failed to reach lately, at most limit of them. */
+    static List<BlockPos> reachable(Village v,List<BlockPos> cells,int limit){return cells.stream().filter(p->!Lighting.unreachable(v,p)).limit(limit).toList();}
     /** Ground in a round patch around the bell, so the meeting place reads as a village square; nearest first. */
     static List<BlockPos> plaza(Village v,int limit){
         BlockPos hub=v.meetingPoint();var out=new ArrayList<BlockPos>();

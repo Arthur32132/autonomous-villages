@@ -18,6 +18,12 @@ public final class VillageState {
     public Set<Long> reforestation=new LinkedHashSet<>();
     public Long mineEntrance;
     public int mineDirection, mineLength;
+    /** Staircase mine: digging, finished (its depth, the claim edge or the world bottom) or blocked (an obstacle the excavator refuses); failed runs at the current face. */
+    public String mineStatus=MINE_DIGGING;
+    public int mineFailures;
+    /** Game time a blocked shaft may be tried again when no other edge fits. */
+    public long mineRetryAt;
+    static final String MINE_DIGGING="digging",MINE_FINISHED="finished",MINE_BLOCKED="blocked";
     public int completedShelters;
     /** Actual settlement footprint. radius is kept for the chunk budget and POI queries. */
     public Bounds bounds;
@@ -118,6 +124,8 @@ public final class VillageState {
         buildings.removeIf(b->b==null||!b.valid(this));
         if(mineEntrance!=null&&!contains(BlockPos.of(mineEntrance)))mineEntrance=null;
         mineDirection=Math.floorMod(mineDirection,4);mineLength=Math.clamp(mineLength,0,64);
+        if(mineEntrance==null||mineStatus==null||!Set.of(MINE_DIGGING,MINE_FINISHED,MINE_BLOCKED).contains(mineStatus))mineStatus=MINE_DIGGING;
+        mineFailures=Math.clamp(mineFailures,0,16);
     }
     /** Woods and fields just outside the footprint where residents may still fell trees and walk. */
     static final int OUTSKIRTS=48;

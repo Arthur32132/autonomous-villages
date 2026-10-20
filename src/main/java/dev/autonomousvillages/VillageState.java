@@ -1,6 +1,7 @@
 package dev.autonomousvillages;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import net.minecraft.core.BlockPos;
 
 /** Only metadata lives here; every item stays in a vanilla chest or entity inventory. */
@@ -71,11 +72,18 @@ public final class VillageState {
         public long posted;
     }
     static final int MAX_TICKET_CHUNKS=1024;
+    /** Shared stores and furnaces a village keeps; capture and compactMetadata hold to the same limits validate() checks. */
+    static final int MAX_STORAGE=128,MAX_FURNACES=16;
+    static final Pattern NAME=Pattern.compile("[A-Za-zА-Яа-яЁё0-9_-]{1,32}");
     static long footprintChunks(Bounds b){return ((long)(b.maxX>>4)-(b.minX>>4)+1)*((long)(b.maxZ>>4)-(b.minZ>>4)+1);}
     static <T> void trimOldest(Set<T> values,int limit){while(values.size()>limit)values.remove(values.iterator().next());}
-    /** Forgets old intent and fills in missing collections; never touches an inventory or the world. */
+    /**
+     * Forgets old intent and fills in missing collections; never touches an inventory or the world.
+     * Afterwards validate() fails only on a broken identity or footprint, the players' own rules, or over 1024 residents or 256 buildings.
+     */
     void compactMetadata(){
         if(residents==null)residents=new LinkedHashSet<>();
+        residents.remove(null);
         if(storage==null)storage=new LinkedHashSet<>();
         if(furnaces==null)furnaces=new LinkedHashSet<>();
         if(plantedTrees==null)plantedTrees=new LinkedHashSet<>();
@@ -85,10 +93,17 @@ public final class VillageState {
         if(reforestation==null)reforestation=new LinkedHashSet<>();
         if(buildings==null)buildings=new ArrayList<>();
         if(capturedPieces==null)capturedPieces=new LinkedHashSet<>();
+        capturedPieces.remove(null);
         if(residentNames==null)residentNames=new LinkedHashMap<>();
         if(residentPositions==null)residentPositions=new LinkedHashMap<>();
         if(residentRoles==null)residentRoles=new LinkedHashMap<>();
         if(policy==null)policy=new VillagePolicy();
+        if(policy.zones==null)policy.zones=new ArrayList<>();
+        policy.zones.removeIf(Objects::isNull);
+        if(policy.privateChests==null)policy.privateChests=new LinkedHashSet<>();
+        policy.privateChests.remove(null);
+        if(policy.expansion==null)policy.expansion=new VillagePolicy().expansion;
+        policy.expansion.removeIf(d->d==null||!Set.of("north","south","east","west").contains(d));
         if(lights==null)lights=new LinkedHashSet<>();
         if(features==null)features=new LinkedHashMap<>();
         features.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||e.getValue().length()>Features.MAX_STATE_CHARS);
@@ -110,17 +125,21 @@ public final class VillageState {
         nameplates.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||!contains(BlockPos.of(e.getKey())));
         while(nameplates.size()>256)nameplates.remove(nameplates.keySet().iterator().next());
         graves.removeIf(g->g==null||g.name==null);
+        for(var g:graves)if(g.role==null)g.role="";
         while(graves.size()>16)graves.removeFirst();
         if(cemetery!=null&&!contains(BlockPos.of(cemetery)))cemetery=null;
         if(noticeBoard!=null&&!contains(BlockPos.of(noticeBoard)))noticeBoard=null;
         productDays.keySet().retainAll(residents);
-        chronicle.sanitize();
+        chronicle.sanitize();chronicle.events.removeIf(Objects::isNull);chronicle.totals.values().removeIf(Objects::isNull);
         trimOldest(plantedCrops,512);trimOldest(reforestation,2048);trimOldest(capturedPieces,4096);trimOldest(lights,1024);trimOldest(plantedTrees,512);
         while(treeWork.size()>256)treeWork.remove(treeWork.keySet().iterator().next());
         residentRoles.keySet().retainAll(residents);
+        residentRoles.values().removeIf(a->a==null||a.role==null||a.schedule<0||a.schedule>=24);
+        residentNames.values().removeIf(Objects::isNull);residentPositions.values().removeIf(Objects::isNull);productDays.values().removeIf(Objects::isNull);
         residentNames.keySet().retainAll(residents);
         residentPositions.keySet().retainAll(residents);
         storage.removeIf(p->p==null||!contains(BlockPos.of(p)));furnaces.removeIf(p->p==null||!contains(BlockPos.of(p)));
+        trimOldest(storage,MAX_STORAGE);trimOldest(furnaces,MAX_FURNACES);
         for(Set<Long> positions:List.of(plantedCrops,lights))positions.removeIf(p->p==null||!contains(BlockPos.of(p)));
         for(Set<Long> positions:List.of(plantedTrees,fellingTrees,reforestation))positions.removeIf(p->p==null||!nearby(BlockPos.of(p)));
         treeWork.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||!nearby(BlockPos.of(e.getKey())));
@@ -129,7 +148,8 @@ public final class VillageState {
         if(mineEntrance!=null&&!contains(BlockPos.of(mineEntrance)))mineEntrance=null;
         mineDirection=Math.floorMod(mineDirection,4);mineLength=Math.clamp(mineLength,0,64);
         if(mineEntrance==null||mineStatus==null||!Set.of(MINE_DIGGING,MINE_FINISHED,MINE_BLOCKED).contains(mineStatus))mineStatus=MINE_DIGGING;
-        mineFailures=Math.clamp(mineFailures,0,16);
+        mineFailures=Math.clamp(mineFailures,0,16);mineRetryAt=Math.max(0,mineRetryAt);
+        completedShelters=Math.clamp(completedShelters,0,256);lastBirth=Math.max(0,lastBirth);lastGolem=Math.max(0,lastGolem);
     }
     /** Woods and fields just outside the footprint where residents may still fell trees and walk. */
     static final int OUTSKIRTS=48;
@@ -190,10 +210,10 @@ public final class VillageState {
      * Stale positions are dropped by {@link #compactMetadata()} instead of rejecting the whole save.
      */
     public void validate() {
-        if (name == null || !name.matches("[A-Za-zА-Яа-яЁё0-9_-]{1,32}") || owner == null
+        if (name == null || !NAME.matcher(name).matches() || owner == null
                 || radius < 24 || radius > 4096 || Math.abs((long)x) >= 29_999_000L || Math.abs((long)z) >= 29_999_000L
                 || y < -64 || y > 320 || residents == null || residents.size() > 1024 || residents.contains(null)
-                || storage == null || storage.size() > 128 || furnaces == null || furnaces.size() > 16
+                || storage == null || storage.size() > MAX_STORAGE || furnaces == null || furnaces.size() > MAX_FURNACES
                 || completedShelters < 0 || completedShelters > 256 || mineLength < 0 || mineLength > 64 || mineDirection < 0 || mineDirection > 3
                 || lastBirth < 0 || lastGolem < 0)
             throw new IllegalArgumentException("Повреждённые данные деревни");

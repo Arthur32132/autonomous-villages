@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      navigation_ai_ref:
+        description: 'Navigation AI branch, tag or commit (empty = default branch)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: AutonomousVillages
+    steps:
+      # settings.gradle expects the library at ../MinecraftmodNavigationAi
+      - name: Check out Autonomous Villages
+        uses: actions/checkout@v4
+        with:
+          path: AutonomousVillages
+
+      - name: Check out Navigation AI
+        uses: actions/checkout@v4
+        with:
+          repository: Arthur32132/navigation-ai
+          ref: ${{ inputs.navigation_ai_ref }}
+          path: MinecraftmodNavigationAi
+
+      - name: Record revisions
+        run: |
+          {
+            echo "### Revisions"
+            echo "- autonomous-villages: \`$(git rev-parse HEAD)\`"
+            echo "- navigation-ai: \`$(git -C ../MinecraftmodNavigationAi rev-parse HEAD)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Byte-compile Python tools
+        run: python3 -m py_compile tools/soak/*.py tools/showcase/*.py
+
+      - name: Build and test
+        run: |
+          ./gradlew test :navigationAi:test build --no-daemon --console=plain
+
+      - name: Upload JARs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jars
+          path: |
+            AutonomousVillages/build/libs/*.jar
+            MinecraftmodNavigationAi/build/libs/*.jar
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            AutonomousVillages/build/reports/tests/
+            MinecraftmodNavigationAi/build/reports/tests/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,10 +1,13 @@
 package dev.autonomousvillages;
 
-import com.google.gson.GsonBuilder;
+import com.google.gson.*;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
+import java.util.Arrays;
+import java.util.function.Consumer;
 
 /**
  * Switches for the parts of village life a server owner may not want: config/autonomous_villages.json,
@@ -82,16 +85,94 @@ public final class ModConfig {
     /** Farmers keep chickens and cows by the pen: eggs, milk and meat for the table. */
     public boolean livestock=true;
 
-    static ModConfig load(Path dir){
-        Path file=dir.resolve("autonomous_villages.json");
-        var gson=new GsonBuilder().setPrettyPrinting().create();
-        ModConfig config=null;
-        try{if(Files.exists(file))config=gson.fromJson(Files.readString(file,StandardCharsets.UTF_8),ModConfig.class);}
-        catch(IOException|RuntimeException broken){AutonomousVillagesMod.LOG.warn("Unreadable {}, using defaults: {}",file,broken.toString());}
-        if(config==null)config=new ModConfig();
-        // Rewritten every start, so switches added by an update appear in the file with their defaults.
-        try{Files.createDirectories(dir);Files.writeString(file,gson.toJson(config),StandardCharsets.UTF_8);}
-        catch(IOException unwritable){AutonomousVillagesMod.LOG.warn("Cannot write {}: {}",file,unwritable.toString());}
+    static final String FILE="autonomous_villages.json";
+    private static final Gson GSON=new GsonBuilder().setPrettyPrinting().create();
+
+    static ModConfig load(Path dir){return load(dir,message->AutonomousVillagesMod.LOG.warn(message));}
+
+    /**
+     * A missing or blank file is written with defaults. A file that does not parse is never touched: a copy goes beside it
+     * (.broken, then .broken-1...) and every switch is on until the owner fixes it. A parsed file keeps the owner's values
+     * and keys and is rewritten only when that adds missing switches or turns "false" into false.
+     */
+    static ModConfig load(Path dir,Consumer<String> warn){
+        Path file=dir.resolve(FILE);
+        byte[] bytes;
+        try{bytes=Files.exists(file)?Files.readAllBytes(file):new byte[0];}
+        catch(IOException|RuntimeException unreadable){warn.accept("Cannot read "+file+" ("+unreadable+"); every switch is on and the file is left as is");return new ModConfig();}
+        JsonObject owner,normalized;ModConfig config;
+        try{owner=parse(bytes);normalized=normalized(owner);config=GSON.fromJson(normalized,ModConfig.class);}
+        catch(IOException|RuntimeException broken){
+            Path copy=keepCopy(file,bytes);
+            warn.accept("Unreadable "+file+": "+reason(broken)+". The file is left as is"+(copy==null?" (no copy could be made)":", copy at "+copy)+"; every switch is on until it is fixed");
+            return new ModConfig();
+        }
+        var known=defaults();
+        var unknown=owner.keySet().stream().filter(k->!known.has(k)).toList();
+        if(!unknown.isEmpty())warn.accept("Unknown keys in "+file+" are ignored: "+unknown);
+        if(!normalized.equals(owner))write(file,GSON.toJson(normalized),warn);
         return config;
+    }
+
+    /** The file as a JSON object (comments allowed); blank text is an empty object. */
+    static JsonObject parse(byte[] bytes)throws CharacterCodingException{
+        String text=StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();
+        if(text.startsWith("\uFEFF"))text=text.substring(1);
+        if(text.isBlank())return new JsonObject();
+        JsonElement tree=JsonParser.parseString(text);
+        if(!tree.isJsonObject())throw new JsonParseException("expected one object {...} of switches");
+        return tree.getAsJsonObject();
+    }
+
+    /** The owner's keys in the owner's order with switches as plain true/false, then each missing switch at its default. */
+    static JsonObject normalized(JsonObject owner){
+        JsonObject defaults=defaults(),out=new JsonObject();
+        for(var e:owner.entrySet()){
+            JsonElement d=defaults.get(e.getKey()),v=e.getValue();
+            if(d!=null&&d.isJsonPrimitive()&&d.getAsJsonPrimitive().isBoolean())v=new JsonPrimitive(bool(e.getKey(),v));
+            out.add(e.getKey(),v);
+        }
+        for(var e:defaults.entrySet())if(!out.has(e.getKey()))out.add(e.getKey(),e.getValue());
+        return out;
+    }
+
+    private static JsonObject defaults(){return GSON.toJsonTree(new ModConfig()).getAsJsonObject();}
+
+    private static boolean bool(String key,JsonElement v){
+        if(v instanceof JsonPrimitive p&&(p.isBoolean()||p.isString()&&(p.getAsString().equalsIgnoreCase("true")||p.getAsString().equalsIgnoreCase("false"))))return p.getAsBoolean();
+        throw new JsonParseException("\""+key+"\" must be true or false, found "+v);
+    }
+
+    /** A byte-for-byte copy of an unreadable file beside it; an identical earlier copy is reused, none is overwritten. */
+    static Path keepCopy(Path file,byte[] bytes){
+        for(int i=0;i<1000;i++){
+            Path copy=file.resolveSibling(file.getFileName()+".broken"+(i==0?"":"-"+i));
+            try{
+                if(!Files.exists(copy,LinkOption.NOFOLLOW_LINKS)){Files.write(copy,bytes,StandardOpenOption.CREATE_NEW);return copy;}
+                if(Files.isRegularFile(copy,LinkOption.NOFOLLOW_LINKS)&&Arrays.equals(Files.readAllBytes(copy),bytes))return copy;
+            }catch(IOException|RuntimeException failed){return null;}
+        }
+        return null;
+    }
+
+    /** The parser's own words, first line only (Gson appends a troubleshooting link). */
+    static String reason(Throwable broken){
+        Throwable root=broken;
+        while(root.getCause()!=null&&root.getCause()!=root)root=root.getCause();
+        String m=root instanceof CharacterCodingException?"not UTF-8 text":root.getMessage();
+        if(m==null||m.isBlank())m=root.toString();
+        int nl=m.indexOf('\n');
+        return nl<0?m:m.substring(0,nl);
+    }
+
+    /** Through a temporary file, so a crash mid-write never leaves half a config; a symlinked file is written at its target. */
+    private static void write(Path file,String json,Consumer<String> warn){
+        try{
+            Files.createDirectories(file.getParent());
+            Path target=Files.exists(file)?file.toRealPath():file,temp=target.resolveSibling(target.getFileName()+".tmp");
+            Files.writeString(temp,json,StandardCharsets.UTF_8);
+            try{Files.move(temp,target,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}
+            catch(AtomicMoveNotSupportedException notAtomic){Files.move(temp,target,StandardCopyOption.REPLACE_EXISTING);}
+        }catch(IOException|RuntimeException unwritable){warn.accept("Cannot write "+file+": "+unwritable);}
     }
 }

@@ -142,6 +142,12 @@ final class Construction {
                 .anyMatch(box -> box.move(step.pos()).intersects(b.entity().getBoundingBox()));
     }
     static int cost(Step step){return step.state().getBlock() instanceof SlabBlock&&step.state().getValue(SlabBlock.TYPE)==SlabType.DOUBLE?2:1;}
+    /** The steps in their order without the cells nobody reached lately; those wait for the memory to expire. */
+    static <T> List<T> deferUnreachable(List<T> steps,java.util.function.Function<T,BlockPos> at,UnreachableMemory memory,long now){
+        var out=new ArrayList<T>(steps.size());
+        for(T step:steps)if(!memory.isUnreachable(at.apply(step),now))out.add(step);
+        return out;
+    }
     static boolean clear(BlockState state){
         return state.isAir()||state.is(Blocks.SHORT_GRASS)||state.is(Blocks.TALL_GRASS)||state.is(Blocks.FERN)||state.is(Blocks.LARGE_FERN)||state.is(Blocks.SNOW);
     }

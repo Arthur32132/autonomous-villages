@@ -58,13 +58,22 @@ abstract class Job {
     }
 
     /**
-     * A store block no route reaches (a chest or workbench behind a house wall) is skipped by everyone
-     * for two minutes, so jobs stop walking there one after another.
+     * A block no route reaches is remembered for the whole village (UnreachableMemory), so jobs stop
+     * walking there one after another: the reporter skips it for about an hour, everyone does once two
+     * residents failed there, and a store block two residents failed at stays out longer still
+     * (Village.unreachableFrom). Soak 8675309: builders walked to the same four cells of a house at
+     * 136/140 every attempt for a day and a half ("материалы не донесены (unreachable)" 22 times).
      */
-    void unreachable(BlockPos p){if(navReason.equals("unreachable")||navReason.equals("no_stand"))v.unreachableFrom(p,w.id);}
-    boolean reachable(BlockPos p){return v.rejected.getOrDefault(p.asLong(),0L)<=now();}
-    /** Chests no route reaches are left out of the search as if they had been tried. */
-    private void skipUnreachable(Set<BlockPos> tried){for(var c:v.stock.chests())if(!reachable(c.getBlockPos()))tried.add(c.getBlockPos());}
+    void unreachable(BlockPos p){
+        if(UnreachableMemory.blockedRoute(navReason))v.stock.unreachable.remember(p,now(),w.id);
+        if(navReason.equals("unreachable")||navReason.equals("no_stand"))v.unreachableFrom(p,w.id);
+    }
+    /** A cell of a building nobody could stand at: remembered only; the votes and strikes of the store are not for cells. */
+    void unreachableCell(BlockPos p){if(UnreachableMemory.blockedRoute(navReason))v.stock.unreachable.remember(p,now(),w.id);}
+    /** A store block (chest, workbench) the village uses: not rejected by votes and not remembered as unreachable by enough residents. */
+    boolean reachable(BlockPos p){return v.rejected.getOrDefault(p.asLong(),0L)<=now()&&!v.stock.unreachable.isUnreachable(p,now(),v.stock.quorum());}
+    /** Chests no route reaches, or this worker failed at lately, are left out of the search as if they had been tried. */
+    private void skipUnreachable(Set<BlockPos> tried){for(var c:v.stock.chests())if(!reachable(c.getBlockPos())||v.stock.skips(c.getBlockPos(),now(),w.id))tried.add(c.getBlockPos());}
 
     boolean lineOfSight(BlockPos p){
         var hit=v.level.clip(new ClipContext(body().getEyePosition(),Vec3.atCenterOf(p),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,body()));
@@ -98,7 +107,8 @@ abstract class Job {
         BlockPos stand;
         int attempts;
         final Progress progress=new Progress();
-        Approach(BlockPos target,double reach,boolean sight){this.target=target;this.reach=reach;this.sight=sight;}
+        /** A new route starts with a clean reason: the old one belonged to another target. */
+        Approach(BlockPos target,double reach,boolean sight){this.target=target;this.reach=reach;this.sight=sight;navReason="";}
         boolean arrived(){return within(target,reach)&&(!sight||lineOfSight(target));}
         State tick(){
             if(nav!=null){
@@ -135,7 +145,7 @@ abstract class Job {
         final Progress progress=new Progress();
         final NavigationPolicy policy;
         Walk(Vec3 point,double radius){this(point,radius,TRAVEL);}
-        Walk(Vec3 point,double radius,NavigationPolicy policy){this.point=point;this.radius=radius;this.policy=policy;}
+        Walk(Vec3 point,double radius,NavigationPolicy policy){this.point=point;this.radius=radius;this.policy=policy;navReason="";}
         Approach.State tick(){
             if(body().position().distanceToSqr(point)<=radius*radius){cancel();return Approach.State.ARRIVED;}
             if(nav!=null&&!nav.completion().isDone()){
@@ -181,6 +191,8 @@ abstract class Job {
         net.minecraft.world.level.block.entity.ChestBlockEntity chest;
         Approach approach;
         String missing="";
+        /** The store holds what is missing, but only in a chest this worker skips as unreachable right now. */
+        boolean hidden;
         Fetch(List<Need> needs){this.needs=needs;}
         int outstanding(Need n){return Math.max(0,n.amount()-w.count(n.test()));}
         Approach.State tick(){
@@ -189,12 +201,13 @@ abstract class Job {
             if(chest==null||!v.stock.chests().contains(chest)){
                 skipUnreachable(tried);
                 chest=v.stock.nearest(body().blockPosition(),first.test(),tried);
-                if(chest==null){missing=first.label();return Approach.State.FAILED;}
+                if(chest==null){missing=first.label();hidden=v.stock.hidden(first.test(),w.id);return Approach.State.FAILED;}
                 approach=new Approach(chest.getBlockPos(),4.0,true);
             }
             var state=approach.tick();
             if(state==Approach.State.FAILED){unreachable(chest.getBlockPos());tried.add(chest.getBlockPos());chest=null;return Approach.State.MOVING;}
             if(state==Approach.State.MOVING)return state;
+            v.stock.unreachable.forget(chest.getBlockPos());
             for(Need n:needs){int want=outstanding(n);if(want>0)Supplies.transfer(bot(),chest,false,n.test(),want);}
             v.stock.changed(chest);tried.add(chest.getBlockPos());chest=null;approach=null;
             return Approach.State.MOVING;
@@ -217,6 +230,7 @@ abstract class Job {
             var state=approach.tick();
             if(state==Approach.State.FAILED){unreachable(chest.getBlockPos());tried.add(chest.getBlockPos());chest=null;return Approach.State.MOVING;}
             if(state==Approach.State.MOVING)return state;
+            v.stock.unreachable.forget(chest.getBlockPos());
             var bag=w.bag();var kept=w.keptSlots();int moved=0;
             for(int i=0;i<bag.size();i++)if(!bag.get(i).isEmpty()&&!kept.contains(i)){
                 var item=bag.get(i);moved+=Supplies.transfer(bot(),chest,true,s->ItemStack.isSameItemSameComponents(s,item),item.getCount());

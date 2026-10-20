@@ -24,6 +24,8 @@ public final class VillageRuntime {
     final Map<UUID,VillageState.ResidentName> pendingReleases=new LinkedHashMap<>();
     private final Path file;
     private final FileSnapshotWriter writer;
+    private final SaveCoalescer saves=new SaveCoalescer(100);
+    private final SaveCoalescer.Partition snapshots=new SaveCoalescer.Partition();
     long residentDecisionRemainingNanos;
     private int villageRotation;
     private boolean persistenceWriteFailed;
@@ -41,7 +43,9 @@ public final class VillageRuntime {
         this.server = server; this.bots = NavigationAiMod.runtime(server).service();
         file = server.getWorldPath(LevelResource.ROOT).resolve("autonomous_villages.json");
         writer=new FileSnapshotWriter(file);load();
-        for(var entity:server.overworld().getAllEntities())if(entity instanceof Villager resident)residentLoaded(resident);
+        // One resident the library refuses must not abort the constructor and leave every village inert; ENTITY_LOAD retries it.
+        for(var entity:server.overworld().getAllEntities())if(entity instanceof Villager resident)
+            try{residentLoaded(resident);}catch(RuntimeException error){AutonomousVillagesMod.LOG.warn("Resident {} not restored on start",resident.getUUID(),error);}
     }
     void residentLoaded(Villager resident){
         if(loadFailed)return;
@@ -50,7 +54,8 @@ public final class VillageRuntime {
             var handle=bots.find(id).orElse(null);
             if(handle==null&&((dev.navigationai.runtime.VillagerAccess)resident).navigationAiSavedState()!=null)handle=bots.attach(resident);
             if(handle!=null&&handle.state()==BotState.ACTIVE)handle.detach();
-            VillagePresentation.restoreName(resident,pendingReleases.remove(id));save();
+            // The entry goes only once the body is back to vanilla; a throw above leaves it for the next load.
+            VillagePresentation.restoreName(resident,pendingReleases.get(id));pendingReleases.remove(id);save();
         }else if(villages.values().stream().anyMatch(v->!v.state.active&&v.state.residents.contains(id)))
             bots.find(id).filter(b->b.state()==BotState.ACTIVE).ifPresent(BotHandle::stopAll);
     }
@@ -88,7 +93,7 @@ public final class VillageRuntime {
         for (Villager v : residents) if (bots.find(v.getUUID()).isPresent()) throw new IllegalArgumentException("Один из жителей уже управляется библиотекой.");
         residents.forEach(v -> state.residents.add(v.getUUID()));
         Village village = new Village(this, state); villages.put(name.toLowerCase(Locale.ROOT), village); village.ticket(true);village.town.capture(survey);
-        village.chronicle.event("Поселение "+name+" основано: жителей "+residents.size());save();
+        village.chronicle.event("Поселение "+name+" основано: жителей "+residents.size());saveNow();
         return "Поселение " + name + " выбрано по зданиям и рабочим точкам: " + state.center().toShortString() + ", жителей сейчас " + residents.size()
                 + ". Автономность включена. /avillage status " + name;
     }
@@ -112,7 +117,7 @@ public final class VillageRuntime {
             }
             default -> throw new IllegalArgumentException("Неизвестное действие");
         }
-        save(); return name + ": " + switch (action) { case "pause" -> "приостановлена"; case "resume" -> "работает"; default -> "освобождена, жители продолжают обычную жизнь"; };
+        saveNow(); return name + ": " + switch (action) { case "pause" -> "приостановлена"; case "resume" -> "работает"; default -> "освобождена, жители продолжают обычную жизнь"; };
     }
     public String storage(String name, BlockPos p, CommandSourceStack source) {
         mutable(); Village v = get(name);
@@ -125,7 +130,7 @@ public final class VillageRuntime {
         var chestState=v.level.getBlockState(p);
         if(chestState.getBlock() instanceof net.minecraft.world.level.block.ChestBlock&&chestState.getValue(net.minecraft.world.level.block.ChestBlock.TYPE)!=net.minecraft.world.level.block.state.properties.ChestType.SINGLE)
             v.state.policy.privateChests.remove(p.relative(net.minecraft.world.level.block.ChestBlock.getConnectedDirection(chestState)).asLong());
-        v.state.storage.add(p.asLong()); save(); return "Общий склад " + name + ": " + p.toShortString();
+        v.state.storage.add(p.asLong()); saveNow(); return "Общий склад " + name + ": " + p.toShortString();
     }
     public String status(String name) {
         if (loadFailed) return "Ошибка загрузки autonomous_villages.json; исходный файл сохранён.";
@@ -143,17 +148,28 @@ public final class VillageRuntime {
                 if (ticks >= village.nextErrorLog) { village.nextErrorLog = ticks + 200; AutonomousVillagesMod.LOG.error("Village {}", village.state.name, error); } }}
         villageRotation++;
         var error=writer.takeFailure();if(error!=null){persistenceWriteFailed=true;AutonomousVillagesMod.LOG.error("Cannot save periodic villages snapshot",error);}
-        if (ticks % 1200 == 0) writeSave(true);
+        // Chronicle totals and resident positions change without save(): the slow periodic snapshot still covers them.
+        if (ticks % 1200 == 0) {saves.clear();writeSave(true);}
+        else if (saves.take(ticks)) writeSave(true);
     }
+    /** Marks the state dirty; the next coalesced snapshot (at most one per 100 ticks) is written off the server thread. */
     public void save() {
-        writeSave(false);
+        saves.dirty();
+    }
+    /** Claim, release, commands and shutdown write at once, before the player sees the answer. */
+    public void saveNow() {
+        saves.clear();writeSave(false);
     }
     private void writeSave(boolean periodic) {
         if (loadFailed) return;
         try {
-            villages.values().forEach(v->{v.rememberResidents();v.state.compactMetadata();v.state.validate();});
-            Save data = new Save(); data.villages = villages.values().stream().map(v -> v.state).toList();data.pendingReleases.putAll(pendingReleases);
-            String json=GSON.toJson(data);
+            // Each village is validated on its own: one broken state keeps its last valid snapshot and never blocks the others.
+            JsonArray encoded=snapshots.encode(villages.values(),v->v.state.name.toLowerCase(Locale.ROOT),
+                    v->{v.rememberResidents();v.state.compactMetadata();v.state.validate();return GSON.toJsonTree(v.state);},
+                    (name,invalid,kept)->AutonomousVillagesMod.LOG.error(kept?"Village {} has invalid state and is saved from its last valid snapshot":"Village {} has invalid state and no valid snapshot yet; it is left out of this save",name,invalid));
+            Save data = new Save(); data.villages = List.of();data.pendingReleases.putAll(pendingReleases);
+            JsonObject root=GSON.toJsonTree(data).getAsJsonObject();root.add("villages",encoded);
+            String json=GSON.toJson(root);
             if(periodic)writer.periodic(json);else{writer.immediate(json);persistenceWriteFailed=false;}
         } catch (Exception error) { persistenceWriteFailed=true;AutonomousVillagesMod.LOG.error("Cannot save villages", error); }
     }
@@ -167,12 +183,16 @@ public final class VillageRuntime {
             if (data == null || data.version!=Save.VERSION || data.villages == null || data.villages.size() > 4
                     ||data.pendingReleases==null||data.pendingReleases.size()>16384||data.pendingReleases.entrySet().stream().anyMatch(e->e.getKey()==null||e.getValue()==null||e.getValue().json==null)) throw new IllegalArgumentException("Invalid village save");
             Map<String, Village> restored = new LinkedHashMap<>(); Set<UUID> people = new HashSet<>();
-            for (VillageState state : data.villages) {
+            JsonArray loaded=json.getAsJsonObject().getAsJsonArray("villages");
+            for (int i=0;i<data.villages.size();i++) {
+                VillageState state=data.villages.get(i);
                 state.compactMetadata();
                 state.validate(); String key = state.name.toLowerCase(Locale.ROOT);
                 if (restored.containsKey(key) || restored.values().stream().anyMatch(v -> state.overlaps(v.state))) throw new IllegalArgumentException("Duplicate/overlapping village");
                 for (UUID id : state.residents) if (!people.add(id)) throw new IllegalArgumentException("Duplicate resident");
                 restored.put(key, new Village(this, state));
+                // The element it was loaded from stands in if the first encode after this restart fails validation.
+                snapshots.seed(key,loaded.get(i));
             }
             pendingReleases.putAll(data.pendingReleases);
             villages.putAll(restored); villages.values().stream().filter(v -> v.state.active).toList().forEach(v -> v.ticket(true));
@@ -216,13 +236,17 @@ public final class VillageRuntime {
         var names=legacyReleases(json.getAsJsonObject());
         pendingReleases.putAll(names);
         AutonomousVillagesMod.LOG.warn("Village save v{} is from an older mod version: backed up to {}; {} residents return to vanilla life. Claim the villages again with /avillage claim.",version,backup.getFileName(),names.size());
-        save();
+        saveNow();
     }
     public void close() {
-        save();
+        saveNow();
         writer.close();
         // Do not detach on shutdown: library may already be closed and it owns backpack persistence.
-        for (Village v : villages.values()) {v.presentation.close();v.ticket(false);}
+        // One village failing to close must not keep the next one's tickets or boss bars alive.
+        for (Village v : villages.values()) {
+            try{v.presentation.close();}catch(RuntimeException error){AutonomousVillagesMod.LOG.error("Village {}: presentation close failed",v.state.name,error);}
+            try{v.ticket(false);}catch(RuntimeException error){AutonomousVillagesMod.LOG.error("Village {}: ticket release failed",v.state.name,error);}
+        }
     }
     static final class Save { static final int VERSION=4; int version = VERSION; List<VillageState> villages;Map<UUID,VillageState.ResidentName> pendingReleases=new LinkedHashMap<>(); }
 }

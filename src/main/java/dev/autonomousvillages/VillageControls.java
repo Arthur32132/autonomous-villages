@@ -25,11 +25,11 @@ final class VillageControls {
                     if(!Set.of("wood","mine","build","farm","all").contains(activity)||v.state.policy.zones.size()>=64)throw new IllegalArgumentException("Допустимо wood/mine/build/farm/all; максимум 64 участка");
                     var a=BlockPosArgument.getBlockPos(c,"from");var b=BlockPosArgument.getBlockPos(c,"to");
                     var z=new VillagePolicy.Zone();z.activity=activity;z.minX=Math.min(a.getX(),b.getX());z.maxX=Math.max(a.getX(),b.getX());z.minZ=Math.min(a.getZ(),b.getZ());z.maxZ=Math.max(a.getZ(),b.getZ());
-                    var proposed=new VillagePolicy();proposed.zones.add(z);proposed.validate();v.state.policy.zones.add(z);v.workers.values().forEach(Worker::cancel);v.runtime.save();return "Запрет №"+(v.state.policy.zones.size()-1)+": "+activity;
+                    var proposed=new VillagePolicy();proposed.zones.add(z);proposed.validate();v.state.policy.zones.add(z);v.workers.values().forEach(Worker::cancel);v.runtime.saveNow();return "Запрет №"+(v.state.policy.zones.size()-1)+": "+activity;
                 })))))));
         root.then(Commands.literal("unprotect").then(Commands.argument("name",StringArgumentType.string()).then(Commands.argument("index",com.mojang.brigadier.arguments.IntegerArgumentType.integer(0,63))
                 .executes(c->run(c.getSource(),()->{var v=village(c.getSource(),StringArgumentType.getString(c,"name"));int i=com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(c,"index");
-                    if(i>=v.state.policy.zones.size())throw new IllegalArgumentException("Нет такого участка");v.state.policy.zones.remove(i);v.runtime.save();return "Запрет снят";})))));
+                    if(i>=v.state.policy.zones.size())throw new IllegalArgumentException("Нет такого участка");v.state.policy.zones.remove(i);v.runtime.saveNow();return "Запрет снят";})))));
         root.then(Commands.literal("private").then(Commands.argument("name",StringArgumentType.string()).then(Commands.argument("pos",BlockPosArgument.blockPos()).executes(c->run(c.getSource(),()->{
             var v=village(c.getSource(),StringArgumentType.getString(c,"name"));var p=BlockPosArgument.getLoadedBlockPos(c,"pos");
             if(!v.state.contains(p)||!(v.level.getBlockEntity(p) instanceof ChestBlockEntity))throw new IllegalArgumentException("Нужен сундук в деревне");
@@ -38,13 +38,13 @@ final class VillageControls {
             if(actual.getValue(ChestBlock.TYPE)!=net.minecraft.world.level.block.state.properties.ChestType.SINGLE)
                 {var mate=p.relative(ChestBlock.getConnectedDirection(actual));if(v.state.contains(mate))pending.add(mate.asLong());}
             if(pending.size()>128)throw new IllegalArgumentException("Лимит личных сундуков");
-            v.state.policy.privateChests=pending;v.state.storage.removeAll(pending);v.workers.values().forEach(Worker::cancel);v.runtime.save();return "Сундук отмечен личным; доступ через storage возвращается только явно";
+            v.state.policy.privateChests=pending;v.state.storage.removeAll(pending);v.workers.values().forEach(Worker::cancel);v.runtime.saveNow();return "Сундук отмечен личным; доступ через storage возвращается только явно";
         })))));
         root.then(Commands.literal("expansion").then(Commands.argument("name",StringArgumentType.string()).then(Commands.argument("direction",StringArgumentType.word())
                 .executes(c->run(c.getSource(),()->{var v=village(c.getSource(),StringArgumentType.getString(c,"name"));String dir=StringArgumentType.getString(c,"direction");
                     if(!Set.of("north","south","east","west","none","all").contains(dir))throw new IllegalArgumentException("north/south/east/west/none/all");
                     v.state.policy.expansion.clear();if(dir.equals("all"))v.state.policy.expansion.addAll(List.of("north","south","east","west"));else if(!dir.equals("none"))v.state.policy.expansion.add(dir);
-                    v.runtime.save();return "Разрешённые направления: "+v.state.policy.expansion;})))));
+                    v.runtime.saveNow();return "Разрешённые направления: "+v.state.policy.expansion;})))));
     }
     private static Village village(CommandSourceStack source,String name){
         var v=AutonomousVillagesMod.runtime(source.getServer()).get(name);

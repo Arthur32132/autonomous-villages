@@ -23,11 +23,11 @@ public final class AutonomousVillagesMod implements ModInitializer {
             Identifier.fromNamespaceAndPath("autonomous_villages", "settlement"),
             new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION | TicketType.FLAG_KEEP_DIMENSION_ACTIVE));
     private static VillageRuntime runtime;
-    private static final TickGuard EVENTS=new TickGuard(200,(event,error)->LOG.error("Event {} failed",event,error));
-    private static long clock(){return System.nanoTime()/50_000_000L;}
+    /** Event failures are logged at most once per 200 ticks (10 s) per event; the clock is read only when one fails. */
+    private static final TickGuard EVENTS=new TickGuard(200,()->System.nanoTime()/50_000_000L,(event,error)->LOG.error("Event {} failed",event,error));
     /** No exception may escape into a Fabric event: that is a "Ticking entity" crash or a crash loop on every chunk load. */
-    static void guarded(String event,Runnable body){EVENTS.run(event,clock(),body);}
-    static <T> T guarded(String event,java.util.function.Supplier<T> body,T fallback){return EVENTS.run(event,clock(),body,fallback);}
+    static void guarded(String event,Runnable body){EVENTS.run(event,body);}
+    static <T> T guarded(String event,java.util.function.Supplier<T> body,T fallback){return EVENTS.run(event,body,fallback);}
     public static boolean hasActiveVillages(){return runtime!=null&&runtime.villages.values().stream().anyMatch(v->v.state.active);}
     public static VillageRuntime runtime(MinecraftServer server) {
         if (runtime == null || runtime.server != server) throw new IllegalStateException("Деревни ещё загружаются.");
@@ -36,7 +36,11 @@ public final class AutonomousVillagesMod implements ModInitializer {
     @Override public void onInitialize() {
         CONFIG = ModConfig.load(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir());
         // A permission check that throws denies the block: protection stays intact while the error is logged.
-        dev.navigationai.api.BlockBreakPermissions.register((id,pos)->guarded("mayBreak",()->runtime==null||runtime.mayBreak(id,pos),false));
+        // Asked per block from route planning, so no lambda or clock read on the way that succeeds.
+        dev.navigationai.api.BlockBreakPermissions.register((id,pos)->{
+            try{return runtime==null||runtime.mayBreak(id,pos);}
+            catch(RuntimeException error){EVENTS.failed("mayBreak",error);return false;}
+        });
         ServerLifecycleEvents.SERVER_STARTED.register(server->guarded("serverStarted",()->runtime=new VillageRuntime(server)));
         ServerEntityEvents.ENTITY_LOAD.register((entity,level)->guarded("entityLoad",()->{if(runtime!=null&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident&&level==runtime.server.overworld())runtime.residentLoaded(resident);}));
         ServerTickEvents.END_SERVER_TICK.register(server->guarded("serverTick",()->{if(runtime!=null)runtime.tick();}));
@@ -54,19 +58,21 @@ public final class AutonomousVillagesMod implements ModInitializer {
         ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> guarded("afterDeath",()->{
             if (runtime != null) for (Village village : runtime.villages.values()) {
                 if (village.state.residents.contains(entity.getUUID())) {
-                    String name=village.presentation.personName(entity.getUUID());
-                    String role=entity.isBaby()?"малыш":village.role(entity.getUUID());
+                    var id=entity.getUUID();
+                    String name=village.presentation.personName(id);
+                    String role=entity.isBaby()?"малыш":village.role(id);
                     String who=name+", "+role;
                     if(CONFIG.graves)village.state.graves.add(new VillageState.Grave(name,role,village.level.getGameTime()/24000+1));
-                    village.state.residents.remove(entity.getUUID());
-                    var worker=village.workers.remove(entity.getUUID());
-                    LOG.info("DEATH {} {}: {}",village.state.name,who,deathContext(village,entity,worker));
-                    if(worker!=null&&worker.job!=null)worker.job.stop();
-                    village.reservations.release(entity.getUUID());
-                    village.residentLost(entity.getUUID());
+                    village.state.residents.remove(id);
+                    var worker=village.workers.remove(id);
+                    // Bookkeeping first: a job that fails to stop or a diagnostic that throws must not leave the dead one's reservations and role behind.
+                    try{if(worker!=null&&worker.job!=null)worker.job.stop();}catch(RuntimeException error){LOG.warn("Death of {}: job stop failed",who,error);}
+                    village.reservations.release(id);
+                    village.residentLost(id);
                     var killer=source.getEntity();
                     village.chronicle.died(who,killer!=null?killer.getType().getDescription().getString():source.getMsgId());
                     runtime.save();
+                    try{LOG.info("DEATH {} {}: {}",village.state.name,who,deathContext(village,entity,worker));}catch(RuntimeException error){LOG.warn("Death of {}: context unavailable",who,error);}
                 }
             }
         }));

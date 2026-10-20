@@ -28,16 +28,20 @@ final class SaveCoalescer {
      * valid snapshot (or is left out when it never had one) instead of blocking the save of every other.
      */
     static final class Partition {
+        /** Called once per failure streak; {@code kept} says whether the last valid snapshot stood in. */
+        interface Fallback{void failed(String key,RuntimeException error,boolean kept);}
         private final Map<String,JsonElement> lastGood=new HashMap<>();
         private final Set<String> warned=new HashSet<>();
-        <T> JsonArray encode(Collection<T> items,Function<T,String> key,Function<T,JsonElement> encoder,BiConsumer<String,RuntimeException> warn){
+        /** The snapshot a village was loaded from: a fallback exists before its first encode after a restart. */
+        void seed(String key,JsonElement json){lastGood.put(key,json);}
+        <T> JsonArray encode(Collection<T> items,Function<T,String> key,Function<T,JsonElement> encoder,Fallback warn){
             var keys=new HashSet<String>();var out=new JsonArray();
             for(T item:items){
                 String k=key.apply(item);keys.add(k);
                 try{JsonElement json=encoder.apply(item);lastGood.put(k,json);warned.remove(k);out.add(json);}
                 catch(RuntimeException error){
-                    if(warned.add(k))warn.accept(k,error);
                     JsonElement previous=lastGood.get(k);if(previous!=null)out.add(previous);
+                    if(warned.add(k))warn.failed(k,error,previous!=null);
                 }
             }
             lastGood.keySet().retainAll(keys);warned.retainAll(keys);

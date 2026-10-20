@@ -71,7 +71,7 @@ final class Village {
     private final AttachRetries attachRetries=new AttachRetries(1200);
     /** One phase of the tick: a throwing feature is reported at most once per 200 ticks and the rest of the tick goes on. */
     private final TickGuard phases;
-    private void guard(String phase,Runnable body){if(!phases.run(phase,level.getGameTime(),body))problem="ошибка: "+phase;}
+    private void guard(String phase,Runnable body){if(!phases.run(phase,body))problem="ошибка: "+phase;}
     private long nextAlarm;
     long nextErrorLog;
     private long nextWorkerErrorLog;
@@ -83,7 +83,7 @@ final class Village {
 
     Village(VillageRuntime runtime,VillageState state){
         this.runtime=runtime;this.state=state;this.level=runtime.server.overworld();
-        this.phases=new TickGuard(200,(phase,error)->AutonomousVillagesMod.LOG.warn("Village {} {}",state.name,phase,error));
+        this.phases=new TickGuard(200,level::getGameTime,(phase,error)->AutonomousVillagesMod.LOG.warn("Village {} {}",state.name,phase,error));
         this.town=new Projects(this);this.planner=new VillagePlanner(this);this.breeding=new Breeding(this);this.presentation=new VillagePresentation(this);this.ambience=new Ambience(this);this.lifeEvents=new LifeEvents(this);
     }
 
@@ -555,15 +555,18 @@ final class Village {
 
     // --- lifecycle and status ------------------------------------------------------------------------
     void stop(boolean detach){
-        rememberResidents();
-        presentation.close();
-        for(Worker w:workers.values()){
+        // One resident whose handle refuses to stop or detach must not leave the rest attached or the tickets alive.
+        try{rememberResidents();}catch(RuntimeException error){AutonomousVillagesMod.LOG.warn("Village {}: resident positions not recorded",state.name,error);}
+        try{presentation.close();}catch(RuntimeException error){AutonomousVillagesMod.LOG.warn("Village {}: presentation close failed",state.name,error);}
+        for(Worker w:workers.values())try{
             if(w.job!=null)w.job.stop();
             BotHandle b=w.bot();if(b!=null&&b.state()==BotState.ACTIVE){b.stopAll();if(detach)b.detach();}
-            reservations.release(w.id);
-        }
+        }catch(RuntimeException error){AutonomousVillagesMod.LOG.warn("Village {}: worker {} not stopped",state.name,w.id,error);}
+        finally{reservations.release(w.id);}
         // On a restart-before-first-tick, members may already have library handles without Worker objects.
-        for(UUID id:state.residents)runtime.bots.find(id).filter(b->b.kind()==BotKind.VILLAGER&&b.state()==BotState.ACTIVE).ifPresent(b->{b.stopAll();if(detach)b.detach();});
+        for(UUID id:state.residents)try{
+            runtime.bots.find(id).filter(b->b.kind()==BotKind.VILLAGER&&b.state()==BotState.ACTIVE).ifPresent(b->{b.stopAll();if(detach)b.detach();});
+        }catch(RuntimeException error){AutonomousVillagesMod.LOG.warn("Village {}: resident {} not released",state.name,id,error);}
         workers.clear();ticket(false);
     }
     String status(){

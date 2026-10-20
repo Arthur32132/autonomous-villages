@@ -43,7 +43,9 @@ public final class VillageRuntime {
         this.server = server; this.bots = NavigationAiMod.runtime(server).service();
         file = server.getWorldPath(LevelResource.ROOT).resolve("autonomous_villages.json");
         writer=new FileSnapshotWriter(file);load();
-        for(var entity:server.overworld().getAllEntities())if(entity instanceof Villager resident)residentLoaded(resident);
+        // One resident the library refuses must not abort the constructor and leave every village inert; ENTITY_LOAD retries it.
+        for(var entity:server.overworld().getAllEntities())if(entity instanceof Villager resident)
+            try{residentLoaded(resident);}catch(RuntimeException error){AutonomousVillagesMod.LOG.warn("Resident {} not restored on start",resident.getUUID(),error);}
     }
     void residentLoaded(Villager resident){
         if(loadFailed)return;
@@ -164,7 +166,7 @@ public final class VillageRuntime {
             // Each village is validated on its own: one broken state keeps its last valid snapshot and never blocks the others.
             JsonArray encoded=snapshots.encode(villages.values(),v->v.state.name.toLowerCase(Locale.ROOT),
                     v->{v.rememberResidents();v.state.compactMetadata();v.state.validate();return GSON.toJsonTree(v.state);},
-                    (name,invalid)->AutonomousVillagesMod.LOG.error("Village {} has invalid state and is saved from its last valid snapshot",name,invalid));
+                    (name,invalid,kept)->AutonomousVillagesMod.LOG.error(kept?"Village {} has invalid state and is saved from its last valid snapshot":"Village {} has invalid state and no valid snapshot yet; it is left out of this save",name,invalid));
             Save data = new Save(); data.villages = List.of();data.pendingReleases.putAll(pendingReleases);
             JsonObject root=GSON.toJsonTree(data).getAsJsonObject();root.add("villages",encoded);
             String json=GSON.toJson(root);
@@ -181,12 +183,16 @@ public final class VillageRuntime {
             if (data == null || data.version!=Save.VERSION || data.villages == null || data.villages.size() > 4
                     ||data.pendingReleases==null||data.pendingReleases.size()>16384||data.pendingReleases.entrySet().stream().anyMatch(e->e.getKey()==null||e.getValue()==null||e.getValue().json==null)) throw new IllegalArgumentException("Invalid village save");
             Map<String, Village> restored = new LinkedHashMap<>(); Set<UUID> people = new HashSet<>();
-            for (VillageState state : data.villages) {
+            JsonArray loaded=json.getAsJsonObject().getAsJsonArray("villages");
+            for (int i=0;i<data.villages.size();i++) {
+                VillageState state=data.villages.get(i);
                 state.compactMetadata();
                 state.validate(); String key = state.name.toLowerCase(Locale.ROOT);
                 if (restored.containsKey(key) || restored.values().stream().anyMatch(v -> state.overlaps(v.state))) throw new IllegalArgumentException("Duplicate/overlapping village");
                 for (UUID id : state.residents) if (!people.add(id)) throw new IllegalArgumentException("Duplicate resident");
                 restored.put(key, new Village(this, state));
+                // The element it was loaded from stands in if the first encode after this restart fails validation.
+                snapshots.seed(key,loaded.get(i));
             }
             pendingReleases.putAll(data.pendingReleases);
             villages.putAll(restored); villages.values().stream().filter(v -> v.state.active).toList().forEach(v -> v.ticket(true));

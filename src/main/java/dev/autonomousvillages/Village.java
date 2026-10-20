@@ -513,18 +513,13 @@ final class Village {
         return hub;
     }
     void moved(){hubTick=LONG_AGO;}
-    private BlockPos board;
-    private long boardTick=LONG_AGO;
-    /** The notice board: a sign near the bell, if the village has put one up. */
+    /** The notice board: only the sign the village put up itself (remembered in the state), never a player's or a landmark's. */
     BlockPos noticeBoard(){
-        long now=level.getGameTime();
-        // A found board is trusted for a while; "no board" is rechecked soon, a sign may have just been put up.
-        if(board!=null&&now-boardTick<200&&level.getBlockEntity(board) instanceof net.minecraft.world.level.block.entity.SignBlockEntity)return board;
-        if(board==null&&now-boardTick<20)return null;
-        boardTick=now;board=null;BlockPos hub=meetingPoint();
-        for(BlockPos q:BlockPos.betweenClosed(hub.offset(-6,-2,-6),hub.offset(6,2,6)))
-            if(level.getBlockEntity(q) instanceof net.minecraft.world.level.block.entity.SignBlockEntity&&!state.nameplates.containsKey(q.asLong())){board=q.immutable();break;}
-        return board;
+        if(state.noticeBoard==null)presentation.adoptBoard();
+        if(state.noticeBoard==null)return null;
+        BlockPos board=BlockPos.of(state.noticeBoard);
+        if(!level.hasChunkAt(board)||level.getBlockEntity(board) instanceof net.minecraft.world.level.block.entity.SignBlockEntity)return board;
+        state.noticeBoard=null;return null;
     }
     BlockPos stand(BlockPos target,Vec3 from){return stand(target,from,3.0,true,Set.of());}
     BlockPos stand(BlockPos target,Vec3 from,double reach,boolean sight,Set<BlockPos> rejectedPositions){

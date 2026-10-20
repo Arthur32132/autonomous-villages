@@ -16,7 +16,9 @@ final class Chronicle {
     Data data(){if(v.state.chronicle==null)v.state.chronicle=new Data();return v.state.chronicle;}
     void add(String key,long n){data().totals.merge(key,n,Long::sum);}
     long total(String key){return data().totals.getOrDefault(key,0L);}
-    String day(){return "день "+(v.level.getGameTime()/24000+1);}
+    String day(){return day(v.level.getOverworldClockTime());}
+    /** The day as players count it (the overworld clock, so a night slept through is a day gone); the morning news uses the same. */
+    static String day(long clock){return "день "+(Math.floorDiv(clock,24000)+1);}
     void event(String message){
         var events=data().events;events.add(day()+": "+message);while(events.size()>60)events.removeFirst();
         AutonomousVillagesMod.LOG.info("SETTLEMENT {}: {}",v.state.name,message);
@@ -27,13 +29,39 @@ final class Chronicle {
         tell(message);
         if(v.lifeEvents!=null)v.lifeEvents.herald();
     }
-    /** Shown in chat to players near the village, but not kept among the events. */
+    /** Shown in chat to players near the village, but not kept among the events; within the chat budget, a burst becomes one line. */
     void tell(String message){
+        if(AutonomousVillagesMod.CONFIG.chatAnnouncements)chat.offer(message);
+        flushChat();
+    }
+    private final ChatBudget chat=new ChatBudget();
+    /** Sends what waits for the chat once the village's budget allows it; called every tick. */
+    void flushChat(){
+        String line=chat.poll(v.level.getGameTime());
+        if(line==null)return;
         var text=net.minecraft.network.chat.Component.literal("["+v.state.name+"] ").withStyle(net.minecraft.ChatFormatting.GOLD)
-                .append(net.minecraft.network.chat.Component.literal(message).withStyle(net.minecraft.ChatFormatting.YELLOW));
+                .append(net.minecraft.network.chat.Component.literal(line).withStyle(net.minecraft.ChatFormatting.YELLOW));
         var area=VillageDiscovery.area(v.state,64);
         for(var player:v.runtime.server.getPlayerList().getPlayers())
             if(player.level()==v.level&&area.contains(player.position()))player.sendSystemMessage(text);
+    }
+    /** At most one chat line per village every {@link #GAP} ticks; what comes in between waits and goes out as one line. */
+    static final class ChatBudget {
+        static final long GAP=100;
+        static final int MERGED=3;
+        private final List<String> waiting=new ArrayList<>();
+        private int extra;
+        private long next=Long.MIN_VALUE;
+        /** A burst keeps its first {@link #MERGED} messages word for word; the rest are only counted. */
+        void offer(String message){if(message==null||message.isBlank())return;if(waiting.size()<MERGED)waiting.add(message);else extra++;}
+        /** The line due at this tick, or null while the budget is spent or nothing waits. */
+        String poll(long now){
+            if(waiting.isEmpty()||now<next)return null;
+            next=now+GAP;
+            String line=String.join(" • ",waiting)+(extra>0?" • и ещё "+MorningNews.plural(extra,"новость","новости","новостей")+" в летописи":"");
+            waiting.clear();extra=0;
+            return line;
+        }
     }
     void crafted(ItemStack output){add("crafted",output.getCount());add("crafted:"+BuiltInRegistries.ITEM.getKey(output.getItem()).getPath(),output.getCount());}
     void placed(){add("placed",1);}

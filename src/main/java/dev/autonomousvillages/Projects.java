@@ -145,7 +145,7 @@ final class Projects {
         var houses=unfinished.stream().filter(b->b.kind.equals("house")).toList();
         var works=unfinished.stream().filter(b->!b.kind.equals("house")).toList();
         var active=unfinished.isEmpty()?null:unfinished.getFirst();
-        if(active!=null)stage=(waiting(active)?"ждут материалы: ":"строят ")+label(active)+" "+built(active)+"/"+size(active);
+        if(active!=null)stage=(blocked(active)?"не подойти к стройке: ":waiting(active)?"ждут материалы: ":"строят ")+label(active)+" "+built(active)+"/"+size(active);
         if(v.state.buildings.size()>=256||v.state.completedShelters>=64){stage="все проекты завершены";return;}
         int residents=v.state.residents.size();
         boolean wool=v.stock.count(x->x.is(ItemTags.WOOL))<3;
@@ -564,6 +564,7 @@ final class Projects {
      * whole day without progress the next house may start anyway.
      */
     boolean waiting(TownBuilding b){
+        if(blocked(b))return true;
         Long since=unpaidSince.get(b.origin);if(since==null)return false;
         long idle=v.level.getGameTime()-since;
         return idle>24000||idle>3000&&missing(b).keySet().stream().noneMatch(EVERYDAY::contains);
@@ -607,11 +608,22 @@ final class Projects {
         return VillageIndex.naturalSoil(s)||s.is(Blocks.STONE)||s.is(Blocks.SAND)||s.is(Blocks.GRAVEL)||s.is(BlockTags.LEAVES)||s.is(BlockTags.FLOWERS)
                 ||s.is(Blocks.DIRT_PATH)||s.getBlock() instanceof SaplingBlock||s.is(Blocks.BUSH)||s.is(Blocks.SNOW)||s.is(Blocks.SNOW_BLOCK);
     }
-    /** Cells to clear first, then missing blocks bottom-up. */
-    List<BlockPos> pendingCuts(TownBuilding b,int limit){
-        var out=new ArrayList<BlockPos>();
-        for(long cut:b.cuts){if(!reachable(b,cut))continue;BlockPos p=BlockPos.of(cut);var s=v.level.getBlockState(p);if(!Construction.clear(s)&&removable(s)&&!planned(b,cut))out.add(p);if(out.size()>=limit)break;}
-        for(var plan:b.blocks){if(out.size()>=limit)break;var s=v.level.getBlockState(plan.position());if(!plan.optional&&!plan.matches(v)&&!Construction.clear(s)&&removable(s)&&!out.contains(plan.position()))out.add(plan.position());}
+    /**
+     * Everything the builders would try next (the cuts and steps of a batch) is remembered as unreachable
+     * after a second failure in a row: nobody gets at the site, so it waits like one short of materials
+     * and the next project may start (soak 8675309: a house at 136/140 held the village for a day and a half).
+     */
+    boolean blocked(TownBuilding b){
+        if(v.stock.unreachable.count(v.level.getGameTime())==0)return false;
+        var cells=cuts(b,6,false);for(var p:nextSteps(b,48))cells.add(p.position());
+        return v.stock.unreachable.allBlocked(cells,v.level.getGameTime());
+    }
+    /** Cells to clear first, then missing blocks bottom-up; cells nobody reached lately wait for the memory to expire. */
+    List<BlockPos> pendingCuts(TownBuilding b,int limit){return cuts(b,limit,true);}
+    private List<BlockPos> cuts(TownBuilding b,int limit,boolean reachableOnly){
+        var out=new ArrayList<BlockPos>();long now=v.level.getGameTime();
+        for(long cut:b.cuts){if(!reachable(b,cut))continue;BlockPos p=BlockPos.of(cut);var s=v.level.getBlockState(p);if(!Construction.clear(s)&&removable(s)&&!planned(b,cut)&&!(reachableOnly&&v.stock.unreachable.isUnreachable(p,now)))out.add(p);if(out.size()>=limit)break;}
+        for(var plan:b.blocks){if(out.size()>=limit)break;var s=v.level.getBlockState(plan.position());if(!plan.optional&&!plan.matches(v)&&!Construction.clear(s)&&removable(s)&&!out.contains(plan.position())&&!(reachableOnly&&v.stock.unreachable.isUnreachable(plan.position(),now)))out.add(plan.position());}
         return out;
     }
     /** Missing structural blocks bottom-up, then decoration the store happens to hold. */

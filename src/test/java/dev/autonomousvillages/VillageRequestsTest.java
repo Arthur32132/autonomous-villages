@@ -1,6 +1,7 @@
 package dev.autonomousvillages;
 
 import static org.junit.jupiter.api.Assertions.*;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -46,5 +47,21 @@ class VillageRequestsTest {
         var loaded=VillageRuntime.GSON.fromJson(json,VillageState.class);
         loaded.compactMetadata();loaded.validate();
         assertTrue(loaded.donations.isEmpty());assertNull(loaded.request);assertEquals(-1,loaded.fairDay);
+    }
+
+    @Test void noRequestsWithoutDonations(){
+        var c=new ModConfig();
+        assertTrue(VillageRequests.enabled(c));
+        c.donations=false;assertFalse(VillageRequests.enabled(c));
+        c.donations=true;c.requests=false;assertFalse(VillageRequests.enabled(c));
+    }
+    @Test void everyoneWhoBroughtPartOfARequestIsThanked(){
+        var givers=new LinkedHashMap<UUID,VillageRequests.Contribution>();
+        UUID mars=UUID.randomUUID(),luna=UUID.randomUUID();
+        VillageRequests.record(givers,mars,"Mars",5);
+        VillageRequests.record(givers,luna,"Luna",3);
+        VillageRequests.record(givers,mars,"Mars",7);
+        assertEquals(12,givers.get(mars).count());
+        assertEquals("Заказ снят (доски). Спасибо за помощь: Mars ×12, Luna ×3!",VillageRequests.credit("Заказ снят","доски",givers));
     }
 }

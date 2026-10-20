@@ -24,7 +24,8 @@ final class LifeEvents {
     /** A short folk tune: semitones above F#3 (0..24), played a note every four ticks. */
     static final int[] TUNE={12,14,16,12, 12,14,16,12, 16,17,19,-1, 16,17,19,-1, 19,21,19,17,16,12, 19,21,19,17,16,12, 12,7,12,-1};
     private final Village v;
-    private int completed=-1;
+    /** Buildings seen finished; null until the first look, which only takes stock. */
+    private Set<TownBuilding> finished;
     private String feastFor;
     private final PriorityQueue<Note> music=new PriorityQueue<>(Comparator.comparingLong(Note::at));
     private record Note(long at,BlockPos where,SoundEvent sound,float pitch){}
@@ -52,8 +53,8 @@ final class LifeEvents {
         if(market==null)return;
         v.state.fairDay=day;
         BlockPos square=middle(market);
+        // The announcement's herald stroke is the fair's bell: one, and only where a bell hangs.
         v.chronicle.announce("Ярмарка! Сегодня на рынке торгуют весь день.");
-        for(int i=0;i<3;i++)music.add(new Note(v.level.getGameTime()+i*30L,v.meetingPoint(),SoundEvents.BELL_BLOCK,1f));
         tune(square,SoundEvents.NOTE_BLOCK_FLUTE.value());
         // The stalls are set out once more for the fair.
         if(AutonomousVillagesMod.CONFIG.landmarkGoods)LandmarkGoods.market(v,market);
@@ -75,13 +76,25 @@ final class LifeEvents {
     }
 
     // --- the feast --------------------------------------------------------------------------------
-    /** A building finished since the last look is celebrated at the tavern that evening. */
+    /** A building the village finished since the last look is celebrated at the tavern that evening. */
     private void watchCompletions(){
-        int done=0;TownBuilding last=null;
-        for(var b:v.state.buildings)if(b.completed){done++;last=b;}
-        if(completed>=0&&done>completed&&last!=null&&!last.kind.equals("tavern"))feastFor=Projects.label(last);
-        completed=done;
+        boolean first=finished==null;
+        if(first)finished=Collections.newSetFromMap(new IdentityHashMap<>());
+        var fresh=fresh(finished,v.state.buildings,first);
+        if(fresh!=null)feastFor=Projects.label(fresh);
     }
+    /**
+     * The last building finished since the last look that the village built itself: the first look only
+     * takes stock, captured houses (finished on capture) and the tavern, the feast's own hall, are not
+     * celebrated. Allocation-free while nothing changes; forgets buildings no longer finished or gone.
+     */
+    static TownBuilding fresh(Set<TownBuilding> finished,List<TownBuilding> buildings,boolean first){
+        TownBuilding fresh=null;int done=0;
+        for(var b:buildings)if(b.completed){done++;if(finished.add(b)&&!first&&celebrated(b))fresh=b;}
+        if(finished.size()>done)finished.removeIf(b->!b.completed||!buildings.contains(b));
+        return fresh;
+    }
+    static boolean celebrated(TownBuilding b){return !b.kind.equals("native_house")&&!b.kind.equals("tavern");}
     private void feast(){
         String reason=feastFor;feastFor=null;
         var tavern=built("tavern");
@@ -95,15 +108,13 @@ final class LifeEvents {
 
     // --- births, the watch, the herald -------------------------------------------------------------
     private long births=-1;
-    /** A newborn: the bell twice and a cradle song at the meeting point. */
+    /** A newborn: a cradle song at the meeting point. The bell is the herald's single stroke for the birth's announcement. */
     private void watchBirths(){
         long now=v.chronicle.total("births");
         if(births>=0&&now>births){
-            BlockPos bell=v.meetingPoint();long t=v.level.getGameTime();
-            music.add(new Note(t,bell,SoundEvents.BELL_BLOCK,1.3f));music.add(new Note(t+25,bell,SoundEvents.BELL_BLOCK,1.3f));
-            long start=t+50;
-            for(int i=0;i<CRADLE.length;i++)if(CRADLE[i]>=0)music.add(new Note(start+i*6L,bell,SoundEvents.NOTE_BLOCK_BELL.value(),pitch(CRADLE[i])));
-            v.level.sendParticles(ParticleTypes.HEART,bell.getX()+.5,bell.getY()+2,bell.getZ()+.5,8,1.5,.6,1.5,0);
+            BlockPos hub=v.meetingPoint();long start=v.level.getGameTime()+30;
+            for(int i=0;i<CRADLE.length;i++)if(CRADLE[i]>=0)music.add(new Note(start+i*6L,hub,SoundEvents.NOTE_BLOCK_BELL.value(),pitch(CRADLE[i])));
+            v.level.sendParticles(ParticleTypes.HEART,hub.getX()+.5,hub.getY()+2,hub.getZ()+.5,8,1.5,.6,1.5,0);
         }
         births=now;
     }
@@ -126,9 +137,15 @@ final class LifeEvents {
         if(!AutonomousVillagesMod.CONFIG.lifeEvents)return;
         long t=v.level.getGameTime();
         if(t-lastHerald<200)return;
+        BlockPos bell=bell();
+        if(bell==null)return;
         lastHerald=t;
-        BlockPos bell=v.meetingPoint();
-        if(v.level.getBlockState(bell).is(net.minecraft.world.level.block.Blocks.BELL))music.add(new Note(t,bell,SoundEvents.BELL_BLOCK,1.1f));
+        music.add(new Note(t,bell,SoundEvents.BELL_BLOCK,1.1f));
+    }
+    /** The village's bell, or null when the meeting point holds none (or its chunk is not loaded). */
+    BlockPos bell(){
+        BlockPos hub=v.meetingPoint();
+        return v.level.hasChunkAt(hub)&&v.level.getBlockState(hub).is(net.minecraft.world.level.block.Blocks.BELL)?hub:null;
     }
 
     // --- shared -----------------------------------------------------------------------------------

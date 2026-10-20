@@ -5,15 +5,18 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.Filterable;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.ai.gossip.GossipType;
 import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -24,7 +27,8 @@ import net.minecraft.world.item.component.WrittenBookContent;
 /**
  * What a player holds of a village. With a book and quill, sneaking, a resident writes the village's
  * ledger: a book that rewrites itself every time it is opened (people, store, the current build).
- * Any other stack handed over sneaking goes to the shared store; the residents remember the gift,
+ * A stack of something the village uses, handed over sneaking, goes to the shared store (leaving room for
+ * the workers' own deposits; anything else stays with the player); the residents remember the gift,
  * which makes vanilla trades cheaper, and a generous donor is given the village's certificate of honour.
  * Vanilla items with names and lore only, so a client needs no mod.
  */
@@ -57,20 +61,65 @@ final class PlayerGoods {
             player.sendSystemMessage(Component.literal("["+v.state.name+"] У деревни ещё нет общего сундука.").withStyle(net.minecraft.ChatFormatting.GRAY));
             return InteractionResult.SUCCESS;
         }
-        int offered=held.getCount();Item item=held.getItem();
-        ItemStack rest=v.stock.put(held.copy());
-        int given=offered-rest.getCount();
-        if(given<=0){
-            player.sendSystemMessage(Component.literal("["+v.state.name+"] Склад полон.").withStyle(net.minecraft.ChatFormatting.GRAY));
+        // The resident turns down what the village has no use for: it stays in the player's hand.
+        if(!wanted(v,held)){
+            v.level.playSound(null,resident.blockPosition(),SoundEvents.VILLAGER_NO,SoundSource.NEUTRAL,1f,1f);
+            player.sendSystemMessage(Component.literal("["+v.state.name+"] Деревне это не нужно: берут стройматериалы, еду, топливо, семена, инструменты.").withStyle(net.minecraft.ChatFormatting.GRAY));
             return InteractionResult.SUCCESS;
         }
-        player.setItemInHand(hand,rest);
+        int offered=room(held.getCount(),topUp(v,held),v.stock.freeSlots(),held.getMaxStackSize());
+        Item item=held.getItem();
+        int given=offered<=0?0:offered-v.stock.put(held.copyWithCount(offered)).getCount();
+        if(given<=0){
+            player.sendSystemMessage(Component.literal("["+v.state.name+"] Склад почти полон: место оставлено для работников.").withStyle(net.minecraft.ChatFormatting.GRAY));
+            return InteractionResult.SUCCESS;
+        }
+        held.shrink(given);
         thank(v,player,resident,item,given);
         return InteractionResult.SUCCESS;
     }
     /** Books, name tags and the village's own papers are never taken by mistake. */
     static boolean donatable(ItemStack s){
         return !s.is(Items.WRITABLE_BOOK)&&!s.is(Items.WRITTEN_BOOK)&&!s.is(Items.NAME_TAG)&&!s.is(Items.KNOWLEDGE_BOOK)&&!s.has(DataComponents.CUSTOM_NAME);
+    }
+    /** Empty slots of the store a gift never takes, so that the workers can always bring their goods home. */
+    static final int RESERVE=9;
+    /** Pieces the village's own designs are built of. */
+    static final Set<String> BUILDING=Set.of("planks","logs","door","bed","torch","cobblestone","stairs","slab","fence","trapdoor","stone_stairs",
+            "stone_slab","stone_wall","glass_pane","ladder","chest","crafting_table","furnace","fence_gate");
+    /** Items the jobs work with (VillageCrafting, Supplies, CompostJob, FarmJob), besides those matched by tag or by building key. */
+    static final Set<Item> USED=Set.of(Items.STICK,Items.COBBLESTONE,Items.IRON_INGOT,Items.IRON_NUGGET,Items.COAL,Items.CHARCOAL,Items.WHEAT,Items.BREAD,
+            Items.CARROT,Items.POTATO,Items.BEETROOT,Items.TORCH,Items.LANTERN,Items.SAND,Items.RED_SAND,Items.GLASS,Items.SHEARS,Items.SHIELD,Items.BONE_MEAL,
+            Items.WHEAT_SEEDS,Items.BEETROOT_SEEDS,Items.PUMPKIN_SEEDS,Items.MELON_SEEDS,Items.EMERALD,Items.APPLE,Items.ANDESITE,Items.DIORITE,Items.GRANITE,
+            Items.TUFF,Items.STONE,Items.MOSSY_COBBLESTONE,Items.DEEPSLATE,Items.SANDSTONE,Items.RED_SANDSTONE,Items.SMOOTH_SANDSTONE,Items.CUT_SANDSTONE);
+    static final List<TagKey<Item>> USED_TAGS=List.of(ItemTags.PLANKS,ItemTags.LOGS_THAT_BURN,ItemTags.STONE_TOOL_MATERIALS,ItemTags.WOOL,ItemTags.SAPLINGS,
+            ItemTags.VILLAGER_PLANTABLE_SEEDS,ItemTags.PICKAXES,ItemTags.AXES,ItemTags.SWORDS,ItemTags.HOES,ItemTags.SHOVELS);
+    /** What the village works with: building stuff and its materials, fuel, food and what the tavern cooks, seeds, saplings, flowers, tools, iron, wool, emeralds. */
+    static boolean used(Item item){
+        if(USED.contains(item)||LandmarkGoods.KITCHEN.containsKey(item)||LandmarkGoods.KITCHEN.containsValue(item))return true;
+        var holder=item.builtInRegistryHolder();
+        for(var tag:USED_TAGS)if(holder.is(tag))return true;
+        return item instanceof BlockItem b&&(BUILDING.contains(Projects.materialKey(b.getBlock().defaultBlockState()))||b.getBlock().defaultBlockState().is(BlockTags.SMALL_FLOWERS));
+    }
+    static boolean used(ItemStack s){return donatable(s)&&used(s.getItem());}
+    /** Something the village uses, or a block the current build is waiting for (a request, a template's hay or terracotta). */
+    static boolean wanted(Village v,ItemStack s){
+        if(used(s))return true;
+        if(!donatable(s))return false;
+        String key=VillageRequests.key(s.getItem());
+        var project=v.town.active();
+        return key!=null&&project!=null&&v.town.missing(project).containsKey(key);
+    }
+    /** How many of a gift go in: topping up the store's stacks of it, then empty slots, but never the last RESERVE of them. */
+    static int room(int offered,int topUp,int freeSlots,int perSlot){
+        return (int)Math.max(0,Math.min(offered,(long)topUp+(long)Math.max(0,freeSlots-RESERVE)*perSlot));
+    }
+    private static int topUp(Village v,ItemStack gift){
+        int n=0;
+        for(var chest:v.stock.chests())for(int i=0;i<chest.getContainerSize();i++){
+            var s=chest.getItem(i);if(!s.isEmpty()&&ItemStack.isSameItemSameComponents(s,gift))n+=Math.max(0,s.getMaxStackSize()-s.getCount());
+        }
+        return n;
     }
     /** Minor goodwill per gift, a little more for a bigger one: four items buy one point, 20 at most. */
     static int goodwill(int items){return Math.clamp((items+3)/4,1,20);}
@@ -97,7 +146,7 @@ final class PlayerGoods {
             v.level.playSound(null,resident.blockPosition(),SoundEvents.PLAYER_LEVELUP,SoundSource.PLAYERS,1f,1f);
         }
         VillageRequests.delivered(v,player,resident,item,given);
-        v.runtime.save();
+        // No save here: the periodic snapshot (every minute, written off the server thread) keeps the tally.
     }
     /** The certificate of honour: paper with the village's name, a glint and the date. */
     static ItemStack certificate(Village v,String player){
@@ -133,76 +182,76 @@ final class PlayerGoods {
     }
     static ItemStack ledger(Village v){
         var pages=new ArrayList<Filterable<Component>>();
-        pages.add(page(summary(v)));
-        pages.add(page(store(v)));
-        pages.add(page(build(v)));
-        for(var people:people(v))pages.add(page(people));
-        var donors=donors(v);if(donors!=null)pages.add(page(donors));
+        for(var sheet:List.of(summary(v),store(v),build(v),people(v),donors(v)))for(var c:sheet)pages.add(page(c));
         var book=new ItemStack(Items.WRITTEN_BOOK);
         String title=LEDGER+v.state.name;if(title.length()>WrittenBookContent.TITLE_MAX_LENGTH)title=title.substring(0,WrittenBookContent.TITLE_MAX_LENGTH);
         book.set(DataComponents.WRITTEN_BOOK_CONTENT,new WrittenBookContent(Filterable.passThrough(title),Chronicle.BOOK_AUTHOR,0,pages,true));
         return book;
     }
     private static Filterable<Component> page(Component c){return Filterable.passThrough(c);}
-    private static Component summary(Village v){
+    /** Book lines an item name in the reader's language is given: the server cannot measure it. */
+    static final int ITEM_LINES=2;
+    private static List<Component> summary(Village v){
         var c=v.chronicle;
-        return Component.literal(v.state.name+"\n"+c.day()+"\n\n"
-                +"Жителей: "+v.state.residents.size()+"\n"
-                +"Кроватей: "+v.index.beds.size()+" (свободно "+v.breeding.freeBeds()+")\n"
-                +"Зданий: "+v.state.buildings.stream().filter(b->b.completed).count()+"\n"
-                +"Рождений: "+c.total("births")+"\nПотерь: "+c.total("deaths")+"\n"
-                +"Деревьев: "+c.total("trees")+"\nБлоков: "+c.total("placed")+"\n"
-                +"Сейчас: "+v.town.stage);
+        return BookLayout.pages(v.state.name+"\n"+c.day(),lines("Жителей: "+v.state.residents.size(),
+                "Кроватей: "+v.index.beds.size()+" (свободно "+v.breeding.freeBeds()+")",
+                "Зданий: "+v.state.buildings.stream().filter(b->b.completed).count(),
+                "Рождений: "+c.total("births"),"Потерь: "+c.total("deaths"),"Деревьев: "+c.total("trees"),"Блоков: "+c.total("placed"),
+                "Сейчас: "+v.town.stage),2);
     }
+    private static List<BookLayout.Entry> lines(String... lines){return Arrays.stream(lines).map(BookLayout::entry).toList();}
     /** The twelve biggest stacks of the store, by item, with names in the reader's language. */
-    private static Component store(Village v){
+    private static List<Component> store(Village v){
         var counts=new HashMap<Item,Integer>();
         for(var chest:v.stock.chests())for(int i=0;i<chest.getContainerSize();i++){var s=chest.getItem(i);if(!s.isEmpty())counts.merge(s.getItem(),s.getCount(),Integer::sum);}
-        MutableComponent out=Component.literal("Склад ("+v.stock.chests().size()+" сунд.)\n\n");
-        if(counts.isEmpty())return out.append("пусто");
+        var entries=new ArrayList<BookLayout.Entry>();
+        if(counts.isEmpty())entries.add(BookLayout.entry("пусто"));
         counts.entrySet().stream().sorted(Map.Entry.<Item,Integer>comparingByValue().reversed()).limit(12)
-                .forEach(e->out.append(Component.literal(e.getValue()+" ")).append(Component.translatable(e.getKey().getDescriptionId())).append("\n"));
-        return out;
+                .forEach(e->entries.add(BookLayout.entry(Component.literal(e.getValue()+" ").append(Component.translatable(e.getKey().getDescriptionId())),ITEM_LINES)));
+        if(counts.size()>12)entries.add(BookLayout.entry(BookLayout.more(counts.size()-12)+" видов"));
+        return BookLayout.pages("Склад ("+v.stock.chests().size()+" сунд.)",entries,3);
     }
-    private static Component build(Village v){
+    private static List<Component> build(Village v){
         var project=v.town.active();
-        if(project==null)return Component.literal("Стройка\n\nВсё построено.");
-        var out=new StringBuilder("Стройка\n\n").append(kind(project.kind)).append(project.design.isEmpty()?"":"\n("+project.design+")")
-                .append("\nготово ").append(v.town.built(project)).append(" из ").append(v.town.size(project)).append("\n\nНе хватает:\n");
+        if(project==null)return BookLayout.pages("Стройка",lines("Всё построено."),1);
+        var entries=new ArrayList<>(lines(kind(project.kind)));
+        if(!project.design.isEmpty())entries.add(BookLayout.entry("("+project.design+")"));
+        entries.add(BookLayout.entry("готово "+v.town.built(project)+" из "+v.town.size(project)));
         var request=v.state.request;
-        if(request!=null)out.append("\nЗаказ игроку: ").append(VillageRequests.label(request.key)).append(" ×").append(VillageRequests.left(request)).append("\n");
+        if(request!=null&&VillageRequests.enabled(AutonomousVillagesMod.CONFIG))
+            entries.add(BookLayout.entry("Заказ игроку: "+VillageRequests.label(request.key)+" ×"+VillageRequests.left(request)));
+        entries.addAll(lines("","Не хватает:"));
         var missing=v.town.missing(project);
-        if(missing.isEmpty())out.append("ничего");
-        missing.entrySet().stream().sorted(Map.Entry.<String,Integer>comparingByValue().reversed()).limit(8)
-                .forEach(e->out.append(VillagePresentation.NEEDS.getOrDefault(e.getKey(),e.getKey())).append(" ").append(e.getValue()).append("\n"));
-        return Component.literal(out.toString());
+        if(missing.isEmpty())entries.add(BookLayout.entry("ничего"));
+        missing.entrySet().stream().sorted(Map.Entry.<String,Integer>comparingByValue().reversed())
+                .forEach(e->entries.add(BookLayout.entry(VillageRequests.label(e.getKey())+" "+e.getValue())));
+        return BookLayout.pages("Стройка",entries,3);
     }
     static String kind(String kind){
         return switch(kind){case "house","native_house"->"Дом";case "well"->"Колодец";case "tower"->"Сторожевая вышка";case "storehouse"->"Амбар";
             case "civic"->"Мастерская";case "farm_plot"->"Поле";case "workshop"->"Мастерская";case "lamp"->"Фонарь";case "path"->"Тропа";
             case "forge","market","tavern"->{var l=Landmarks.label(kind);yield Character.toUpperCase(l.charAt(0))+l.substring(1);}default->kind;};
     }
-    /** Residents with role and what they do, ten to a page, four pages at most. */
+    /** Pages a long list may take before it ends with "…и ещё N". */
+    static final int PEOPLE_PAGES=40,DONOR_PAGES=3;
+    /** Every resident with role and what they do, as many pages as it takes. */
     private static List<Component> people(Village v){
-        var lines=new ArrayList<String>();
+        var entries=new ArrayList<BookLayout.Entry>();
         for(UUID id:v.state.residents){
             var w=v.workers.get(id);
-            lines.add(v.presentation.personName(id)+", "+v.role(id)+(w==null?"":": "+shorten(w.status,28)));
+            entries.add(BookLayout.entry(v.presentation.personName(id)+", "+v.role(id)+(w==null?"":": "+shorten(w.status,28))));
         }
-        var out=new ArrayList<Component>();
-        for(int i=0;i<lines.size()&&out.size()<4;i+=10)
-            out.add(Component.literal("Жители\n\n"+String.join("\n",lines.subList(i,Math.min(lines.size(),i+10)))));
-        return out;
+        return entries.isEmpty()?List.of():BookLayout.pages("Жители",entries,PEOPLE_PAGES);
     }
     static String shorten(String s,int max){return s==null?"":s.length()<=max?s:s.substring(0,max-1)+"…";}
-    private static Component donors(Village v){
-        if(v.state.donations.isEmpty())return null;
-        var out=new StringBuilder("Дарители\n\n");
-        v.state.donations.entrySet().stream().sorted(Map.Entry.<UUID,Long>comparingByValue().reversed()).limit(10).forEach(e->{
+    private static List<Component> donors(Village v){
+        if(v.state.donations.isEmpty())return List.of();
+        var entries=new ArrayList<BookLayout.Entry>();
+        v.state.donations.entrySet().stream().sorted(Map.Entry.<UUID,Long>comparingByValue().reversed()).forEach(e->{
             String name=v.state.donorNames.getOrDefault(e.getKey(),"гость");
-            out.append(v.state.honoured.contains(e.getKey())?"★ ":"").append(name).append(": ").append(e.getValue()).append("\n");
+            entries.add(BookLayout.entry((v.state.honoured.contains(e.getKey())?"★ ":"")+name+": "+e.getValue()));
         });
-        return Component.literal(out.toString());
+        return BookLayout.pages("Дарители",entries,DONOR_PAGES);
     }
     private static Village village(VillageRuntime runtime,Villager resident){
         for(Village v:runtime.villages.values())if(v.state.active&&v.state.residents.contains(resident.getUUID()))return v;

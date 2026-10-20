@@ -1,6 +1,7 @@
 package dev.autonomousvillages;
 
 import static org.junit.jupiter.api.Assertions.*;
+import java.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
 import org.junit.jupiter.api.Test;
@@ -29,5 +30,28 @@ class LifeEventsTest {
         assertEquals(new BlockPos(2,65,2),LifeEvents.middle(b));
         assertTrue(new ModConfig().lifeEvents);
         assertEquals(-1,new VillageState().fairDay);
+    }
+
+    @Test void onlyABuildingTheVillageFinishedItselfIsFeasted(){
+        var finished=Collections.<TownBuilding>newSetFromMap(new IdentityHashMap<>());
+        var buildings=new ArrayList<TownBuilding>();
+        var old=new TownBuilding("house",BlockPos.ZERO);old.completed=true;buildings.add(old);
+        var tower=new TownBuilding("tower",new BlockPos(5,64,5));buildings.add(tower);
+        // The first look only takes stock of what already stands.
+        assertNull(LifeEvents.fresh(finished,buildings,true));
+        assertNull(LifeEvents.fresh(finished,buildings,false));
+        // Houses captured from the generated village come in finished: no feast for them.
+        var captured=new TownBuilding("native_house",new BlockPos(9,64,9));captured.completed=true;buildings.add(captured);
+        assertNull(LifeEvents.fresh(finished,buildings,false));
+        // The tower the village built itself is celebrated, once, even with an older building after it in the list.
+        tower.completed=true;
+        assertSame(tower,LifeEvents.fresh(finished,buildings,false));
+        assertNull(LifeEvents.fresh(finished,buildings,false));
+        var tavern=new TownBuilding("tavern",new BlockPos(20,64,20));tavern.completed=true;buildings.add(tavern);
+        assertNull(LifeEvents.fresh(finished,buildings,false));
+        // A building gone from the list is forgotten.
+        buildings.remove(old);LifeEvents.fresh(finished,buildings,false);
+        assertFalse(finished.contains(old));
+        assertEquals(3,finished.size());
     }
 }

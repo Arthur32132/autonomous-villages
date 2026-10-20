@@ -1,0 +1,223 @@
+{
+  "version": 4,
+  "villages": [
+    {
+      "name": "Берёзовка",
+      "owner": "00000000-0000-4000-8000-000000000099",
+      "x": 10,
+      "y": 70,
+      "z": 5,
+      "radius": 96,
+      "active": false,
+      "residents": [
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002",
+        "00000000-0000-4000-8000-000000000003"
+      ],
+      "storage": [
+        3298534907974,
+        3848290721862
+      ],
+      "furnaces": [
+        4398046543942
+      ],
+      "plantedTrees": [
+        -13743895224251,
+        24739011788868
+      ],
+      "plantedCrops": [
+        8246337290309,
+        8521215197253
+      ],
+      "fellingTrees": [
+        -19241453445052
+      ],
+      "treeWork": {
+        "-19241453445052": [
+          -19241453445051,
+          -19241453445050
+        ]
+      },
+      "reforestation": [
+        -19791209250748
+      ],
+      "mineEntrance": 19241453506630,
+      "mineDirection": 2,
+      "mineLength": 17,
+      "completedShelters": 3,
+      "bounds": {
+        "minX": -60,
+        "minZ": -40,
+        "maxX": 80,
+        "maxZ": 50
+      },
+      "buildings": [
+        {
+          "kind": "house",
+          "origin": 5497558220870,
+          "completed": true,
+          "blocks": [
+            {
+              "pos": 5497558220870,
+              "state": "{\"Name\":\"minecraft:oak_planks\"}",
+              "optional": false
+            },
+            {
+              "pos": 5772436127814,
+              "state": "{\"Properties\":{\"powered\":\"false\",\"open\":\"false\",\"hinge\":\"left\",\"half\":\"lower\",\"facing\":\"south\"},\"Name\":\"minecraft:oak_door\"}",
+              "optional": false
+            },
+            {
+              "pos": 6047314034759,
+              "state": "{\"Name\":\"minecraft:flower_pot\"}",
+              "optional": true
+            }
+          ],
+          "cuts": [
+            5497558224967
+          ],
+          "design": "plains_small_house_1",
+          "path": [
+            5772436136005,
+            5772436140101
+          ]
+        },
+        {
+          "kind": "wall",
+          "origin": -15668040851386,
+          "completed": false,
+          "blocks": [
+            {
+              "pos": -15668040851386,
+              "state": "{\"Properties\":{\"west\":\"false\",\"waterlogged\":\"false\",\"south\":\"false\",\"north\":\"false\",\"east\":\"false\"},\"Name\":\"minecraft:oak_fence\"}",
+              "optional": false
+            },
+            {
+              "pos": -15393162944442,
+              "state": "{\"Properties\":{\"powered\":\"false\",\"open\":\"false\",\"in_wall\":\"false\",\"facing\":\"north\"},\"Name\":\"minecraft:oak_fence_gate\"}",
+              "optional": false
+            }
+          ],
+          "cuts": [],
+          "design": "",
+          "path": []
+        }
+      ],
+      "capturedPieces": [
+        10995116441670,
+        11269994348614
+      ],
+      "residentNames": {
+        "00000000-0000-4000-8000-000000000001": {
+          "json": "{\"text\":\"Аня\"}",
+          "visible": true,
+          "untouched": false
+        },
+        "00000000-0000-4000-8000-000000000002": {
+          "json": "",
+          "visible": false,
+          "untouched": true
+        }
+      },
+      "residentPositions": {
+        "00000000-0000-4000-8000-000000000001": 3023656996934,
+        "00000000-0000-4000-8000-000000000002": 6871947763782
+      },
+      "residentRoles": {
+        "00000000-0000-4000-8000-000000000001": {
+          "role": "MINER",
+          "profession": "minecraft:toolsmith",
+          "reason": "ближе всех к шахте",
+          "schedule": 9
+        },
+        "00000000-0000-4000-8000-000000000002": {
+          "role": "FARMER",
+          "profession": "minecraft:farmer",
+          "reason": "фермер по профессии",
+          "schedule": 10
+        }
+      },
+      "policy": {
+        "zones": [
+          {
+            "activity": "wood",
+            "minX": -20,
+            "minZ": -20,
+            "maxX": -10,
+            "maxZ": -5
+          }
+        ],
+        "privateChests": [
+          3573412819014
+        ],
+        "expansion": [
+          "north",
+          "east"
+        ]
+      },
+      "lights": [
+        4123168645191,
+        6871947776071
+      ],
+      "chronicle": {
+        "totals": {
+          "births": 2,
+          "trees": 14
+        },
+        "events": [
+          "день 1: основано",
+          "день 3: построен дом"
+        ]
+      },
+      "lastBirth": 4800,
+      "productDays": {
+        "00000000-0000-4000-8000-000000000001": 3
+      },
+      "lastGolem": 12000,
+      "newsDay": 4,
+      "newsTotals": {
+        "trees": 10
+      },
+      "newsResidents": 3,
+      "graves": [
+        {
+          "name": "Борис",
+          "role": "шахтёр",
+          "day": 3
+        }
+      ],
+      "cemetery": -10720238493626,
+      "nameplates": {
+        "6047314030662": 5497558220870
+      },
+      "donations": {
+        "00000000-0000-4000-8000-000000000050": 12
+      },
+      "donorNames": {
+        "00000000-0000-4000-8000-000000000050": "Steve"
+      },
+      "honoured": [
+        "00000000-0000-4000-8000-000000000050"
+      ],
+      "goodsDays": {
+        "forge": 5,
+        "market": 6
+      },
+      "fairDay": 7,
+      "request": {
+        "key": "door",
+        "amount": 4,
+        "delivered": 1,
+        "posted": 30000
+      },
+      "nextRequest": 48000
+    }
+  ],
+  "pendingReleases": {
+    "00000000-0000-4000-8000-000000000007": {
+      "json": "{\"text\":\"Вера\"}",
+      "visible": false,
+      "untouched": false
+    }
+  }
+}

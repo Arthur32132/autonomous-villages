@@ -21,8 +21,7 @@ final class ShelterJob extends Job {
     private final int night;
     private Walk walk;
     private boolean holding;
-    private long renewed;
-    private ShelterJob(Worker w,BlockPos cell){super(w,"ночует под крышей");this.cell=cell;night=PatrolJob.nightLeft(v.level.getOverworldClockTime());renewed=now();}
+    private ShelterJob(Worker w,BlockPos cell){super(w,"ночует под крышей");this.cell=cell;night=PatrolJob.nightLeft(v.level.getOverworldClockTime());}
     /** Null when no free indoor cell is known near the resident. */
     static ShelterJob find(Worker w){
         var v=w.v;BlockPos from=w.body().blockPosition();int[] budget={SEARCH_BUDGET};
@@ -63,7 +62,15 @@ final class ShelterJob extends Job {
         out.sort(Comparator.comparingInt(BlockPos::getY));
         return out;
     }
+    /** Answers kept for a second: Worker asks every tick for every resident, and the walls test reads about a hundred blocks. */
+    private static final class Memo { long second=-1; final Map<Long,Boolean> cells=new HashMap<>(); }
+    private static final Map<Village,Memo> memo=new WeakHashMap<>();
     static boolean indoor(Village v,BlockPos p){
+        var m=memo.computeIfAbsent(v,k->new Memo());long second=v.level.getGameTime()/20;
+        if(m.second!=second){m.second=second;m.cells.clear();}
+        return m.cells.computeIfAbsent(p.asLong(),k->indoorNow(v,p));
+    }
+    private static boolean indoorNow(Village v,BlockPos p){
         return v.town.protects(p.below())&&v.level.hasChunkAt(p)&&!v.level.canSeeSky(p)&&!v.level.canSeeSky(p.above())
                 &&!(v.level.getBlockState(p).getBlock() instanceof BedBlock)&&!(v.level.getBlockState(p.below()).getBlock() instanceof BedBlock)
                 &&v.safeFeet(p)&&enclosed(cells(v),p);
@@ -117,8 +124,8 @@ final class ShelterJob extends Job {
     @Override int timeLimit(){return night+600;}
     @Override boolean tick(){
         if(!w.hiding())return false;
-        // The cell stays this resident's all night: a lease left to lapse after a minute gave it to a second sleeper.
-        if(now()-renewed>=600){v.reservations.acquire(cell.asLong(),w.id,now());renewed=now();}
+        // The cell stays this resident's all night: renewed every tick, so a fight never lets the lease lapse; lost anyway, the search runs again.
+        if(!v.reservations.acquire(cell.asLong(),w.id,now()))return false;
         Vec3 point=v.feetPosition(cell);
         // Under the same roof a step or two away is shelter enough: the exact cell is often one a route
         // cannot end in (a slab, a bed edge), and failing there sent residents back out (rc13, seed 42).

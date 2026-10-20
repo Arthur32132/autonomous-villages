@@ -2,6 +2,7 @@ package dev.autonomousvillages;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.*;
+import java.util.function.Function;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.Bootstrap;
@@ -110,22 +111,69 @@ class SafetyJobsTest {
         }
     }
 
+    /** A plot with one free grave, every other plot full. */
+    private static Function<BlockPos,GraveJob.Room> only(BlockPos plot,BlockPos grave){return o->o.equals(plot)?new GraveJob.Room(grave,false):GraveJob.Room.FULL;}
     @Test void aFullCemeteryIsReplacedAndAFailedSearchWaits(){
         BlockPos old=new BlockPos(20,64,0),fresh=new BlockPos(0,64,20),grave=new BlockPos(2,64,20);
         int[] searches={0};
         var c=new GraveJob.Cemetery(old.asLong(),0);
-        assertEquals(grave,c.next(100,o->o.equals(fresh)?grave:null,()->{searches[0]++;return fresh;}));
+        assertEquals(grave,c.next(100,only(fresh,grave),()->{searches[0]++;return fresh;}));
         assertEquals(fresh.asLong(),c.corner);assertEquals(1,searches[0]);
         // The new plot has room: no search.
-        assertEquals(grave,c.next(200,o->o.equals(fresh)?grave:null,()->{searches[0]++;return null;}));assertEquals(1,searches[0]);
+        assertEquals(grave,c.next(200,only(fresh,grave),()->{searches[0]++;return null;}));assertEquals(1,searches[0]);
         // Full and nowhere else to go: one search, then none until the cooldown is over.
-        assertNull(c.next(300,o->null,()->{searches[0]++;return null;}));assertEquals(2,searches[0]);assertEquals(fresh.asLong(),c.corner);
-        assertNull(c.next(300+GraveJob.SEARCH_COOLDOWN-1,o->null,()->{searches[0]++;return null;}));assertEquals(2,searches[0]);
-        assertEquals(grave,c.next(300+GraveJob.SEARCH_COOLDOWN,o->o.equals(old)?grave:null,()->{searches[0]++;return old;}));assertEquals(3,searches[0]);
+        assertNull(c.next(300,o->GraveJob.Room.FULL,()->{searches[0]++;return null;}));assertEquals(2,searches[0]);assertEquals(fresh.asLong(),c.corner);
+        assertNull(c.next(300+GraveJob.SEARCH_COOLDOWN-1,o->GraveJob.Room.FULL,()->{searches[0]++;return null;}));assertEquals(2,searches[0]);
+        assertEquals(grave,c.next(300+GraveJob.SEARCH_COOLDOWN,only(old,grave),()->{searches[0]++;return old;}));assertEquals(3,searches[0]);
         assertEquals(0,c.retryAt);
         // No cemetery yet and a search finding a plot with no free place waits too.
         var none=new GraveJob.Cemetery(null,0);
-        assertNull(none.next(10,o->null,()->fresh));assertNull(none.corner);assertEquals(10+GraveJob.SEARCH_COOLDOWN,none.retryAt);
+        assertNull(none.next(10,o->GraveJob.Room.FULL,()->fresh));assertNull(none.corner);assertEquals(10+GraveJob.SEARCH_COOLDOWN,none.retryAt);
+    }
+    @Test void aCemeteryOnlyUnloadedOrBlockedForAWhileStays(){
+        BlockPos plot=new BlockPos(20,64,0),grave=new BlockPos(22,64,0);int[] searches={0};
+        var c=new GraveJob.Cemetery(plot.asLong(),0);
+        assertNull(c.next(100,o->GraveJob.Room.LATER,()->{searches[0]++;return new BlockPos(0,64,20);}));
+        assertEquals(0,searches[0]);assertEquals(plot.asLong(),c.corner);assertEquals(0,c.retryAt);
+        // Back in loaded chunks: the same plot goes on filling.
+        assertEquals(grave,c.next(200,only(plot,grave),()->{searches[0]++;return null;}));assertEquals(0,searches[0]);
+    }
+
+    /** Cells by what they are; anything not listed is loaded powder snow, open to building and empty. */
+    private static final class Snowfield implements HazardJob.Snow {
+        final Set<BlockPos> unloaded=new HashSet<>(),packed=new HashSet<>(),closed=new HashSet<>(),occupied=new HashSet<>();
+        @Override public boolean loaded(BlockPos p){return !unloaded.contains(p);}
+        @Override public boolean powder(BlockPos p){return !packed.contains(p);}
+        @Override public boolean allowed(BlockPos p){return !closed.contains(p);}
+        @Override public boolean occupied(BlockPos p){return occupied.contains(p);}
+    }
+    @Test void snowIsPackedOnlyWhereItIsSafeAndEveryRefusalIsRemembered(){
+        BlockPos free=new BlockPos(0,64,0),far=new BlockPos(1,64,0),done=new BlockPos(2,64,0),zone=new BlockPos(3,64,0),child=new BlockPos(4,64,0);
+        var w=new Snowfield();w.unloaded.add(far);w.packed.add(done);w.closed.add(zone);w.occupied.add(child);
+        var hazards=new LinkedHashSet<>(List.of(free,far,done,zone,child));var rejected=new HashMap<Long,Long>();long now=1000;
+        assertEquals(HazardJob.Verdict.PACK,HazardJob.verdict(w,free,true));
+        assertTrue(HazardJob.remember(HazardJob.Verdict.PACK,free,hazards,rejected,now));
+        assertTrue(hazards.contains(free));assertFalse(rejected.containsKey(free.asLong()));
+        // An unloaded cell is left for a while instead of being offered again on the next planner call.
+        assertEquals(HazardJob.Verdict.UNLOADED,HazardJob.verdict(w,far,false));
+        assertFalse(HazardJob.remember(HazardJob.verdict(w,far,false),far,hazards,rejected,now));
+        assertEquals(now+1200,rejected.get(far.asLong()));assertTrue(hazards.contains(far));
+        assertEquals(HazardJob.Verdict.GONE,HazardJob.verdict(w,done,false));
+        assertFalse(HazardJob.remember(HazardJob.verdict(w,done,false),done,hazards,rejected,now));
+        assertFalse(hazards.contains(done));assertFalse(rejected.containsKey(done.asLong()));
+        assertEquals(HazardJob.Verdict.CLOSED,HazardJob.verdict(w,zone,false));
+        assertFalse(HazardJob.remember(HazardJob.verdict(w,zone,false),zone,hazards,rejected,now));
+        assertEquals(now+24_000,rejected.get(zone.asLong()));
+        // Someone standing in the snow: walked up to, but never packed over; tried again shortly.
+        assertEquals(HazardJob.Verdict.PACK,HazardJob.verdict(w,child,false));
+        assertEquals(HazardJob.Verdict.OCCUPIED,HazardJob.verdict(w,child,true));
+        assertFalse(HazardJob.remember(HazardJob.Verdict.OCCUPIED,child,hazards,rejected,now));
+        assertEquals(now+200,rejected.get(child.asLong()));assertTrue(hazards.contains(child));
+        // A shorter wait never cuts a longer rejection short.
+        rejected.put(far.asLong(),now+5000);HazardJob.remember(HazardJob.Verdict.UNLOADED,far,hazards,rejected,now);
+        assertEquals(now+5000,rejected.get(far.asLong()));
+        // An unloaded cell never reads as gone: the index keeps it until the column is surveyed again.
+        w.packed.add(far);assertEquals(HazardJob.Verdict.UNLOADED,HazardJob.verdict(w,far,true));
     }
 
     @Test void aTrappedWorkerDigsToTheNearestWayOutNotToTheBell(){

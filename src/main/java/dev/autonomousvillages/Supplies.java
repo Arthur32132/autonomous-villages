@@ -1,9 +1,12 @@
 package dev.autonomousvillages;
 
 import dev.navigationai.api.BotHandle;
+import dev.navigationai.api.BotInventory;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import net.minecraft.world.Container;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.*;
 import net.minecraft.tags.ItemTags;
 
@@ -42,15 +45,55 @@ final class Supplies {
         for (int i = 0; i < a.size(); i++) if (!ItemStack.matches(a.get(i), b.get(i))) return false;
         return true;
     }
-    static boolean replace(BotHandle bot, List<ItemStack> before, List<ItemStack> next) {
-        if (!bot.stopAll() || !matches(before, bot.inventory().snapshot().slots())) return false;
-        for (int i = 0; i < before.size(); i++) bot.inventory().extract(i, Integer.MAX_VALUE);
-        for (ItemStack stack : next) if (!stack.isEmpty()) {
-            if (!bot.inventory().insert(stack).isEmpty()) throw new IllegalStateException("Inventory transaction overflow");
+    static boolean replace(BotHandle bot, List<ItemStack> before, List<ItemStack> next) { return replace(bot, before, next, spill(bot)); }
+    /** True: the bot now holds {@code next}; false: it holds {@code before}. Goods that no longer fit go to {@code overflow}, never vanish. */
+    static boolean replace(BotHandle bot, List<ItemStack> before, List<ItemStack> next, Consumer<ItemStack> overflow) {
+        if (!stopped(bot) || !matches(before, bot.inventory().snapshot().slots())) return false;
+        BotInventory inv = bot.inventory(); List<ItemStack> held = new ArrayList<>(); boolean intact = true;
+        // The library returns EMPTY when its stopAll fails and a completion callback may reshuffle slots: check every take.
+        for (int i = 0; i < before.size() && intact; i++) if (!before.get(i).isEmpty()) {
+            ItemStack got = take(inv, i); if (!got.isEmpty()) held.add(got); intact = ItemStack.matches(got, before.get(i));
         }
-        return true;
+        if (!intact) { putBack(inv, held, overflow); return false; }
+        List<ItemStack> left = new ArrayList<>();
+        for (ItemStack stack : next) if (!stack.isEmpty()) { ItemStack rest = left.isEmpty() ? put(inv, stack) : stack.copy(); if (!rest.isEmpty()) left.add(rest); }
+        if (left.isEmpty()) return true;
+        // Part of next did not go in: take it out again and restore before; if it cannot all come out, keep next instead.
+        for (int i = 0; i < before.size(); i++) { ItemStack got = take(inv, i); if (!got.isEmpty()) left.add(got); }
+        if (inv.snapshot().slots().stream().allMatch(ItemStack::isEmpty) && sameGoods(left, next)) { putBack(inv, before, overflow); return false; }
+        putBack(inv, left, overflow); return true;
     }
-    static int transfer(BotHandle bot, Container chest, boolean deposit, Predicate<ItemStack> test, int limit) {
+    /** The same goods however they are split into stacks. */
+    static boolean sameGoods(List<ItemStack> a, List<ItemStack> b) {
+        List<ItemStack> pool = copy(a);
+        for (ItemStack s : b) {
+            int n = s.getCount();
+            for (ItemStack p : pool) if (n > 0 && !p.isEmpty() && ItemStack.isSameItemSameComponents(p, s)) { int k = Math.min(n, p.getCount()); p.shrink(k); n -= k; }
+            if (n > 0) return false;
+        }
+        return pool.stream().allMatch(ItemStack::isEmpty);
+    }
+    private static boolean stopped(BotHandle bot) { try { return bot.stopAll(); } catch (RuntimeException inactive) { return false; } }
+    // Library insert/extract throw only before they touch the inventory (inactive bot): treat that as "nothing moved".
+    private static ItemStack take(BotInventory inv, int slot) { try { return inv.extract(slot, Integer.MAX_VALUE); } catch (RuntimeException inactive) { return ItemStack.EMPTY; } }
+    private static ItemStack put(BotInventory inv, ItemStack stack) { try { return inv.insert(stack.copy()); } catch (RuntimeException inactive) { return stack.copy(); } }
+    private static void putBack(BotInventory inv, List<ItemStack> stacks, Consumer<ItemStack> overflow) {
+        for (ItemStack stack : stacks) if (!stack.isEmpty()) { ItemStack rest = put(inv, stack); if (!rest.isEmpty()) overflow.accept(rest); }
+    }
+    /** Last resort: what the bot cannot hold any more is set down at its feet, with one warning per transaction. */
+    private static Consumer<ItemStack> spill(BotHandle bot) {
+        boolean[] warned = {false};
+        return rest -> {
+            try {
+                var body = bot.entity();
+                if (!warned[0]) { warned[0] = true; AutonomousVillagesMod.LOG.warn("Bot {} could not take back {} after an inventory transaction, dropped at {}", bot.name(), rest, body.blockPosition()); }
+                var item = new ItemEntity(body.level(), body.getX(), body.getY() + .5, body.getZ(), rest.copy());
+                item.setDefaultPickUpDelay(); body.level().addFreshEntity(item);
+            } catch (RuntimeException broken) { AutonomousVillagesMod.LOG.error("Cannot drop {} for bot {}", rest, bot.name(), broken); }
+        };
+    }
+    static int transfer(BotHandle bot, Container chest, boolean deposit, Predicate<ItemStack> test, int limit) { return transfer(bot, chest, deposit, test, limit, spill(bot)); }
+    static int transfer(BotHandle bot, Container chest, boolean deposit, Predicate<ItemStack> test, int limit, Consumer<ItemStack> overflow) {
         List<ItemStack> b = copy(bot.inventory().snapshot().slots()), c = copy(chest);
         List<ItemStack> bn = copy(b), cn = copy(c), from = deposit ? bn : cn, to = deposit ? cn : bn;
         int moved = 0;
@@ -65,7 +108,7 @@ final class Supplies {
             for (int j = 0; j < to.size(); j++) to.set(j, attempt.get(j));
             stack.shrink(amount); moved += amount;
         }
-        if (moved == 0 || !matches(c, copy(chest)) || !replace(bot, b, bn)) return 0;
+        if (moved == 0 || !matches(c, copy(chest)) || !replace(bot, b, bn, overflow)) return 0;
         for (int i = 0; i < cn.size(); i++) chest.setItem(i, cn.get(i));
         chest.setChanged(); return moved;
     }

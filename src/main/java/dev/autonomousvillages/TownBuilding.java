@@ -51,7 +51,10 @@ public final class TownBuilding {
         if(path==null)path=new ArrayList<>();
         path.removeIf(p->p==null||!village.contains(BlockPos.of(p)));
         if(path.size()>256)return false;
-        if(kind==null||!KINDS.contains(kind)||blocks==null||blocks.size()>4096||cuts==null||cuts.size()>4096||design.length()>128||!village.contains(BlockPos.of(origin)))return false;
+        if(kind==null||!KINDS.contains(kind)||blocks==null||blocks.size()>4096||cuts==null||cuts.size()>4096||design.length()>128)return false;
+        // An old palisade whose corner lies outside the bounds keeps its ring: the origin moves onto the first post inside.
+        if(kind.equals("wall")&&!village.contains(BlockPos.of(origin)))for(Plan p:blocks)if(p!=null&&village.contains(BlockPos.of(p.pos))){origin=p.pos;break;}
+        if(!village.contains(BlockPos.of(origin)))return false;
         cuts.removeIf(p->p==null||!village.contains(BlockPos.of(p)));
         try{
             for(Plan p:blocks)if(p==null||p.state==null||p.state.length()>2048||!village.contains(p.position())||p.block().getBlock().asItem()==Items.AIR)return false;

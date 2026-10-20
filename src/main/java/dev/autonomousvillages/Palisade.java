@@ -34,5 +34,10 @@ final class Palisade {
      * so a course more for each block the higher neighbour stands above; at most three.
      */
     static int courses(int ground,int highestBeside){return Math.max(1,Math.min(3,1+highestBeside-ground));}
+    /** The ring kept inside the village bounds (minX, minZ, maxX, maxZ); null when no ring is left. */
+    static int[] clamp(int minX,int minZ,int maxX,int maxZ,int boundMinX,int boundMinZ,int boundMaxX,int boundMaxZ){
+        int x0=Math.max(minX,boundMinX),z0=Math.max(minZ,boundMinZ),x1=Math.min(maxX,boundMaxX),z1=Math.min(maxZ,boundMaxZ);
+        return x1<=x0||z1<=z0?null:new int[]{x0,z0,x1,z1};
+    }
     static boolean torch(int index){return index%8==0;}
 }

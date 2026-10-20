@@ -25,8 +25,11 @@ final class Projects {
     private final Set<BlockPos> protectedDoors=new HashSet<>(),protectedGates=new HashSet<>();
     private int protectedCount=-1;
     private long protectionTick=-1;
-    private long nextPlanning;
-    private int siteCursor;
+    private long nextPlanning,nextCapture;
+    /** Site searches by project kind: the cursor walks the rings outward, a kind without a site waits for its retry tick. */
+    private final Map<String,Integer> cursors=new HashMap<>();
+    private final Map<String,Long> retry=new HashMap<>();
+    private final Set<String> failedHooks=new HashSet<>();
     Projects(Village v){this.v=v;}
 
     void invalidate(){protectedCount=-1;}
@@ -53,7 +56,14 @@ final class Projects {
     Collection<BlockPos> gates(){protects(BlockPos.ZERO);return protectedGates;}
 
     // --- generated village houses ------------------------------------------------------------
+    /** The survey shows a piece or a home no building record covers yet. */
+    boolean uncaptured(VillageDiscovery.Survey survey){
+        for(var piece:survey.pieces()){var box=piece.getBoundingBox();if(!v.state.capturedPieces.contains(new BlockPos(box.minX(),box.minY(),box.minZ()).asLong()))return true;}
+        for(BlockPos home:survey.homes())if(!covered(home))return true;
+        return false;
+    }
     void capture(VillageDiscovery.Survey survey){
+        var boxes=survey.pieces().stream().map(net.minecraft.world.level.levelgen.structure.StructurePiece::getBoundingBox).toList();
         for(var piece:survey.pieces()){
             if(v.state.buildings.size()>=256)break;
             var box=piece.getBoundingBox();
@@ -74,21 +84,39 @@ final class Projects {
             }
             if(!house.blocks.isEmpty()){house.completed=true;v.state.buildings.add(house);}
         }
-        for(BlockPos home:survey.homes())captureHouse(home);
+        // A home outside every generated piece is a player's: protected like the rest, its chests left alone.
+        for(BlockPos home:survey.homes())captureHouse(home,boxes.isEmpty()||boxes.stream().anyMatch(box->box.isInside(home)));
         captured=true;invalidate();
     }
-    private void captureHouse(BlockPos home){
-        if(v.state.buildings.size()>=256)return;
-        if(v.state.buildings.stream().anyMatch(b->b.blocks.stream().anyMatch(s->s.block().getBlock() instanceof BedBlock&&s.position().distSqr(home)<4)))return;
-        var house=new TownBuilding("native_house",home);var todo=new ArrayDeque<BlockPos>();var seen=new HashSet<BlockPos>();
+    /** The bed stands in a building on record already (a spare bed put into a captured house included). */
+    private boolean covered(BlockPos home){
+        if(protects(home)||protects(home.below()))return true;
+        return v.state.buildings.stream().anyMatch(b->b.blocks.stream().anyMatch(s->s.block().getBlock() instanceof BedBlock&&s.position().distSqr(home)<4));
+    }
+    private void captureHouse(BlockPos home,boolean generated){
+        if(v.state.buildings.size()>=256||covered(home))return;
+        var house=new TownBuilding("native_house",home);var todo=new ArrayDeque<BlockPos>();var seen=new HashSet<BlockPos>();boolean marked=false;
         todo.add(home);todo.add(home.below());
         while(!todo.isEmpty()&&seen.size()<1500){
             BlockPos p=todo.removeFirst();if(!seen.add(p)||!v.state.contains(p)||p.distSqr(home)>16*16)continue;
             var s=v.level.getBlockState(p);if(!structural(s))continue;
-            if(!upperHalf(s)){house.add(p,s);adopt(p);}
+            marked|=foreign(s);
+            if(!upperHalf(s))house.add(p,s);
             for(Direction d:Direction.values())todo.add(p.relative(d));
         }
-        if(!house.blocks.isEmpty()){house.completed=true;v.state.buildings.add(house);}
+        if(house.blocks.isEmpty())return;
+        // Shared property comes only from the generated village: a sign or a redstone part marks a player's house.
+        if(generated&&!marked)for(var p:house.blocks)adopt(p.position());
+        house.completed=true;v.state.buildings.add(house);
+    }
+    /** A player's mark in a bed-anchored house; the vanilla village templates hold none of these. */
+    static boolean foreign(BlockState s){
+        var b=s.getBlock();
+        return b instanceof SignBlock||b instanceof ShulkerBoxBlock||b instanceof AnvilBlock||b instanceof net.minecraft.world.level.block.piston.PistonBaseBlock
+                ||s.is(Blocks.ENDER_CHEST)||s.is(Blocks.TRAPPED_CHEST)||s.is(Blocks.HOPPER)||s.is(Blocks.DISPENSER)||s.is(Blocks.DROPPER)||s.is(Blocks.OBSERVER)
+                ||s.is(Blocks.COMPARATOR)||s.is(Blocks.REPEATER)||s.is(Blocks.REDSTONE_WIRE)||s.is(Blocks.REDSTONE_TORCH)||s.is(Blocks.REDSTONE_WALL_TORCH)||s.is(Blocks.REDSTONE_BLOCK)
+                ||s.is(Blocks.LEVER)||s.is(Blocks.BEACON)||s.is(Blocks.ENCHANTING_TABLE)||s.is(Blocks.IRON_DOOR)||s.is(Blocks.OBSIDIAN)||s.is(Blocks.CRYING_OBSIDIAN)||s.is(Blocks.TNT)
+                ||s.is(Blocks.GLOWSTONE)||s.is(Blocks.SEA_LANTERN)||s.is(Blocks.SHROOMLIGHT)||s.is(Blocks.END_ROD)||s.is(Blocks.CRAFTER)||s.is(Blocks.LODESTONE);
     }
     /** Unlocked chests and furnaces inside village houses become shared property on claim. */
     private void adopt(BlockPos p){
@@ -108,105 +136,126 @@ final class Projects {
     // --- projects --------------------------------------------------------------------------------
     void tick(){
         long now=v.level.getGameTime();
-        if(!captured&&now%100==0){
-            try{capture(VillageDiscovery.survey(v.level,v.state.center()));v.runtime.save();}catch(IllegalArgumentException ignored){}
-        }
+        if(!captured&&now>=nextCapture)recapture(now);
         if(now<nextPlanning)return;
         nextPlanning=now+100;
-        for(var b:v.state.buildings)if(!b.completed&&remaining(b)==0){
-            b.completed=true;v.chronicle.announce("Построено: "+label(b)+" — новоселье!");
-            if(b.kind.equals("house")||b.kind.equals("civic")||Landmarks.kind(b.kind))Festivities.housewarming(v,b);
-            if(b.kind.equals("civic")||Landmarks.kind(b.kind))furnish(b);
-            if(Landmarks.kind(b.kind))signboard(b);
-            if(b.kind.equals("stable"))stableHorses(b);
-            if(b.kind.equals("well"))fillWell(b);
-            if(b.kind.equals("pen")){furnish(b);stockPen(b);}
-            if(b.path.isEmpty())b.path.addAll(footpath(b));
-            v.runtime.save();
-        }
+        for(var b:v.state.buildings)if(!b.completed&&remaining(b)==0)complete(b);
         closePenGate();
         var unfinished=unfinished();
-        var active=unfinished.isEmpty()?null:unfinished.getFirst();
         var houses=unfinished.stream().filter(b->b.kind.equals("house")).toList();
-        if(active!=null){
-            stage=(waiting(active)?"ждут материалы: ":"строят ")+label(active)+" "+built(active)+"/"+size(active);
-            // Every soak village stalled on its first house for want of a bed: no wool, and the pen that
-            // brings sheep came only after the tower. The pen is laid beside the house as soon as beds wait on wool.
-            if(woolWanted(houses)){layPen();return;}
-            // Only houses hold up the next house: a half-built watchtower never keeps a family homeless.
-            if(houses.size()>=3||!houses.stream().allMatch(this::waiting))return;
-        }
+        var works=unfinished.stream().filter(b->!b.kind.equals("house")).toList();
+        var active=unfinished.isEmpty()?null:unfinished.getFirst();
+        if(active!=null)stage=(waiting(active)?"ждут материалы: ":"строят ")+label(active)+" "+built(active)+"/"+size(active);
         if(v.state.buildings.size()>=256||v.state.completedShelters>=64){stage="все проекты завершены";return;}
-        int beds=v.index.beds.size();
-        boolean homeless=beds<v.state.residents.size()+2;
-        // Houses waiting only for beds hold up nothing else: the village builds its barn, well and tower
-        // meanwhile instead of laying another house that would wait for the same wool.
-        boolean bedBound=!houses.isEmpty()&&houses.stream().allMatch(b->waiting(b)&&missing(b).containsKey("bed"))&&v.stock.count(x->x.is(ItemTags.WOOL))<3;
-        boolean free=houses.size()==unfinished.size()&&(houses.isEmpty()||bedBound);
-        String landmark=AutonomousVillagesMod.CONFIG.landmarks&&free&&tower()!=null?Landmarks.due(kinds(),v.state.residents.size(),deferred()):null;
-        TownBuilding planned=null;
-        if(homeless&&!bedBound){
-            if(!layHouse())return;
-        }else if(AutonomousVillagesMod.CONFIG.storehouse&&free&&v.state.residents.size()>=4&&storehouse()==null){
-            // The store moves under a roof: a timber barn by the bell with chests inside.
-            BlockPos site=null;
-            for(int attempt=0;attempt<32&&site==null;attempt++){
-                BlockPos hub=v.meetingPoint();int ring=5+attempt/8*2;double angle=attempt*Math.PI/4+attempt/8*0.4;
-                site=siteAt(hub.getX()+(int)Math.round(Math.cos(angle)*ring)-BARN_W/2,hub.getZ()+(int)Math.round(Math.sin(angle)*ring)-BARN_D/2,BARN_W,BARN_D);
-            }
-            if(site==null){stage="жилья хватает; ищут место для амбара";return;}
-            var built=storehouse(site);v.state.buildings.add(built);invalidate();
-            v.chronicle.announce("Заложен амбар у "+site.toShortString());v.runtime.save();
-            stage="заложен амбар";
-        }else if(AutonomousVillagesMod.CONFIG.storehouse&&free&&storehouse()!=null&&well()==null&&!v.level.getBlockState(v.meetingPoint()).is(Blocks.WATER)){
-            BlockPos site=null;
-            for(int attempt=0;attempt<32&&site==null;attempt++){
-                BlockPos hub=v.meetingPoint();int ring=4+attempt/8*2;double angle=attempt*Math.PI/4+0.2+attempt/8*0.4;
-                site=siteAt(hub.getX()+(int)Math.round(Math.cos(angle)*ring)-2,hub.getZ()+(int)Math.round(Math.sin(angle)*ring)-2,4,4);
-            }
-            if(site==null){stage="жилья хватает; ищут место для колодца";return;}
-            var built=well(site);v.state.buildings.add(built);invalidate();
-            v.chronicle.announce("Заложен колодец у "+site.toShortString());v.runtime.save();
-            stage="заложен колодец";
-        }else if(AutonomousVillagesMod.CONFIG.watchtower&&free&&v.state.residents.size()>=4&&tower()==null){
-            // With every family housed the village puts up a watchtower by the bell for its guards.
-            BlockPos site=findSite(TOWER,TOWER);
-            if(site==null){stage="жилья хватает; ищут место для вышки";return;}
-            var built=tower(site);v.state.buildings.add(built);invalidate();
-            v.chronicle.announce("Заложена "+label(built)+" у "+site.toShortString());v.runtime.save();
-            stage="заложена "+label(built);
-        }else if(AutonomousVillagesMod.CONFIG.pen&&free&&tower()!=null&&v.state.residents.size()>=6&&pen()==null&&now>=penRetry){
-            // A sheep pen keeps the flock, and the wool for new beds, within the village.
-            layPen();
-        }else if(AutonomousVillagesMod.CONFIG.palisade&&free&&tower()!=null&&v.state.residents.size()>=6&&wall()==null&&now>=palisadeRetry){
-            // Zombies walking in from the dark killed most residents lost in soak: the village fences itself in.
-            var built=palisade();
-            if(built==null){palisadeRetry=now+24000;stage="жилья хватает; частокол не замкнуть";return;}
-            v.state.buildings.add(built);invalidate();
-            v.chronicle.announce("Заложен частокол: "+built.blocks.stream().filter(p->p.block().getBlock() instanceof FenceGateBlock).count()+" ворот");v.runtime.save();
-            stage="заложен частокол";
-        }else if(landmark!=null&&(planned=landmark(landmark))!=null){
-            // Then the village's own big buildings, one at a time as it grows: forge, market, tavern.
-            v.state.buildings.add(planned);invalidate();
-            String laid=(Landmarks.feminine(landmark)?"Заложена ":"Заложен ")+label(planned);
-            v.chronicle.announce(laid+" у "+BlockPos.of(planned.origin).toShortString());v.runtime.save();
-            stage=laid.toLowerCase(Locale.ROOT);
-        }else if(AutonomousVillagesMod.CONFIG.civicBuildings&&free&&tower()!=null&&(pen()!=null||!AutonomousVillagesMod.CONFIG.pen||v.state.residents.size()<6)&&civic().size()<Math.min(6,v.state.residents.size()/4)){
-            // Then the workplaces of a real village, one of each trade, as the village grows.
-            var built=civicBuilding();
-            if(built==null){stage="жилья хватает; ищут место для мастерской";return;}
-            v.state.buildings.add(built);invalidate();
-            v.chronicle.announce("Заложена "+label(built));v.runtime.save();
-            stage="заложена "+label(built);
-        }else if(homeless&&houses.size()==unfinished.size()){
-            layHouse();
-        }else if(active==null)stage="жилья хватает; копят запасы";
+        int residents=v.state.residents.size();
+        boolean wool=v.stock.count(x->x.is(ItemTags.WOOL))<3;
+        // Houses waiting only for beds hold up nothing: the barn, well and tower go up meanwhile instead
+        // of another house that would wait for the same wool.
+        boolean bedBound=!houses.isEmpty()&&houses.stream().allMatch(b->waiting(b)&&missing(b).containsKey("bed"))&&wool;
+        var built=kinds();
+        var q=new Queue(v.index.beds.size(),residents,houses.size(),houses.stream().allMatch(this::waiting),bedBound,works.size(),works.stream().allMatch(this::waiting),
+                wool&&houses.stream().anyMatch(b->missing(b).containsKey("bed")),v.level.getBlockState(v.meetingPoint()).is(Blocks.WATER),
+                Landmarks.due(built,residents,deferred(now)),civic().size(),built,cooling(now),AutonomousVillagesMod.CONFIG);
+        var choice=decide(q);
+        boolean laid=choice.civic()!=null&&lay(choice.civic(),now);
+        if(choice.house())laid|=layHouse();
+        if(!laid&&active==null&&choice.civic()==null&&!choice.house())stage="жилья хватает; копят запасы";
     }
+    /** After a restart the survey is taken once more, but only a new piece or home gets captured. */
+    private void recapture(long now){
+        nextCapture=now+1200;
+        try{var survey=VillageDiscovery.survey(v.level,v.state.center());captured=true;if(uncaptured(survey)){capture(survey);v.runtime.save();}}
+        catch(IllegalArgumentException ignored){}
+    }
+    private void complete(TownBuilding b){
+        b.completed=true;v.chronicle.announce("Построено: "+label(b)+" — новоселье!");
+        boolean landmark=Landmarks.kind(b.kind);
+        if(b.kind.equals("house")||b.kind.equals("civic")||landmark)hook(b,"housewarming",()->Festivities.housewarming(v,b));
+        if(b.kind.equals("civic")||landmark||b.kind.equals("pen"))hook(b,"furnish",()->furnish(b));
+        if(landmark)hook(b,"signboard",()->signboard(b));
+        if(b.kind.equals("stable"))hook(b,"horses",()->stableHorses(b));
+        if(b.kind.equals("well"))hook(b,"water",()->fillWell(b));
+        if(b.kind.equals("pen"))hook(b,"flock",()->stockPen(b));
+        if(b.path.isEmpty())hook(b,"footpath",()->b.path.addAll(footpath(b)));
+        v.runtime.save();
+    }
+    /** A hook that fails is logged once and skipped; the building stays finished, the other hooks and the save still run. */
+    private void hook(TownBuilding b,String name,Runnable r){
+        try{r.run();}
+        catch(RuntimeException e){if(failedHooks.size()<64&&failedHooks.add(name+"@"+b.origin))AutonomousVillagesMod.LOG.warn("Hook {} of {} failed",name,label(b),e);}
+    }
+
+    /** What the project queue decides on, free of the world so the order can be tested. */
+    record Queue(int beds,int residents,int houses,boolean housesWaiting,boolean bedBound,int works,boolean worksWaiting,boolean woolWanted,
+                 boolean waterAtHub,String landmarkDue,int workshops,Set<String> built,Set<String> cooling,ModConfig flags){
+        boolean homeless(){return beds<residents+2;}
+        /** Another house may be laid: none unfinished, or all of them wait for what the village cannot make (never a fourth). */
+        boolean houseFree(){return houses==0||houses<3&&housesWaiting;}
+        /** One civic project at a time; a second only beside one that has waited a whole day. */
+        boolean workFree(){return works==0||works<2&&worksWaiting;}
+        boolean ready(String kind){return !built.contains(kind)&&!cooling.contains(kind);}
+    }
+    record Choice(boolean house,String civic){}
+    /** The civic chain after houses; a kind without a site cools down and the next one gets its turn. */
+    static final List<String> CHAIN=List.of("storehouse","well","tower","pen","wall","landmark","civic");
+    /**
+     * One civic project is laid beside at most one house: a village short of beds no longer waits for
+     * all its housing before the barn. A house needing a bed with no wool in store calls for the pen first.
+     */
+    static Choice decide(Queue q){
+        String civic=null;
+        if(q.flags().pen&&q.woolWanted()&&q.ready("pen"))civic="pen";
+        else if(q.workFree())for(String kind:CHAIN)if(eligible(q,kind)){civic=kind.equals("landmark")?q.landmarkDue():kind;break;}
+        boolean house=q.homeless()&&q.houseFree()&&(!q.bedBound()||civic==null);
+        return new Choice(house,civic);
+    }
+    static boolean eligible(Queue q,String kind){
+        var f=q.flags();
+        return switch(kind){
+            case "storehouse"->f.storehouse&&q.residents()>=4&&q.ready(kind);
+            case "well"->f.storehouse&&q.residents()>=4&&!q.waterAtHub()&&q.ready(kind);
+            case "tower"->f.watchtower&&q.residents()>=4&&q.ready(kind);
+            case "pen"->f.pen&&q.residents()>=6&&q.ready(kind);
+            case "wall"->f.palisade&&q.residents()>=6&&q.ready(kind);
+            case "landmark"->f.landmarks&&q.landmarkDue()!=null;
+            case "civic"->f.civicBuildings&&q.workshops()<Math.min(6,q.residents()/4)&&!q.cooling().contains("civic");
+            default->false;
+        };
+    }
+    /** Lays one civic project; without a site the kind waits {@link #retryTicks} and the chain falls through to the next. */
+    private boolean lay(String kind,long now){
+        BlockPos hub=v.meetingPoint();
+        TownBuilding b=switch(kind){
+            case "storehouse"->place(kind,new net.minecraft.core.Vec3i(BARN_W,6,BARN_D),Direction.NORTH,this::storehouse,hub,5,48);
+            case "well"->{BlockPos site=findSite(kind,4,4,4,48);yield site==null?null:well(site);}
+            case "tower"->{BlockPos site=findSite(kind,TOWER,TOWER,6,48);yield site==null?null:tower(site);}
+            case "pen"->{BlockPos site=findSite(kind,PEN,PEN,6,48);yield site==null?null:pen(site);}
+            case "wall"->palisade();
+            case "civic"->civicBuilding();
+            default->Landmarks.kind(kind)?landmark(kind):null;
+        };
+        if(b==null){retry.put(kind,now+retryTicks(kind));stage=seeking(kind);return false;}
+        v.state.buildings.add(b);invalidate();
+        String laid=(feminine(b)?"Заложена ":"Заложен ")+label(b);
+        v.chronicle.announce(laid+(b.kind.equals("wall")?": "+b.blocks.stream().filter(p->p.block().getBlock() instanceof FenceGateBlock).count()+" ворот":" у "+BlockPos.of(b.origin).toShortString()));
+        v.runtime.save();stage=laid.toLowerCase(Locale.ROOT);
+        return true;
+    }
+    /** A ring that cannot close is a matter of the ground, not of the search: it waits a day. */
+    static long retryTicks(String kind){return kind.equals("wall")?24000:2400;}
+    static boolean feminine(TownBuilding b){return b.kind.equals("tower")||b.kind.equals("civic")||Landmarks.kind(b.kind)&&Landmarks.feminine(b.kind);}
+    static String seeking(String kind){
+        return switch(kind){case "storehouse"->"ищут место для амбара";case "well"->"ищут место для колодца";case "tower"->"ищут место для вышки";case "pen"->"ищут место для загона";
+            case "wall"->"частокол не замкнуть";case "civic"->"ищут место для мастерской";default->"ищут место: "+Landmarks.label(kind);};
+    }
+    Set<String> cooling(long now){var out=new HashSet<String>();retry.forEach((k,t)->{if(t>now)out.add(k);});return out;}
+    /** Landmarks without a site lately; the next in the order gets its turn. */
+    Set<String> deferred(long now){var out=cooling(now);out.removeIf(k->!Landmarks.kind(k));return out;}
     /** Lays the next house (a village template, else a cottage); false while no site is found. */
     private boolean layHouse(){
         var house=templateHouse();
         if(house==null){
-            BlockPos site=findSite(HOUSE_W,HOUSE_D);
+            BlockPos site=findSite("house",HOUSE_W,HOUSE_D,6,24);
             if(site==null){stage="ищут место для нового дома";return false;}
             house=cottage(site);
         }
@@ -215,26 +264,11 @@ final class Projects {
         stage="заложен "+label(house);
         return true;
     }
-    /** A house needs a bed, the store has no wool for one, and there is no pen for sheep yet. */
-    private boolean woolWanted(List<TownBuilding> houses){
-        return AutonomousVillagesMod.CONFIG.pen&&pen()==null&&now()>=penRetry&&v.stock.count(x->x.is(ItemTags.WOOL))<3
-                &&houses.stream().anyMatch(b->missing(b).containsKey("bed"));
-    }
-    private long penRetry;
-    private long now(){return v.level.getGameTime();}
-    private void layPen(){
-        BlockPos site=findSite(PEN,PEN);
-        if(site==null){penRetry=now()+6000;stage="ищут место для загона";return;}
-        var built=pen(site);v.state.buildings.add(built);invalidate();
-        v.chronicle.announce("Заложен "+label(built)+" у "+site.toShortString());v.runtime.save();
-        stage="заложен "+label(built);
-    }
     TownBuilding wall(){return v.state.buildings.stream().filter(b->b.kind.equals("wall")).findFirst().orElse(null);}
-    private long palisadeRetry;
     /**
      * A fence ring {@link Palisade#MARGIN} blocks outside every building: a gate where a street or a
      * footpath crosses, a higher course where the ground beside is higher, a torch on every eighth post.
-     * Water, fields, trees and other buildings stay as they are (a gap the guards watch).
+     * Water, fields, trees, roofs and other buildings stay as they are (a gap the guards watch).
      */
     TownBuilding palisade(){
         int minX=Integer.MAX_VALUE,minZ=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE,maxZ=Integer.MIN_VALUE;
@@ -248,6 +282,9 @@ final class Projects {
         BlockPos hub=v.meetingPoint();
         minX=Math.min(minX,hub.getX())-Palisade.MARGIN;maxX=Math.max(maxX,hub.getX())+Palisade.MARGIN;
         minZ=Math.min(minZ,hub.getZ())-Palisade.MARGIN;maxZ=Math.max(maxZ,hub.getZ())+Palisade.MARGIN;
+        // The ring, and with it the record's origin, stays inside the bounds: a record outside is dropped on load and laid again.
+        var bounds=v.state.bounds;
+        if(bounds!=null){int[] r=Palisade.clamp(minX,minZ,maxX,maxZ,bounds.minX,bounds.minZ,bounds.maxX,bounds.maxZ);if(r==null)return null;minX=r[0];minZ=r[1];maxX=r[2];maxZ=r[3];}
         var ring=Palisade.ring(minX,minZ,maxX,maxZ);
         if(ring.size()>Palisade.MAX_COLUMNS)return null;
         var b=new TownBuilding("wall",new BlockPos(minX,v.state.y,minZ));
@@ -258,9 +295,9 @@ final class Projects {
             BlockPos ground=new BlockPos(c.x(),v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,c.x(),c.z())-1,c.z());
             BlockPos foot=ground.above();var under=v.level.getBlockState(ground);var at=v.level.getBlockState(foot);
             if(!under.getFluidState().isEmpty()||!at.getFluidState().isEmpty()||under.is(Blocks.FARMLAND)||under.getBlock() instanceof CropBlock||under.is(BlockTags.LEAVES)
-                    ||!under.isFaceSturdy(v.level,ground,Direction.UP)&&!under.is(Blocks.DIRT_PATH)
+                    ||!natural(under)&&!street(under)||!under.isFaceSturdy(v.level,ground,Direction.UP)&&!under.is(Blocks.DIRT_PATH)
                     ||protects(ground)||protects(foot)||!v.state.policy.allows("build",foot)||!Construction.clear(at)&&!removable(at))continue;
-            if(under.is(Blocks.DIRT_PATH)||paths.contains(ground.asLong())){
+            if(street(under)||paths.contains(ground.asLong())){
                 b.add(foot,Blocks.OAK_FENCE_GATE.defaultBlockState().setValue(FenceGateBlock.FACING,c.gateFacing()));
                 continue;
             }
@@ -277,18 +314,13 @@ final class Projects {
         return b.blocks.isEmpty()?null:b;
     }
     Set<String> kinds(){var out=new HashSet<String>();for(var b:v.state.buildings)out.add(b.kind);return out;}
-    /** When a landmark without a site may look for one again (by kind). */
-    private final Map<String,Long> landmarkRetry=new HashMap<>();
-    Set<String> deferred(){long now=v.level.getGameTime();var out=new HashSet<String>();landmarkRetry.forEach((k,t)->{if(t>now)out.add(k);});return out;}
     /**
      * The landmark's design on a flat free site by the bell, its entrance turned toward it; a pier on the
-     * bank of water nearby. Without a site the next landmark gets its turn for five minutes.
+     * bank of water nearby. Without a site the next landmark gets its turn (see {@link #lay}).
      */
     TownBuilding landmark(String kind){
         var design=Landmarks.design(kind);
-        var b=design.afloat()?pier(design):place(design.size(),Direction.NORTH,(base,rotation)->fromDesign(design,base,rotation),v.meetingPoint());
-        if(b==null)landmarkRetry.put(kind,v.level.getGameTime()+6000);
-        return b;
+        return design.afloat()?pier(design):place(kind,design.size(),Direction.NORTH,(base,rotation)->fromDesign(design,base,rotation),v.meetingPoint(),8,48);
     }
     /**
      * A bank cell by still water, the pier running out over it: the deck level with the bank, water
@@ -298,7 +330,7 @@ final class Projects {
         if(v.state.bounds==null)return null;
         BlockPos hub=v.meetingPoint();BlockPos bank=new BlockPos(1,0,-1);
         for(int attempt=0;attempt<48;attempt++){
-            int n=siteCursor++;int ring=6+(n/16%12)*4;double angle=(n%16)*Math.PI/8+(n/16)*0.37;
+            int n=cursor(d.kind());int ring=ring(6,n);double angle=(n%16)*Math.PI/8+(n/16)*0.37;
             int x=hub.getX()+(int)Math.round(Math.cos(angle)*ring),z=hub.getZ()+(int)Math.round(Math.sin(angle)*ring);
             if(!v.level.hasChunkAt(new BlockPos(x,v.state.y,z))||!v.state.contains(new BlockPos(x,v.state.y,z)))continue;
             BlockPos shore=new BlockPos(x,v.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,x,z)-1,z);
@@ -332,10 +364,7 @@ final class Projects {
             if(piece.pos().getY()==0&&!piece.optional())
                 for(int y=1;y<=3&&v.level.getBlockState(p.below(y)).isAir();y++)b.add(p.below(y),Blocks.COBBLESTONE.defaultBlockState());
         }
-        for(int x=0;x<d.width();x++)for(int z=0;z<d.depth();z++)for(int y=1;y<=d.height();y++){
-            BlockPos p=base.offset(Blueprints.turn(new BlockPos(x,y,z),d.size(),rotation));
-            if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());
-        }
+        for(int x=0;x<d.width();x++)for(int z=0;z<d.depth();z++)for(int y=1;y<=d.height();y++)cut(b,base.getY(),base.offset(Blueprints.turn(new BlockPos(x,y,z),d.size(),rotation)));
         b.blocks.removeIf(p->!v.state.contains(p.position()));b.cuts.removeIf(p->!v.state.contains(BlockPos.of(p)));
         return b;
     }
@@ -372,7 +401,7 @@ final class Projects {
                 .sorted(Comparator.comparingInt(Blueprints.Template::work)).toList();
         BlockPos hub=v.meetingPoint();
         for(var design:designs){
-            var b=place(design,hub);
+            var b=place("civic",design,hub);
             if(b!=null){b.kind="civic";return b;}
         }
         return null;
@@ -402,7 +431,7 @@ final class Projects {
             BlockPos floor=base.offset(x,0,z);boolean basin=x>=1&&x<=2&&z>=1&&z<=2;
             for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,cobble);}
             if(!basin)b.add(floor,cobble);else b.add(floor.below(),cobble);
-            for(int y=1;y<=5;y++)if(!Construction.clear(v.level.getBlockState(floor.above(y))))b.cuts.add(floor.above(y).asLong());
+            for(int y=1;y<=5;y++)cut(b,base.getY(),floor.above(y));
             if(basin&&!Construction.clear(v.level.getBlockState(floor)))b.cuts.add(floor.asLong());
             boolean corner=(x==0||x==3)&&(z==0||z==3);
             if(!basin)b.add(floor.above(),corner?cobble:Blocks.COBBLESTONE_WALL.defaultBlockState());
@@ -422,42 +451,43 @@ final class Projects {
     /**
      * A timber barn for the village store: log corners and a log sill, plank walls with a window on
      * each side, a pitched plank-and-stair roof, three chests along the back wall, a workbench and a
-     * torch inside, the door facing south.
+     * torch inside. The door is in the front (north) wall; {@link #place} turns it toward the bell.
      */
-    TownBuilding storehouse(BlockPos base){
-        var b=new TownBuilding("storehouse",base);
-        var log=Blocks.OAK_LOG.defaultBlockState();var planks=Blocks.OAK_PLANKS.defaultBlockState();
+    TownBuilding storehouse(BlockPos base,Rotation r){
+        var b=new TownBuilding("storehouse",base);var size=new net.minecraft.core.Vec3i(BARN_W,6,BARN_D);
+        var log=Blocks.OAK_LOG.defaultBlockState();var planks=Blocks.OAK_PLANKS.defaultBlockState();var cobble=Blocks.COBBLESTONE.defaultBlockState();
+        java.util.function.Function<BlockPos,BlockPos> at=p->base.offset(Blueprints.turn(p,size,r));
         for(int x=0;x<BARN_W;x++)for(int z=0;z<BARN_D;z++){
-            BlockPos floor=base.offset(x,0,z);
-            for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,Blocks.COBBLESTONE.defaultBlockState());}
-            b.add(floor,(x==0||z==0||x==BARN_W-1||z==BARN_D-1)?Blocks.COBBLESTONE.defaultBlockState():planks);
-            for(int y=1;y<=6;y++)if(!Construction.clear(v.level.getBlockState(floor.above(y))))b.cuts.add(floor.above(y).asLong());
+            BlockPos floor=at.apply(new BlockPos(x,0,z));
+            for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,cobble);}
+            b.add(floor,(x==0||z==0||x==BARN_W-1||z==BARN_D-1)?cobble:planks);
+            for(int y=1;y<=6;y++)cut(b,base.getY(),floor.above(y));
         }
         for(int y=1;y<=3;y++)for(int x=0;x<BARN_W;x++)for(int z=0;z<BARN_D;z++){
             boolean edge=x==0||z==0||x==BARN_W-1||z==BARN_D-1;if(!edge)continue;
             boolean corner=(x==0||x==BARN_W-1)&&(z==0||z==BARN_D-1);
             if(x==3&&z==0&&y<=2)continue; // door
-            if(!corner&&y==2&&(z==2&&(x==0||x==BARN_W-1)||x==3&&z==BARN_D-1)){b.add(base.offset(x,y,z),Blocks.GLASS_PANE.defaultBlockState());continue;}
-            b.add(base.offset(x,y,z),corner||y==3?log:planks);
+            if(!corner&&y==2&&(z==2&&(x==0||x==BARN_W-1)||x==3&&z==BARN_D-1)){b.add(at.apply(new BlockPos(x,y,z)),Blocks.GLASS_PANE.defaultBlockState());continue;}
+            b.add(at.apply(new BlockPos(x,y,z)),corner||y==3?log:planks);
         }
         // Pitched roof along x: stairs on the long sides rising to a plank ridge.
         for(int x=-1;x<=BARN_W;x++){
             for(int z=-1;z<=BARN_D;z++){
                 int fromEdge=Math.min(z+1,BARN_D-z);
-                BlockPos p=base.offset(x,4+Math.min(fromEdge,2)-1,z);
+                BlockPos p=at.apply(new BlockPos(x,4+Math.min(fromEdge,2)-1,z));
                 if(fromEdge>=3){b.add(p,planks);continue;}
                 Direction up=z<BARN_D/2?Direction.SOUTH:Direction.NORTH;
-                b.add(p,Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING,up));
+                b.add(p,Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING,up).rotate(r));
             }
         }
-        for(int z=1;z<BARN_D-1;z++){b.add(base.offset(0,4,z),planks);b.add(base.offset(BARN_W-1,4,z),planks);}
-        b.add(base.offset(3,1,0),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.SOUTH));
-        for(int x:new int[]{1,3,5})b.add(base.offset(x,1,BARN_D-2),Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING,Direction.SOUTH));
-        b.add(base.offset(1,1,1),Blocks.CRAFTING_TABLE.defaultBlockState());
-        b.add(base.offset(5,1,1),Blocks.TORCH.defaultBlockState());
-        b.decorate(base.offset(2,1,BARN_D-2),Blocks.BARREL.defaultBlockState());
-        b.decorate(base.offset(4,1,BARN_D-2),Blocks.BARREL.defaultBlockState());
-        b.blocks.removeIf(p->!v.state.contains(p.position()));
+        for(int z=1;z<BARN_D-1;z++){b.add(at.apply(new BlockPos(0,4,z)),planks);b.add(at.apply(new BlockPos(BARN_W-1,4,z)),planks);}
+        b.add(at.apply(new BlockPos(3,1,0)),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.SOUTH).rotate(r));
+        for(int x:new int[]{1,3,5})b.add(at.apply(new BlockPos(x,1,BARN_D-2)),Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING,Direction.NORTH).rotate(r));
+        b.add(at.apply(new BlockPos(1,1,1)),Blocks.CRAFTING_TABLE.defaultBlockState());
+        b.add(at.apply(new BlockPos(5,1,1)),Blocks.TORCH.defaultBlockState());
+        b.decorate(at.apply(new BlockPos(2,1,BARN_D-2)),Blocks.BARREL.defaultBlockState());
+        b.decorate(at.apply(new BlockPos(4,1,BARN_D-2)),Blocks.BARREL.defaultBlockState());
+        b.blocks.removeIf(p->!v.state.contains(p.position()));b.cuts.removeIf(p->!v.state.contains(BlockPos.of(p)));
         return b;
     }
     TownBuilding pen(){return v.state.buildings.stream().filter(b->b.kind.equals("pen")).findFirst().orElse(null);}
@@ -472,7 +502,7 @@ final class Projects {
         var log=Blocks.OAK_LOG.defaultBlockState();var fence=Blocks.OAK_FENCE.defaultBlockState();
         for(int x=0;x<PEN;x++)for(int z=0;z<PEN;z++){
             BlockPos ground=base.offset(x,0,z);
-            for(int y=1;y<=3;y++)if(!Construction.clear(v.level.getBlockState(ground.above(y))))b.cuts.add(ground.above(y).asLong());
+            for(int y=1;y<=3;y++)cut(b,base.getY(),ground.above(y));
             boolean edge=x==0||z==0||x==PEN-1||z==PEN-1;
             if(!edge)continue;
             // The ring stands on solid ground: a hollow under it is filled, the grass inside stays.
@@ -555,11 +585,19 @@ final class Projects {
     int size(TownBuilding b){return (int)b.blocks.stream().filter(p->!p.optional).count();}
     int built(TownBuilding b){return (int)b.blocks.stream().filter(p->!p.optional&&p.matches(v)).count();}
     int remaining(TownBuilding b){
-        int n=0;for(long cut:b.cuts)if(!Construction.clear(v.level.getBlockState(BlockPos.of(cut)))&&removable(v.level.getBlockState(BlockPos.of(cut)))&&!planned(b,cut))n++;
+        int n=0;for(long cut:b.cuts)if(reachable(b,cut)&&!Construction.clear(v.level.getBlockState(BlockPos.of(cut)))&&removable(v.level.getBlockState(BlockPos.of(cut)))&&!planned(b,cut))n++;
         for(var p:b.blocks)if(!p.optional&&!p.matches(v)&&!blockedForever(p))n++;
         return n;
     }
     private boolean planned(TownBuilding b,long pos){return b.blocks.stream().anyMatch(p->p.pos==pos&&p.matches(v));}
+    /**
+     * How high over the floor a builder standing on it works: {@code Village.stand} wants the eye (feet+1.62)
+     * within {@code reach-.65} of the block's centre. Cuts above that are optional and never hold up completion.
+     */
+    static int reachTop(double reach){return (int)Math.floor(reach-.65+1+1.62-.5);}
+    static final int CUT_TOP=reachTop(4.5);
+    private static boolean reachable(TownBuilding b,long cut){return BlockPos.of(cut).getY()-BlockPos.of(b.origin).getY()<=CUT_TOP;}
+    private void cut(TownBuilding b,int floorY,BlockPos p){if(p.getY()-floorY<=CUT_TOP&&!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());}
     /** A foreign, non-natural block standing in a planned cell is left alone; the plan skips it. */
     boolean blockedForever(TownBuilding.Plan p){
         var actual=v.level.getBlockState(p.position());
@@ -572,7 +610,7 @@ final class Projects {
     /** Cells to clear first, then missing blocks bottom-up. */
     List<BlockPos> pendingCuts(TownBuilding b,int limit){
         var out=new ArrayList<BlockPos>();
-        for(long cut:b.cuts){BlockPos p=BlockPos.of(cut);var s=v.level.getBlockState(p);if(!Construction.clear(s)&&removable(s)&&!planned(b,cut))out.add(p);if(out.size()>=limit)break;}
+        for(long cut:b.cuts){if(!reachable(b,cut))continue;BlockPos p=BlockPos.of(cut);var s=v.level.getBlockState(p);if(!Construction.clear(s)&&removable(s)&&!planned(b,cut))out.add(p);if(out.size()>=limit)break;}
         for(var plan:b.blocks){if(out.size()>=limit)break;var s=v.level.getBlockState(plan.position());if(!plan.optional&&!plan.matches(v)&&!Construction.clear(s)&&removable(s)&&!out.contains(plan.position()))out.add(plan.position());}
         return out;
     }
@@ -621,18 +659,21 @@ final class Projects {
     }
 
     // --- sites and blueprints ----------------------------------------------------------------------
-    /** Flat, free, natural ground near the meeting point; rings outward a few candidates per call. */
-    BlockPos findSite(int width,int depth){
+    /** Flat, free, natural ground near the meeting point; the kind's own cursor rings outward, so a retry searches wider. */
+    BlockPos findSite(String kind,int width,int depth,int baseRing,int attempts){
         var bounds=v.state.bounds;if(bounds==null)return null;
         BlockPos hub=v.meetingPoint();
-        for(int attempt=0;attempt<24;attempt++){
-            int n=siteCursor++;int ring=6+(n/16%12)*4;double angle=(n%16)*Math.PI/8+(n/16)*0.37;
+        for(int attempt=0;attempt<attempts;attempt++){
+            int n=cursor(kind);int ring=ring(baseRing,n);double angle=(n%16)*Math.PI/8+(n/16)*0.37;
             int x=hub.getX()+(int)Math.round(Math.cos(angle)*ring)-width/2,z=hub.getZ()+(int)Math.round(Math.sin(angle)*ring)-depth/2;
             BlockPos base=siteAt(x,z,width,depth);
             if(base!=null)return base;
         }
         return null;
     }
+    private int cursor(String kind){return cursors.merge(kind,1,Integer::sum)-1;}
+    /** Ring {@code n/16} of a search: sixteen angles a ring, four blocks further out each, round again after twelve. */
+    static int ring(int base,int n){return base+(n/16%12)*4;}
     BlockPos siteAt(int x,int z,int width,int depth){
         int low=Integer.MAX_VALUE,high=Integer.MIN_VALUE;var heights=new ArrayList<Integer>();
         for(int dx=-2;dx<=width+1;dx++)for(int dz=-3;dz<=depth+1;dz++){
@@ -646,19 +687,35 @@ final class Projects {
         // then opens level with the street instead of a block above it.
         heights.sort(null);int y=heights.get(heights.size()/2)-1;
         BlockPos base=new BlockPos(x,y,z);
+        // A neighbour's doorway stays open: no site within a block of a door's approach.
+        for(BlockPos door:doors())if(nearDoor(x,z,width,depth,door.getX(),door.getZ()))return null;
         for(int dx=-2;dx<=width+1;dx++)for(int dz=-3;dz<=depth+1;dz++)for(int dy=0;dy<=6;dy++){
             BlockPos p=base.offset(dx,dy,dz);var s=v.level.getBlockState(p);
             if(protects(p)||s.getBlock() instanceof BedBlock||s.is(Blocks.FARMLAND)||s.getBlock() instanceof CropBlock||!s.getFluidState().isEmpty()
                     ||s.is(BlockTags.LOGS)||s.getBlock() instanceof net.minecraft.world.level.block.ChestBlock||!v.state.policy.allows("build",p))return null;
             boolean inside=dx>=0&&dx<width&&dz>=0&&dz<depth;
-            // Above ground the cells must be clearable; in the ground layer a foreign block (a cobblestone
-            // street tile) simply stays as a tile of the floor.
             if(inside&&dy>=1&&!Construction.clear(s)&&!removable(s))return null;
-            if(inside&&dy==0&&s.isAir()&&!v.level.getBlockState(p.below()).isFaceSturdy(v.level,p.below(),Direction.UP))return null;
+            // The floor replaces the top layer of natural ground: never a street, another plan or the
+            // flat roof of a building nobody captured (the heightmap stands on roofs as on soil).
+            if(inside&&dy==0){
+                boolean dip=Construction.clear(s);var ground=dip?v.level.getBlockState(p.below()):s;
+                if(!natural(ground)||dip&&(protects(p.below())||!ground.isFaceSturdy(v.level,p.below(),Direction.UP)))return null;
+            }
         }
         if(v.state.buildings.stream().filter(b->b.kind.equals("house")||b.kind.equals("native_house")||b.kind.equals("civic")||Landmarks.kind(b.kind)).anyMatch(b->BlockPos.of(b.origin).distSqr(base)<10*10))return null;
         return base;
     }
+    /** Natural ground a project stands on: soil, sand, gravel, stone or snow; never a street, a floor or a roof. */
+    static boolean natural(BlockState s){
+        return VillageIndex.naturalSoil(s)||s.is(Blocks.GRASS_BLOCK)||s.is(Blocks.DIRT)||s.is(Blocks.COARSE_DIRT)||s.is(Blocks.PODZOL)||s.is(Blocks.ROOTED_DIRT)
+                ||s.is(BlockTags.SAND)||s.is(Blocks.SAND)||s.is(Blocks.RED_SAND)||s.is(Blocks.GRAVEL)||s.is(Blocks.SANDSTONE)||s.is(Blocks.RED_SANDSTONE)
+                ||s.is(BlockTags.BASE_STONE_OVERWORLD)||s.is(Blocks.STONE)||s.is(Blocks.ANDESITE)||s.is(Blocks.DIORITE)||s.is(Blocks.GRANITE)||s.is(Blocks.TUFF)||s.is(Blocks.DEEPSLATE)
+                ||s.is(Blocks.SNOW_BLOCK)||s.is(Blocks.SNOW)||s.is(Blocks.CLAY)||s.is(Blocks.MOSS_BLOCK);
+    }
+    /** Street tiles of a generated village: dirt paths, smooth sandstone in the desert. */
+    static boolean street(BlockState s){return s.is(Blocks.DIRT_PATH)||s.is(Blocks.SMOOTH_SANDSTONE);}
+    /** A door's approach runs two cells out; a site (two cells of margin aside, three in front) keeps one block more from any door. */
+    static boolean nearDoor(int x,int z,int width,int depth,int doorX,int doorZ){return doorX>=x-3&&doorX<=x+width+2&&doorZ>=z-4&&doorZ<=z+depth+2;}
     /** Vanilla style of the village, by the most common villager type among residents. */
     String style(){
         var counts=new HashMap<String,Integer>();
@@ -676,19 +733,19 @@ final class Projects {
         // A big house needs a bigger flat site; when none is found the next design gets its turn.
         for(int turn=0;turn<best.size();turn++){
             var design=best.get(Math.floorMod(v.state.completedShelters+turn,best.size()));
-            var house=place(design,hub);
+            var house=place("house",design,hub);
             if(house!=null)return house;
         }
         return null;
     }
-    private TownBuilding place(Blueprints.Template design,BlockPos hub){
+    private TownBuilding place(String kind,Blueprints.Template design,BlockPos hub){
         // A template whose door stands higher than layer 1 sinks further, so the door is at street level.
-        return place(design.size(),design.front(),(base,rotation)->fromTemplate(design,base.below(design.doorLevel()-1),rotation),hub);
+        return place(kind,design.size(),design.front(),(base,rotation)->fromTemplate(design,base.below(design.doorLevel()-1),rotation),hub,8,16);
     }
     /** A plan of the given size on a ring round the hub, its front turned toward the hub, with an open doorway. */
-    private TownBuilding place(net.minecraft.core.Vec3i size,Direction front,java.util.function.BiFunction<BlockPos,Rotation,TownBuilding> plan,BlockPos hub){
-        for(int attempt=0;attempt<16;attempt++){
-            int n=siteCursor++;int ring=8+(n/16%12)*4;double angle=(n%16)*Math.PI/8+(n/16)*0.37;
+    private TownBuilding place(String kind,net.minecraft.core.Vec3i size,Direction front,java.util.function.BiFunction<BlockPos,Rotation,TownBuilding> plan,BlockPos hub,int baseRing,int attempts){
+        for(int attempt=0;attempt<attempts;attempt++){
+            int n=cursor(kind);int ring=ring(baseRing,n);double angle=(n%16)*Math.PI/8+(n/16)*0.37;
             int cx=hub.getX()+(int)Math.round(Math.cos(angle)*ring),cz=hub.getZ()+(int)Math.round(Math.sin(angle)*ring);
             Direction toHub=Math.abs(hub.getX()-cx)>=Math.abs(hub.getZ()-cz)?(hub.getX()>cx?Direction.EAST:Direction.WEST):(hub.getZ()>cz?Direction.SOUTH:Direction.NORTH);
             var rotation=Blueprints.facing(front,toHub);
@@ -713,7 +770,9 @@ final class Projects {
             if(entry.pos().getY()==0&&Blueprints.structural(s))
                 for(int y=1;y<=3&&v.level.getBlockState(p.below(y)).isAir();y++)b.add(p.below(y),Blocks.COBBLESTONE.defaultBlockState());
         }
-        for(BlockPos rel:t.clear()){BlockPos p=base.offset(Blueprints.turn(rel,t.size(),rotation));if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());}
+        // Builders stand on the ground outside, level with the door's floor.
+        int floorY=base.getY()+t.doorLevel()-1;
+        for(BlockPos rel:t.clear())cut(b,floorY,base.offset(Blueprints.turn(rel,t.size(),rotation)));
         b.blocks.removeIf(p->!v.state.contains(p.position()));b.cuts.removeIf(p->!v.state.contains(BlockPos.of(p)));
         return b;
     }
@@ -813,9 +872,7 @@ final class Projects {
             for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,cobble);}
             b.add(floor,cobble);
         }
-        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)for(int y=1;y<=6;y++){
-            BlockPos p=base.offset(x,y,z);if(!Construction.clear(v.level.getBlockState(p)))b.cuts.add(p.asLong());
-        }
+        for(int x=0;x<TOWER;x++)for(int z=0;z<TOWER;z++)for(int y=1;y<=6;y++)cut(b,base.getY(),base.offset(x,y,z));
         for(int y=1;y<=3;y++)for(int x=1;x<=3;x++)for(int z=1;z<=3;z++){
             if(x==2&&z==2||x==2&&z==1&&y<=2)continue; // the ladder shaft and the doorway
             b.add(base.offset(x,y,z),cobble);
@@ -836,7 +893,7 @@ final class Projects {
             BlockPos floor=base.offset(x,0,z);
             for(int y=-2;y<0;y++){BlockPos fill=floor.offset(0,y,0);if(v.level.getBlockState(fill).isAir())b.add(fill,Blocks.COBBLESTONE.defaultBlockState());}
             b.add(floor,Blocks.OAK_PLANKS.defaultBlockState());
-            for(int y=1;y<=4;y++)if(!Construction.clear(v.level.getBlockState(floor.above(y))))b.cuts.add(floor.above(y).asLong());
+            for(int y=1;y<=4;y++)cut(b,base.getY(),floor.above(y));
         }
         for(int y=1;y<=2;y++)for(int x=0;x<w;x++)for(int z=0;z<d;z++){
             boolean edge=x==0||z==0||x==w-1||z==d-1;if(!edge)continue;

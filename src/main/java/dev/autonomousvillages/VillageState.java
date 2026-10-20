@@ -63,6 +63,8 @@ public final class VillageState {
     public long nextRequest;
     /** The notice board: the sign the village itself put up by the bell; no other sign is ever written over. */
     public Long noticeBoard;
+    /** Saved state of each optional feature (see {@link Features}), JSON by feature key. */
+    public Map<String,String> features=new LinkedHashMap<>();
     public static final class Request {
         public String key="";
         public int amount,delivered;
@@ -88,6 +90,8 @@ public final class VillageState {
         if(residentRoles==null)residentRoles=new LinkedHashMap<>();
         if(policy==null)policy=new VillagePolicy();
         if(lights==null)lights=new LinkedHashSet<>();
+        if(features==null)features=new LinkedHashMap<>();
+        features.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null||e.getValue().length()>Features.MAX_STATE_CHARS);
         if(chronicle==null)chronicle=new Chronicle.Data();
         if(productDays==null)productDays=new LinkedHashMap<>();
         if(newsTotals!=null)newsTotals.entrySet().removeIf(e->e.getKey()==null||e.getValue()==null);

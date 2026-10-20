@@ -106,6 +106,8 @@ final class VillagePlanner {
                 return new GiftJob(w,guest);
             }
         }
+        // 4d. Optional features (campfire evenings, orchard, heraldry, storm, livestock...): each limits itself.
+        Job feature=Features.job(v,w,role,v.level.getGameTime());if(feature!=null)return feature;
         // 5. The role's own work, then shared priorities.
         Job own=role==null?null:switch(role){
             case BUILDER->first(()->build(w,s),()->craftForProject(w,s),()->chop(w,s,true));

@@ -33,6 +33,7 @@ final class LifeEvents {
 
     void tick(long time){
         playMusic(time);
+        Features.tick(v,time);
         if(!AutonomousVillagesMod.CONFIG.lifeEvents)return;
         if(time%10==4)watchLanterns();
         if(time%20!=11)return;

@@ -69,6 +69,19 @@ public final class ModConfig {
     /** Village news in the chat of players nearby (at most one line per village every 5 seconds); off keeps the chronicle but mutes the chat. */
     public boolean chatAnnouncements=true;
 
+    /** Evenings: a campfire on the square and residents gathering around it before bed. */
+    public boolean campfire=true;
+    /** An orchard of apple trees in rows at the edge of the village; apples count as meals. */
+    public boolean orchard=true;
+    /** The village's own coat of arms: banners of its colours on the tower, barn and gates. */
+    public boolean heraldry=true;
+    /** In a thunderstorm residents go under a roof; a lightning rod crowns the watchtower. */
+    public boolean storm=true;
+    /** Residents who keep to one craft earn a title (подмастерье, мастер) that the chronicle remembers. */
+    public boolean mastery=true;
+    /** Farmers keep chickens and cows by the pen: eggs, milk and meat for the table. */
+    public boolean livestock=true;
+
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");
         var gson=new GsonBuilder().setPrettyPrinting().create();

@@ -66,6 +66,12 @@ final class Village {
     private final Set<Long> leases=new HashSet<>();
     private long nextTickets;
     private long nextSurvey;
+    private long nextSync;
+    /** Residents the library refused to attach; each is tried again after a minute, warned about once. */
+    private final AttachRetries attachRetries=new AttachRetries(1200);
+    /** One phase of the tick: a throwing feature is reported at most once per 200 ticks and the rest of the tick goes on. */
+    private final TickGuard phases;
+    private void guard(String phase,Runnable body){if(!phases.run(phase,level.getGameTime(),body))problem="ошибка: "+phase;}
     private long nextAlarm;
     long nextErrorLog;
     private long nextWorkerErrorLog;
@@ -77,6 +83,7 @@ final class Village {
 
     Village(VillageRuntime runtime,VillageState state){
         this.runtime=runtime;this.state=state;this.level=runtime.server.overworld();
+        this.phases=new TickGuard(200,(phase,error)->AutonomousVillagesMod.LOG.warn("Village {} {}",state.name,phase,error));
         this.town=new Projects(this);this.planner=new VillagePlanner(this);this.breeding=new Breeding(this);this.presentation=new VillagePresentation(this);this.ambience=new Ambience(this);this.lifeEvents=new LifeEvents(this);
     }
 
@@ -109,18 +116,18 @@ final class Village {
 
     // --- tick ------------------------------------------------------------------------------------
     void tick(){
-        if(state.bounds==null){try{var survey=VillageDiscovery.survey(level,state.center());VillageDiscovery.apply(state,survey);town.capture(survey);chronicle.event("Границы обновлены по всей деревне");runtime.save();}catch(IllegalArgumentException ignored){}}
-        ticket(true);
         long time=level.getGameTime();
-        index.tick(level,state,time);
+        if(state.bounds==null)guard("bounds",()->{try{var survey=VillageDiscovery.survey(level,state.center());VillageDiscovery.apply(state,survey);town.capture(survey);chronicle.event("Границы обновлены по всей деревне");runtime.save();}catch(IllegalArgumentException ignored){}});
+        guard("ticket",()->ticket(true));
+        guard("index",()->index.tick(level,state,time));
         if(time>=nextSurvey){
             nextSurvey=time+2400;
-            try{var survey=VillageDiscovery.survey(level,state.center());if(expand(survey.bounds())){town.capture(survey);runtime.save();}}
-            catch(IllegalArgumentException ignored){}
+            guard("survey",()->{try{var survey=VillageDiscovery.survey(level,state.center());if(expand(survey.bounds())){town.capture(survey);runtime.save();}}catch(IllegalArgumentException ignored){}});
         }
-        if(time%100==0||workers.isEmpty())sync();
-        town.tick();
-        breeding.tick();
+        // Without loaded adults a sync every tick scanned the whole area for nothing; once per 100 ticks finds them just as well.
+        if(time%100==0||workers.isEmpty()&&time>=nextSync){nextSync=time+100;guard("sync",this::sync);}
+        guard("projects",town::tick);
+        guard("breeding",breeding::tick);
         List<Worker> order=List.copyOf(workers.values());
         for(int n=0;n<order.size();n++){
             Worker w=order.get(Math.floorMod(n+rotation,order.size()));
@@ -134,23 +141,23 @@ final class Village {
             finally{if(idle&&mayPlan)runtime.residentDecisionRemainingNanos-=System.nanoTime()-start;}
         }
         rotation++;
-        if(time%5==0)rescueFromPowderSnow();
-        if(time%20==7)guardChildren();
-        if(time%100==23)huntLurkers();
+        if(time%5==0)guard("powderSnow",this::rescueFromPowderSnow);
+        if(time%20==7)guard("children",this::guardChildren);
+        if(time%100==23)guard("lurkers",this::huntLurkers);
         // At dusk a village short of golems calls one before the zombies come, not after.
-        if(time%200==13&&Math.floorMod(level.getOverworldClockTime(),24000)>=11500&&Math.floorMod(level.getOverworldClockTime(),24000)<13000)summonGolem(time);
-        if(time%6000==1234)writeChronicleBook();
-        if(time%100==61)MorningNews.tick(this);
-        if(time%20==3)dayBells(time);
-        if(time%600==311&&AutonomousVillagesMod.CONFIG.nameplates)NameplateJob.refresh(this);
-        presentation.tick();
-        ambience.tick(time);
-        if(time%200==77)LandmarkGoods.tick(this);
-        if(time%200==137)VillageRequests.tick(this);
-        lifeEvents.tick(time);
-        if(time%10==4)clearDoorways();
-        if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))closeDoors();
-        if(time%200==0){
+        if(time%200==13&&Math.floorMod(level.getOverworldClockTime(),24000)>=11500&&Math.floorMod(level.getOverworldClockTime(),24000)<13000)guard("golem",()->summonGolem(time));
+        if(time%6000==1234)guard("chronicleBook",this::writeChronicleBook);
+        if(time%100==61)guard("news",()->MorningNews.tick(this));
+        if(time%20==3)guard("bells",()->dayBells(time));
+        if(time%600==311&&AutonomousVillagesMod.CONFIG.nameplates)guard("nameplates",()->NameplateJob.refresh(this));
+        guard("presentation",presentation::tick);
+        guard("ambience",()->ambience.tick(time));
+        if(time%200==77)guard("landmarkGoods",()->LandmarkGoods.tick(this));
+        if(time%200==137)guard("requests",()->VillageRequests.tick(this));
+        guard("lifeEvents",()->lifeEvents.tick(time));
+        if(time%10==4)guard("doorways",this::clearDoorways);
+        if(time%100==50&&Worker.nightRestWindow(level.getOverworldClockTime(),level.isDarkOutside()))guard("doors",this::closeDoors);
+        if(time%200==0)guard("cleanup",()->{
             state.plantedTrees.removeIf(p->{var pos=BlockPos.of(p);return level.hasChunkAt(pos)&&!(level.getBlockState(pos).getBlock() instanceof net.minecraft.world.level.block.SaplingBlock)
                     &&!level.getBlockState(pos).is(net.minecraft.tags.BlockTags.LOGS)&&!state.fellingTrees.contains(p);});
             state.furnaces.removeIf(p->level.hasChunkAt(BlockPos.of(p))&&!(level.getBlockEntity(BlockPos.of(p)) instanceof net.minecraft.world.level.block.entity.FurnaceBlockEntity));
@@ -158,7 +165,7 @@ final class Village {
                     &&!level.getBlockState(BlockPos.of(p)).is(net.minecraft.world.level.block.Blocks.LANTERN));
             rejected.values().removeIf(expiry->expiry<=time);
             problem=workers.isEmpty()?"нет загруженных взрослых жителей":town.stage;
-        }
+        });
     }
     /**
      * A resident (child or adult) sinking in powder snow is dug out at once: the snow at its feet and
@@ -204,6 +211,7 @@ final class Village {
         body.teleportTo(to.x,to.y,to.z);chronicle.add("rescued",1);
     }
     void sync(){
+        long now=level.getGameTime();
         var area=VillageDiscovery.area(state,64);
         for(Villager v:level.getEntitiesOfClass(Villager.class,area,v->v.isAlive()&&(state.contains(v.blockPosition())
                 ||v.getBrain().getMemory(MemoryModuleType.HOME).filter(home->home.dimension().equals(level.dimension())&&state.contains(home.pos())).isPresent()))){
@@ -213,11 +221,18 @@ final class Village {
         for(UUID id:List.copyOf(state.residents)){
             var e=level.getEntity(id);
             if(e instanceof Villager v&&v.isAlive()){
-                if(v.isBaby()||v.isNoAi())continue; // childhood and map-maker NoAI stay vanilla
-                BotHandle handle=runtime.bots.find(id).orElseGet(()->runtime.bots.attach(v));
-                if(handle.kind()==BotKind.VILLAGER)workers.computeIfAbsent(id,ignored->new Worker(this,id));
+                if(v.isBaby()||v.isNoAi()||attachRetries.waiting(id,now))continue; // childhood and map-maker NoAI stay vanilla
+                try{
+                    BotHandle handle=runtime.bots.find(id).orElseGet(()->runtime.bots.attach(v));
+                    if(handle.kind()==BotKind.VILLAGER)workers.computeIfAbsent(id,ignored->new Worker(this,id));
+                    attachRetries.succeeded(id);
+                }catch(RuntimeException error){
+                    // One resident the library refuses (duplicate UUID, foreign controller, broken saved state) must not freeze the village.
+                    if(attachRetries.failed(id,now))AutonomousVillagesMod.LOG.warn("Village {}: resident {} not attached, retry in 1200 ticks",state.name,id,error);
+                }
             }else if(e!=null&&!e.isAlive()){state.residents.remove(id);workers.remove(id);reservations.release(id);residentLost(id);}
         }
+        attachRetries.retain(state.residents);
         workers.entrySet().removeIf(entry->{
             var bot=runtime.bots.find(entry.getKey()).orElse(null);
             if(bot!=null&&bot.state()==BotState.DEAD){state.residents.remove(entry.getKey());reservations.release(entry.getKey());residentLost(entry.getKey());return true;}

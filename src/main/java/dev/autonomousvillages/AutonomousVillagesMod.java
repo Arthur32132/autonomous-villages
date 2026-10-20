@@ -23,6 +23,11 @@ public final class AutonomousVillagesMod implements ModInitializer {
             Identifier.fromNamespaceAndPath("autonomous_villages", "settlement"),
             new TicketType(TicketType.NO_TIMEOUT, TicketType.FLAG_LOADING | TicketType.FLAG_SIMULATION | TicketType.FLAG_KEEP_DIMENSION_ACTIVE));
     private static VillageRuntime runtime;
+    private static final TickGuard EVENTS=new TickGuard(200,(event,error)->LOG.error("Event {} failed",event,error));
+    private static long clock(){return System.nanoTime()/50_000_000L;}
+    /** No exception may escape into a Fabric event: that is a "Ticking entity" crash or a crash loop on every chunk load. */
+    static void guarded(String event,Runnable body){EVENTS.run(event,clock(),body);}
+    static <T> T guarded(String event,java.util.function.Supplier<T> body,T fallback){return EVENTS.run(event,clock(),body,fallback);}
     public static boolean hasActiveVillages(){return runtime!=null&&runtime.villages.values().stream().anyMatch(v->v.state.active);}
     public static VillageRuntime runtime(MinecraftServer server) {
         if (runtime == null || runtime.server != server) throw new IllegalStateException("Деревни ещё загружаются.");
@@ -30,25 +35,23 @@ public final class AutonomousVillagesMod implements ModInitializer {
     }
     @Override public void onInitialize() {
         CONFIG = ModConfig.load(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir());
-        dev.navigationai.api.BlockBreakPermissions.register((id,pos)->{
-            if(runtime==null)return true;
-            return runtime.mayBreak(id,pos);
-        });
-        ServerLifecycleEvents.SERVER_STARTED.register(server -> runtime = new VillageRuntime(server));
-        ServerEntityEvents.ENTITY_LOAD.register((entity,level)->{if(runtime!=null&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident&&level==runtime.server.overworld())runtime.residentLoaded(resident);});
-        ServerTickEvents.END_SERVER_TICK.register(server -> { if (runtime != null) runtime.tick(); });
-        net.fabricmc.fabric.api.event.player.UseEntityCallback.EVENT.register((player,level,hand,entity,hit)->
+        // A permission check that throws denies the block: protection stays intact while the error is logged.
+        dev.navigationai.api.BlockBreakPermissions.register((id,pos)->guarded("mayBreak",()->runtime==null||runtime.mayBreak(id,pos),false));
+        ServerLifecycleEvents.SERVER_STARTED.register(server->guarded("serverStarted",()->runtime=new VillageRuntime(server)));
+        ServerEntityEvents.ENTITY_LOAD.register((entity,level)->guarded("entityLoad",()->{if(runtime!=null&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident&&level==runtime.server.overworld())runtime.residentLoaded(resident);}));
+        ServerTickEvents.END_SERVER_TICK.register(server->guarded("serverTick",()->{if(runtime!=null)runtime.tick();}));
+        net.fabricmc.fabric.api.event.player.UseEntityCallback.EVENT.register((player,level,hand,entity,hit)->guarded("useEntity",()->
                 runtime!=null&&!level.isClientSide()&&player instanceof net.minecraft.server.level.ServerPlayer p&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident
-                        ?PlayerGoods.useOnResident(runtime,p,hand,resident):net.minecraft.world.InteractionResult.PASS);
+                        ?PlayerGoods.useOnResident(runtime,p,hand,resident):net.minecraft.world.InteractionResult.PASS,net.minecraft.world.InteractionResult.PASS));
         net.fabricmc.fabric.api.event.player.UseItemCallback.EVENT.register((player,level,hand)->{
-            if(runtime!=null&&!level.isClientSide()&&player instanceof net.minecraft.server.level.ServerPlayer p)PlayerGoods.refresh(runtime,p,hand);
+            guarded("useItem",()->{if(runtime!=null&&!level.isClientSide()&&player instanceof net.minecraft.server.level.ServerPlayer p)PlayerGoods.refresh(runtime,p,hand);});
             return net.minecraft.world.InteractionResult.PASS;
         });
-        ServerEntityEvents.ENTITY_UNLOAD.register((entity,level)->{
+        ServerEntityEvents.ENTITY_UNLOAD.register((entity,level)->guarded("entityUnload",()->{
             if(runtime!=null&&entity instanceof net.minecraft.world.entity.npc.villager.Villager resident&&resident.isAlive()&&level==runtime.server.overworld())
                 for(var village:runtime.villages.values())if(village.state.residents.contains(resident.getUUID()))village.state.residentPositions.put(resident.getUUID(),resident.blockPosition().asLong());
-        });
-        ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> {
+        }));
+        ServerLivingEntityEvents.AFTER_DEATH.register((entity, source) -> guarded("afterDeath",()->{
             if (runtime != null) for (Village village : runtime.villages.values()) {
                 if (village.state.residents.contains(entity.getUUID())) {
                     String name=village.presentation.personName(entity.getUUID());
@@ -66,9 +69,9 @@ public final class AutonomousVillagesMod implements ModInitializer {
                     runtime.save();
                 }
             }
-        });
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> { if (runtime != null) { runtime.close(); runtime = null; } });
-        CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> {
+        }));
+        ServerLifecycleEvents.SERVER_STOPPING.register(server->guarded("serverStopping",()->{if(runtime!=null)try{runtime.close();}finally{runtime=null;}}));
+        CommandRegistrationCallback.EVENT.register((dispatcher, access, env) -> guarded("commands",()->{
             var root = Commands.literal("avillage").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                     .executes(c -> help(c.getSource()))
                     .then(Commands.literal("help").executes(c -> help(c.getSource())))
@@ -84,7 +87,7 @@ public final class AutonomousVillagesMod implements ModInitializer {
                         .change(StringArgumentType.getString(c, "name"), action)))));
             VillageControls.register(root);
             dispatcher.register(root);
-        });
+        }));
     }
     private static int claim(CommandSourceStack s, String name, int radius) {
         return run(s, () -> runtime(s.getServer()).claim(s.getLevel(), net.minecraft.core.BlockPos.containing(s.getPosition()), name, radius,

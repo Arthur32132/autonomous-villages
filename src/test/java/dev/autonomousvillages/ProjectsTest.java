@@ -79,6 +79,17 @@ class ProjectsTest {
         assertFalse(Projects.decide(penned).house());assertEquals("storehouse",Projects.decide(penned).civic());
         var housed=new Projects.Queue(2,5,1,true,true,0,true,true,false,null,1,Set.of("pen","storehouse","well","tower"),Set.of(),new ModConfig());
         assertTrue(Projects.decide(housed).house());assertNull(Projects.decide(housed).civic());
+        // A barn under way (not waiting) lays nothing new, and the bed-bound house does not beget a third beside it.
+        var building=new Projects.Queue(2,5,1,true,true,1,false,true,false,null,0,Set.of("pen"),Set.of(),new ModConfig());
+        assertNull(Projects.decide(building).civic());assertFalse(Projects.decide(building).house());
+        // Houses short of planks (not bed-bound) still get their second site beside the barn.
+        var planks=new Projects.Queue(2,5,1,true,false,1,false,false,false,null,0,Set.of("pen"),Set.of(),new ModConfig());
+        assertTrue(Projects.decide(planks).house());
+    }
+    @Test void aHouseWithoutASiteCoolsDownLikeACivicKind(){
+        var choice=Projects.decide(cooling(village(2,6),"house"));
+        assertFalse(choice.house());assertEquals("storehouse",choice.civic());
+        assertTrue(Projects.decide(village(2,6)).house());assertEquals(2400,Projects.retryTicks("house"));
     }
     @Test void theSearchRingGrowsWithEveryRetryAndComesRoundAgain(){
         assertEquals(5,Projects.ring(5,0));assertEquals(5,Projects.ring(5,15));
@@ -89,6 +100,11 @@ class ProjectsTest {
         // Village.stand: eye at feet+1.62 within reach-.65 of the block's centre, builders standing on the floor.
         assertEquals(5,Projects.reachTop(4.5));assertEquals(5,Projects.reachTop(4.2));assertEquals(4,Projects.reachTop(3.0));
         assertEquals(5,Projects.CUT_TOP);assertEquals(Landmarks.REACH_TOP,Projects.CUT_TOP);
+        // The reach is told from the floor before the door: a sunk template's origin lies a block lower.
+        var house=new TownBuilding("house",new BlockPos(0,63,0));house.add(new BlockPos(2,65,0),Blocks.OAK_DOOR.defaultBlockState());
+        assertEquals(64,Projects.floor(house));
+        var well=new TownBuilding("well",new BlockPos(0,64,0));assertEquals(64,Projects.floor(well));
+        assertTrue(Projects.reachable(64,new BlockPos(1,69,1).asLong()));assertFalse(Projects.reachable(64,new BlockPos(1,70,1).asLong()));
     }
     @Test void sitesRejectStreetsRoofsAndDoorLines(){
         for(var s:List.of(Blocks.GRASS_BLOCK,Blocks.DIRT,Blocks.COARSE_DIRT,Blocks.SAND,Blocks.RED_SAND,Blocks.GRAVEL,Blocks.STONE,Blocks.ANDESITE,Blocks.SNOW_BLOCK,Blocks.SANDSTONE))
@@ -106,8 +122,14 @@ class ProjectsTest {
     @Test void aPlayersHouseIsToldByBlocksNoVillageTemplateHolds(){
         for(var s:List.of(Blocks.OAK_SIGN,Blocks.OAK_WALL_SIGN,Blocks.OAK_HANGING_SIGN,Blocks.ENDER_CHEST,Blocks.TRAPPED_CHEST,Blocks.HOPPER,Blocks.ANVIL,Blocks.PISTON,Blocks.REDSTONE_WIRE,Blocks.LEVER,Blocks.IRON_DOOR,Blocks.SHULKER_BOX))
             assertTrue(Projects.foreign(s.defaultBlockState()),s.toString());
-        for(var s:List.of(Blocks.CHEST,Blocks.OAK_PLANKS,Blocks.FURNACE,Blocks.CRAFTING_TABLE,Blocks.LANTERN,Blocks.BELL,Blocks.STONE_BUTTON,Blocks.OAK_PRESSURE_PLATE,Blocks.IRON_BARS))
+        // taiga_small_house_1 hangs two spruce wall signs; no other sign stands in a 26.2 village template.
+        for(var s:List.of(Blocks.CHEST,Blocks.OAK_PLANKS,Blocks.FURNACE,Blocks.CRAFTING_TABLE,Blocks.LANTERN,Blocks.BELL,Blocks.STONE_BUTTON,Blocks.OAK_PRESSURE_PLATE,Blocks.IRON_BARS,Blocks.SPRUCE_WALL_SIGN))
             assertFalse(Projects.foreign(s.defaultBlockState()),s.toString());
+    }
+    @Test void chestsAreAdoptedOnlyFromUnmarkedPiecesOfTheGeneratedVillage(){
+        assertTrue(Projects.adoptable(true,false));
+        // A home outside every piece is a player's even when the survey found no pieces; a marked piece keeps its chests too.
+        assertFalse(Projects.adoptable(false,false));assertFalse(Projects.adoptable(true,true));assertFalse(Projects.adoptable(false,true));
     }
     @Test void thePalisadeRingStaysInsideTheBounds(){
         assertArrayEquals(new int[]{-20,-20,20,20},Palisade.clamp(-24,-24,24,24,-20,-20,20,20));

@@ -66,6 +66,8 @@ public final class ModConfig {
     public boolean lifeEvents=true;
     /** The material the build lacks most is posted as a request to players on the notice board; filling it is rewarded from the store. */
     public boolean requests=true;
+    /** Village news in the chat of players nearby (at most one line per village every 5 seconds); off keeps the chronicle but mutes the chat. */
+    public boolean chatAnnouncements=true;
 
     static ModConfig load(Path dir){
         Path file=dir.resolve("autonomous_villages.json");

@@ -55,6 +55,8 @@ public final class VillageState {
     /** The open request to players, if any, and the game time before which no new one is posted. */
     public Request request;
     public long nextRequest;
+    /** The notice board: the sign the village itself put up by the bell; no other sign is ever written over. */
+    public Long noticeBoard;
     public static final class Request {
         public String key="";
         public int amount,delivered;
@@ -100,6 +102,7 @@ public final class VillageState {
         graves.removeIf(g->g==null||g.name==null);
         while(graves.size()>16)graves.removeFirst();
         if(cemetery!=null&&!contains(BlockPos.of(cemetery)))cemetery=null;
+        if(noticeBoard!=null&&!contains(BlockPos.of(noticeBoard)))noticeBoard=null;
         productDays.keySet().retainAll(residents);
         chronicle.sanitize();
         trimOldest(plantedCrops,512);trimOldest(reforestation,2048);trimOldest(capturedPieces,4096);trimOldest(lights,1024);trimOldest(plantedTrees,512);

@@ -5,7 +5,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import net.minecraft.world.entity.ai.village.poi.PoiTypes;
 import net.minecraft.world.entity.npc.villager.Villager;
-import net.minecraft.world.item.Items;
 
 /**
  * Village growth: when a bed is free and the store holds enough food, two adults have a child.
@@ -24,14 +23,13 @@ final class Breeding {
         return v.level.getPoiManager().getInSquare(h->h.is(PoiTypes.HOME),center,r,PoiManager.Occupancy.HAS_SPACE)
                 .map(p->p.getPos()).filter(v.state::contains).toList();
     }
-    /** Meals in the store (bread, apples from felled oaks, cooked fish or meat), four vegetables counting as one. */
-    static final java.util.function.Predicate<net.minecraft.world.item.ItemStack> MEAL=s->s.is(Items.BREAD)||s.is(Items.APPLE)||s.is(Items.COOKED_COD)
-            ||s.is(Items.COOKED_SALMON)||s.is(Items.COOKED_PORKCHOP)||s.is(Items.COOKED_BEEF)||s.is(Items.COOKED_MUTTON)||s.is(Items.COOKED_CHICKEN);
-    int food(){return v.stock.count(MEAL)+v.stock.count(s->s.is(Items.CARROT)||s.is(Items.POTATO)||s.is(Items.BEETROOT))/4;}
+    static final int MEALS=3;
+    /** Meals in the store as {@link Food} counts them (the boss bar shows the same number). */
+    int food(){return Food.meals(v.stock);}
     String blocker(){
         if(v.state.residents.size()>=MAX_RESIDENTS)return "предел населения";
         if(freeBeds()<1)return "нет свободной кровати";
-        if(food()<3)return "мало еды на складе (нужно 3 хлеба или яблока)";
+        if(food()<MEALS)return "мало еды на складе (нужно 3 обеда: хлеб, яблоки, жареное; 4 овоща за один)";
         long wait=v.state.lastBirth+INTERVAL-v.level.getGameTime();
         if(wait>0)return "семьи отдыхают ещё "+wait/20+" с";
         return "";
@@ -51,15 +49,16 @@ final class Breeding {
         BlockPos crib=v.safeFeet(bed.above())?bed.above():java.util.stream.Stream.of(net.minecraft.core.Direction.values()).map(bed::relative)
                 .filter(v::safeFeet).findFirst().orElse(null);
         if(crib==null)return;
-        int eaten=v.stock.consume(s->s.is(Items.BREAD),3);
-        if(eaten<3)eaten+=v.stock.consume(MEAL,3-eaten);
-        if(eaten<3)v.stock.consume(s->s.is(Items.CARROT)||s.is(Items.POTATO)||s.is(Items.BEETROOT),(3-eaten)*4);
+        int[] meal=Food.plan(v.stock,MEALS);
+        if(meal==null)return;
         Villager baby=first.getBreedOffspring(v.level,second);
         if(baby==null)return;
         baby.setAge(-24000);
         var spot=v.feetPosition(crib);
         baby.snapTo(spot.x,spot.y,spot.z,0,0);
-        v.level.addFreshEntityWithPassengers(baby);
+        // The child first, then the meal: a failed spawn eats nothing and is no birth.
+        if(!v.level.addFreshEntity(baby))return;
+        if(!Food.eat(v.stock,meal))AutonomousVillagesMod.LOG.warn("SETTLEMENT {}: the store lost food during a birth",v.state.name);
         Festivities.birth(v,baby);
         first.setAge(6000);second.setAge(6000);
         v.level.broadcastEntityEvent(first,(byte)12);v.level.broadcastEntityEvent(second,(byte)12);v.level.broadcastEntityEvent(baby,(byte)12);

@@ -11,7 +11,7 @@ final class ForestWork {
     private ForestWork(){}
     static boolean felling(Village v,BlockPos base){return v.state.fellingTrees.contains(base.asLong());}
     /** Logs the village may fell here: outside every protected plan and no-felling zone. Leaves follow the same rule. */
-    static boolean usable(Village v,BlockPos p){return !v.town.protects(p)&&v.state.policy.allows("wood",p);}
+    static boolean usable(Village v,BlockPos p){return !v.town.protects(p)&&v.state.policy.allows("wood",p)&&!OrchardFeature.isOrchardTree(v,p);}
 
     /** Logs still to fell, lowest first: the saved list once felling started, otherwise a fresh survey of a natural tree. */
     static List<BlockPos> remaining(Village v,BlockPos base){

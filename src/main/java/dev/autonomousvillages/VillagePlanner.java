@@ -458,7 +458,7 @@ final class VillagePlanner {
         return new ChopJob(w,tree);
     }
     private boolean treeCandidate(Worker w,BlockPos base){
-        if(!v.ready(base,w.id)||v.town.protects(base)||!v.state.policy.allows("wood",base))return false;
+        if(!v.ready(base,w.id)||v.town.protects(base)||!v.state.policy.allows("wood",base)||OrchardFeature.isOrchardTree(v,base))return false;
         return VillageIndex.naturalLog(v.level,base)||v.state.fellingTrees.contains(base.asLong())&&ForestWork.next(v,base)!=null;
     }
     private Job mine(Worker w,Snapshot s,boolean helping){

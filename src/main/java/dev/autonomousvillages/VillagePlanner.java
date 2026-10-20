@@ -32,8 +32,9 @@ final class VillagePlanner {
         int wood(){return planks+logs*4;}
         int need(String key){return missing.getOrDefault(key,0);}
     }
-    private List<BlockPos> rooms=List.of();
+    private List<BlockPos> rooms=List.of(),doorsteps=List.of();
     private long roomsScanned=Village.LONG_AGO;
+    private final Lighting.RoomScan roomScan=new Lighting.RoomScan();
     Snapshot snapshot(){
         long now=v.level.getGameTime();
         if(s!=null&&now-refreshed<40)return s;
@@ -45,13 +46,17 @@ final class VillagePlanner {
         for(var b:v.town.unfinished())v.town.missing(b).forEach((k,n)->missing.merge(k,n,Integer::sum));
         boolean night=v.level.isDarkOutside()||Math.floorMod(v.level.getOverworldClockTime(),24000)>9000;
         var dark=new ArrayList<BlockPos>();
-        if(v.state.lights.size()<160&&(night||now%1200<600)){
+        if(night||now%1200<600){
+            // Doorsteps and rooms are never capped: that is where residents die at night.
             if(AutonomousVillagesMod.CONFIG.lightHomes){
-                // Rooms are scanned block by block, so only every ten seconds; the list is checked again before each torch.
-                if(now-roomsScanned>=200){rooms=new ArrayList<>(Lighting.darkDoorsteps(v,3));rooms.addAll(Lighting.darkRooms(v,2));roomsScanned=now;}
-                for(var p:rooms)if(Lighting.needsLight(v,p)&&!Lighting.unreachable(v,p))dark.add(p);
+                // Doors are checked every ten seconds; rooms block by block, a few anchors per refresh in turn, kept until lit.
+                if(now-roomsScanned>=200){doorsteps=Lighting.darkDoorsteps(v,3);roomsScanned=now;}
+                rooms=new ArrayList<>(rooms);rooms.removeIf(p->!Lighting.needsLight(v,p)||Lighting.unreachable(v,p));
+                if(rooms.size()<2)for(var p:Lighting.darkRooms(v,roomScan,6))if(rooms.size()<2&&!rooms.contains(p))rooms.add(p);
+                for(var p:doorsteps)if(Lighting.needsLight(v,p)&&!Lighting.unreachable(v,p))dark.add(p);
+                for(var p:rooms)if(!dark.contains(p))dark.add(p);
             }
-            for(var p:Lighting.darkSpots(v,8))if(dark.size()<8)dark.add(p);
+            if(v.state.lights.size()<Lighting.lightCap(v))for(var p:Lighting.darkSpots(v,8))if(dark.size()<8)dark.add(p);
         }
         BlockPos hub=v.meetingPoint();
         // The workbench nearest the bell that a route reaches; none such and the village makes its own by the bell.
@@ -391,7 +396,7 @@ final class VillagePlanner {
     /** Footpaths from new houses, once there is nothing more urgent; a shovel is made for it. */
     private Job pave(Worker w,Snapshot s){
         if(!w.ready("path")||v.activeJobs("path")>0)return null;
-        var cells=v.town.unpaved(24);
+        var cells=PathJob.reachable(v,v.town.unpaved(256),24);
         if(cells.isEmpty()&&AutonomousVillagesMod.CONFIG.plaza)cells=PathJob.plaza(v,24);
         if(cells.isEmpty()){w.cooldown("path",1200);return null;}
         boolean shovel=w.hasTool(ItemTags.SHOVELS)||v.stock.count(x->x.is(ItemTags.SHOVELS)&&Supplies.usable(x))>0;

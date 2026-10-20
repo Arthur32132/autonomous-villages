@@ -21,6 +21,8 @@ public final class VillageState {
     /** Staircase mine: digging, finished (its depth, the claim edge or the world bottom) or blocked (an obstacle the excavator refuses); failed runs at the current face. */
     public String mineStatus=MINE_DIGGING;
     public int mineFailures;
+    /** Game time a blocked shaft may be tried again when no other edge fits. */
+    public long mineRetryAt;
     static final String MINE_DIGGING="digging",MINE_FINISHED="finished",MINE_BLOCKED="blocked";
     public int completedShelters;
     /** Actual settlement footprint. radius is kept for the chunk budget and POI queries. */

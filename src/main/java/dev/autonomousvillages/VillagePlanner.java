@@ -459,9 +459,8 @@ final class VillagePlanner {
         // Rubble (andesite, diorite...) stands in for cobblestone blocks; stairs, slabs and walls need real cobblestone.
         int wanted=STONE_RESERVE+Math.max(0,s.need("cobblestone")-s.rubble())+(s.need("stone_stairs")*3+1)/2+(s.need("stone_slab")+1)/2+s.need("stone_wall");
         if(s.cobble()>=wanted&&!ironWanted)return null;
-        // A failed MineJob cools down its own kind ("quarry" or "shaft"); both keys pause that work here, "mine" is the planner's own pause.
-        boolean quarry=w.ready("quarry"),shaft=w.ready("shaft")&&v.activeJobs("shaft")==0;
-        if(!w.ready("mine")||!quarry&&!shaft||!w.hasTool(ItemTags.PICKAXES))return null;
+        boolean quarry=MineJob.quarryAllowed(w::ready),shaft=MineJob.shaftAllowed(w::ready,v.activeJobs("shaft")>0);
+        if(!quarry&&!shaft||!w.hasTool(ItemTags.PICKAXES))return null;
         BlockPos from=w.body().blockPosition();
         // Cave walls far below are seen by the survey but not reachable on foot: stay near the worker's level.
         // A block beside water or lava is never quarried: breaking it floods the pit or burns the digger.
@@ -527,7 +526,7 @@ final class VillagePlanner {
     private Job sand(Worker w,Snapshot s){
         boolean glass=s.need("glass_pane")>owned(x->x.is(Items.GLASS_PANE))&&owned(VillageCrafting.GLASS)+owned(VillageCrafting.SAND)<6;
         boolean sandstone=sandstoneVillage(s)&&owned(VillageCrafting.PLAIN_SAND)<Math.min(64,4*stoneShort(s));
-        if(!w.ready("mine")||!glass&&!sandstone)return null;
+        if(!MineJob.quarryAllowed(w::ready)||!glass&&!sandstone)return null;
         BlockPos from=w.body().blockPosition(),hub=v.meetingPoint();
         // Sand for sandstone comes in bulk: a shallow pit away from homes and the bell, never a deep hole.
         Predicate<BlockPos> quarry=p->(glass||p.getY()>=v.state.y-1&&p.distSqr(hub)>=12*12&&v.index.beds.stream().noneMatch(b->b.distSqr(p)<6*6)
@@ -547,14 +546,16 @@ final class VillagePlanner {
     }
     /**
      * A staircase mine starts at the edge of the claim on natural ground, away from beds. A finished
-     * shaft is left alone; a blocked one, or an entrance failed recently (rejected), sends the search
-     * to the other edges. The state is picked up by the periodic save, not saved here.
+     * shaft is left alone (unless the claim has grown past its edge); a blocked one, or an entrance
+     * failed recently (rejected), sends the search to the other edges. The state is picked up by the
+     * periodic save, not saved here.
      */
     BlockPos mineEntrance(){
         var st=v.state;long now=v.level.getGameTime();
-        if(st.mineEntrance!=null){
-            if(VillageState.MINE_FINISHED.equals(st.mineStatus)||st.mineLength>=MineJob.MAX_DEPTH)return null;
-            if(!VillageState.MINE_BLOCKED.equals(st.mineStatus))return v.rejected.getOrDefault(st.mineEntrance,0L)<=now?BlockPos.of(st.mineEntrance):null;
+        switch(MineJob.shaftCall(st,v.level.getMinY(),st.mineEntrance!=null&&v.rejected.getOrDefault(st.mineEntrance,0L)>now)){
+            case DIG->{return BlockPos.of(st.mineEntrance);}
+            case WAIT,DONE->{return null;}
+            default->{}
         }
         for(Direction d:Direction.Plane.HORIZONTAL){
             BlockPos column=st.localMineColumn(d);
@@ -569,7 +570,7 @@ final class VillagePlanner {
             }
         }
         // No other edge fits: the blocked shaft is resumed at its depth once its day has passed.
-        if(st.mineEntrance!=null&&v.rejected.getOrDefault(st.mineEntrance,0L)<=now){st.mineStatus=VillageState.MINE_DIGGING;st.mineFailures=0;return BlockPos.of(st.mineEntrance);}
+        if(st.mineEntrance!=null&&st.mineRetryAt<=now){st.mineStatus=VillageState.MINE_DIGGING;st.mineFailures=0;return BlockPos.of(st.mineEntrance);}
         return null;
     }
     private Job farm(Worker w){

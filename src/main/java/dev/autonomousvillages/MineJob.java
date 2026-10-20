@@ -23,6 +23,8 @@ final class MineJob extends Job {
     /** Failed runs at one face before the shaft is declared blocked: obstacles the excavator never passes, then anything else. */
     static final int BLOCKED_AFTER=2,STUCK_AFTER=6;
     enum Verdict { RETRY, BLOCKED, FINISHED }
+    /** What the stored shaft asks of the planner: dig on, wait out a rejection, leave it finished, or find another entrance. */
+    enum ShaftCall { DIG, WAIT, DONE, MOVE }
     private final ArrayDeque<BlockPos> targets;
     private final BlockPos entrance;
     private Approach approach;
@@ -50,16 +52,19 @@ final class MineJob extends Job {
             BlockPos done=targets.poll();
             if(state==Harvest.State.DONE){broken++;v.chronicle.mined();}
             // A block the miner cannot break is left alone for a while instead of being planned again at once.
-            else{failed++;error=harvest.error;if(done!=null)v.rejected.put(done.asLong(),now()+2400);}
+            else{failed++;error="камень не поддаётся: "+harvest.error;if(done!=null)v.rejected.put(done.asLong(),now()+2400);}
             harvest=null;approach=null;
         }
+        if(approach!=null){
+            var state=approach.tick();
+            if(state==Approach.State.MOVING)return true;
+            if(state==Approach.State.ARRIVED){harvest=new Harvest(targets.peek());return true;}
+            // An unreachable block is a failure too: a quarry that broke nothing ends with one and the worker cools down.
+            failed++;error="не подойти к камню";v.rejected.put(targets.poll().asLong(),now()+1200);approach=null;
+        }
         while(!targets.isEmpty()&&!quarryable(targets.peek()))targets.poll();
-        if(targets.isEmpty()||broken>=12)return broken==0&&failed>0?fail("камень не поддаётся: "+error):false;
-        if(approach==null)approach=new Approach(targets.peek(),4.5,true);
-        var state=approach.tick();
-        if(state==Approach.State.MOVING)return true;
-        if(state==Approach.State.FAILED){v.rejected.put(targets.poll().asLong(),now()+1200);approach=null;return !targets.isEmpty();}
-        harvest=new Harvest(targets.peek());
+        if(targets.isEmpty()||broken>=12)return broken==0&&failed>0?fail(error):false;
+        approach=new Approach(targets.peek(),4.5,true);
         return true;
     }
     /** A loaded, mineable block with no water or lava beside it; a wet one is left alone for a day. */
@@ -122,9 +127,10 @@ final class MineJob extends Job {
         switch(verdict(reason,st.mineFailures,atBottom)){
             case FINISHED->{return finish("Шахта дошла до дна мира: "+st.mineLength+" ступеней");}
             case BLOCKED->{
-                st.mineStatus=VillageState.MINE_BLOCKED;st.mineFailures=0;v.rejected.put(entrance.asLong(),now()+24000);
-                v.chronicle.announce("Шахта у "+entrance.toShortString()+" упёрлась в препятствие ("+reason+"), ищут другое место");
-                status="шахта заброшена: "+reason;return false;
+                st.mineStatus=VillageState.MINE_BLOCKED;st.mineFailures=0;st.mineRetryAt=now()+24000;
+                AutonomousVillagesMod.LOG.info("MINE {} blocked at {}: {}",st.name,entrance.toShortString(),reason);
+                v.chronicle.announce("Шахта у "+entrance.toShortString()+" заброшена ("+describe(reason)+"), ищут другое место");
+                status="шахта заброшена: "+describe(reason);return false;
             }
             default->{return fail(text);}
         }
@@ -194,6 +200,38 @@ final class MineJob extends Job {
     static Verdict verdict(String reason,int failures,boolean atBottom){
         if(reason.startsWith("world_bounds")||atBottom&&permanent(reason))return Verdict.FINISHED;
         return failures>=(permanent(reason)?BLOCKED_AFTER:STUCK_AFTER)?Verdict.BLOCKED:Verdict.RETRY;
+    }
+    /** The excavator's reason in the villagers' words, for chat. */
+    static String describe(String reason){
+        return switch(reason){
+            case "unsafe_fluid"->"вода или лава";
+            case "mining_cannot_break","world_border"->"несокрушимая порода";
+            case "protected_block_entity","not_allowed","mining_not_allowed"->"чужая постройка";
+            case "falling_block","unstable_ceiling"->"сыпучий грунт";
+            case "dangerous_block","unsafe_floor","unsafe_passage","unsafe_entrance"->"опасный ход";
+            case "entrance_unreachable"->"нет дороги ко входу";
+            default->"работа не идёт";
+        };
+    }
+    /**
+     * Mining the planner may hand out, from the worker's cooldowns: a failed MineJob cools down its
+     * own kind ("quarry" or "shaft"), "mine" is the planner's own pause; one shaft is dug at a time.
+     */
+    static boolean quarryAllowed(Predicate<String> ready){return ready.test("mine")&&ready.test("quarry");}
+    static boolean shaftAllowed(Predicate<String> ready,boolean shaftBusy){return ready.test("mine")&&ready.test("shaft")&&!shaftBusy;}
+    /** A shaft finished at the claim edge digs on once the footprint has grown past its next step; depth and world-bottom finishes are final. */
+    static boolean resumable(VillageState st,int minY){
+        if(st.mineEntrance==null||!VillageState.MINE_FINISHED.equals(st.mineStatus)||st.mineLength>=MAX_DEPTH)return false;
+        BlockPos next=shaftStep(BlockPos.of(st.mineEntrance),Direction.from2DDataValue(st.mineDirection),st.mineLength+1);
+        return st.contains(next)&&next.getY()>minY+5;
+    }
+    /** The planner's view of the stored shaft, undoing an edge finish the claim has grown past; {@code rejected} is the worker's short rejection after a failed run. */
+    static ShaftCall shaftCall(VillageState st,int minY,boolean rejected){
+        if(st.mineEntrance==null)return ShaftCall.MOVE;
+        if(resumable(st,minY)){st.mineStatus=VillageState.MINE_DIGGING;st.mineFailures=0;}
+        if(VillageState.MINE_FINISHED.equals(st.mineStatus)||st.mineLength>=MAX_DEPTH)return ShaftCall.DONE;
+        if(VillageState.MINE_BLOCKED.equals(st.mineStatus))return ShaftCall.MOVE;
+        return rejected?ShaftCall.WAIT:ShaftCall.DIG;
     }
     /** True when any of the six neighbours holds fluid (or is not loaded, which counts as unknown). */
     static boolean fluidAdjacent(BlockPos p,Predicate<BlockPos> fluid){

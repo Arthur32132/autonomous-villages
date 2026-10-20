@@ -3,8 +3,8 @@ package dev.autonomousvillages;
 import static org.junit.jupiter.api.Assertions.*;
 import dev.navigationai.api.ExcavationMode;
 import dev.navigationai.api.ExcavationRequest;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import org.junit.jupiter.api.Test;
@@ -60,7 +60,7 @@ class MineJobTest {
     }
     @Test void oldSavesLoadWithTheShaftStillDigging(){
         var s=VillageRuntime.GSON.fromJson("{\"name\":\"Old\",\"mineEntrance\":1,\"mineDirection\":2,\"mineLength\":17}",VillageState.class);
-        assertEquals(VillageState.MINE_DIGGING,s.mineStatus);assertEquals(0,s.mineFailures);assertEquals(17,s.mineLength);
+        assertEquals(VillageState.MINE_DIGGING,s.mineStatus);assertEquals(0,s.mineFailures);assertEquals(0,s.mineRetryAt);assertEquals(17,s.mineLength);
         var restored=VillageRuntime.GSON.fromJson(VillageRuntime.GSON.toJson(s),VillageState.class);
         assertEquals(VillageState.MINE_DIGGING,restored.mineStatus);
     }
@@ -74,6 +74,54 @@ class MineJobTest {
         // A finished shaft whose entrance left the footprint is no longer finished: a new one may be dug.
         s.mineStatus=VillageState.MINE_FINISHED;s.mineEntrance=new BlockPos(90,64,0).asLong();s.compactMetadata();
         assertNull(s.mineEntrance);assertEquals(VillageState.MINE_DIGGING,s.mineStatus);
-        assertEquals(Set.of("digging","finished","blocked"),Set.of(VillageState.MINE_DIGGING,VillageState.MINE_FINISHED,VillageState.MINE_BLOCKED));
+    }
+    @Test void aFailedQuarryOrShaftPausesOnlyItsOwnKindAndThePlannerPausePausesBoth(){
+        Set<String> cooling=new HashSet<>();Predicate<String> ready=k->!cooling.contains(k);
+        assertTrue(MineJob.quarryAllowed(ready));assertTrue(MineJob.shaftAllowed(ready,false));
+        cooling.add("quarry");assertFalse(MineJob.quarryAllowed(ready));assertTrue(MineJob.shaftAllowed(ready,false));
+        cooling.clear();cooling.add("shaft");assertTrue(MineJob.quarryAllowed(ready));assertFalse(MineJob.shaftAllowed(ready,false));
+        cooling.clear();cooling.add("mine");assertFalse(MineJob.quarryAllowed(ready));assertFalse(MineJob.shaftAllowed(ready,false));
+        // One shaft at a time; the quarry does not wait for it.
+        cooling.clear();assertFalse(MineJob.shaftAllowed(ready,true));assertTrue(MineJob.quarryAllowed(ready));
+    }
+    @Test void thePlannerDigsWaitsLeavesOrMovesTheShaftByItsState(){
+        var s=new VillageState("A",UUID.randomUUID(),new BlockPos(0,64,0),24);
+        assertEquals(MineJob.ShaftCall.MOVE,MineJob.shaftCall(s,-64,false));
+        s.mineEntrance=new BlockPos(16,64,0).asLong();s.mineDirection=Direction.WEST.get2DDataValue();s.mineLength=5;
+        assertEquals(MineJob.ShaftCall.DIG,MineJob.shaftCall(s,-64,false));
+        // The worker's short rejection after a failed run pauses the shaft without moving it.
+        assertEquals(MineJob.ShaftCall.WAIT,MineJob.shaftCall(s,-64,true));
+        s.mineStatus=VillageState.MINE_BLOCKED;
+        assertEquals(MineJob.ShaftCall.MOVE,MineJob.shaftCall(s,-64,false));assertEquals(MineJob.ShaftCall.MOVE,MineJob.shaftCall(s,-64,true));
+        s.mineStatus=VillageState.MINE_DIGGING;s.mineLength=MineJob.MAX_DEPTH;
+        assertEquals(MineJob.ShaftCall.DONE,MineJob.shaftCall(s,-64,false));
+        // Finished where the next step (y=15) leaves the claim's 48-block depth; it stays finished.
+        s.mineStatus=VillageState.MINE_FINISHED;s.mineLength=48;
+        assertEquals(MineJob.ShaftCall.DONE,MineJob.shaftCall(s,-64,false));assertEquals(VillageState.MINE_FINISHED,s.mineStatus);
+    }
+    @Test void anEdgeFinishIsUndoneOnceTheClaimGrowsPastTheNextStepButDepthAndBottomStayFinal(){
+        var s=new VillageState("A",UUID.randomUUID(),new BlockPos(0,64,0),24);
+        s.bounds=new VillageState.Bounds(-24,-24,24,24);
+        // Entrance 8 blocks inside the east edge, running west: step 41 at x=-25 is the first outside the claim.
+        s.mineEntrance=new BlockPos(16,64,0).asLong();s.mineDirection=Direction.WEST.get2DDataValue();s.mineLength=40;s.mineStatus=VillageState.MINE_FINISHED;s.mineFailures=3;
+        assertFalse(MineJob.resumable(s,-64));assertEquals(MineJob.ShaftCall.DONE,MineJob.shaftCall(s,-64,false));
+        s.bounds.include(new BlockPos(-40,64,0),8);
+        assertTrue(MineJob.resumable(s,-64));assertEquals(MineJob.ShaftCall.DIG,MineJob.shaftCall(s,-64,false));
+        assertEquals(VillageState.MINE_DIGGING,s.mineStatus);assertEquals(0,s.mineFailures);
+        // The same step at the world bottom (y=23 with minY=18) or at full depth is left finished.
+        s.mineStatus=VillageState.MINE_FINISHED;
+        assertFalse(MineJob.resumable(s,18));assertEquals(MineJob.ShaftCall.DONE,MineJob.shaftCall(s,18,false));
+        s.mineLength=MineJob.MAX_DEPTH;s.bounds.include(new BlockPos(-80,64,0),8);
+        assertFalse(MineJob.resumable(s,-64));assertEquals(MineJob.ShaftCall.DONE,MineJob.shaftCall(s,-64,false));
+        // A blocked shaft is never resumed this way.
+        s.mineLength=40;s.mineStatus=VillageState.MINE_BLOCKED;
+        assertFalse(MineJob.resumable(s,-64));assertEquals(MineJob.ShaftCall.MOVE,MineJob.shaftCall(s,-64,false));
+    }
+    @Test void theChatNamesTheObstacleInRussianNotWithTheLibraryToken(){
+        assertEquals("вода или лава",MineJob.describe("unsafe_fluid"));
+        assertEquals("несокрушимая порода",MineJob.describe("mining_cannot_break"));
+        for(String reason:List.of("unsafe_fluid","unsafe_floor","unsafe_passage","unsafe_entrance","dangerous_block","falling_block","unstable_ceiling",
+                "protected_block_entity","not_allowed","mining_not_allowed","mining_cannot_break","world_border","entrance_unreachable","timeout","cancelled"))
+            assertFalse(MineJob.describe(reason).contains("_"),reason);
     }
 }

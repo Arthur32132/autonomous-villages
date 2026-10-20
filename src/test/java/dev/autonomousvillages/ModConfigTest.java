@@ -18,4 +18,17 @@ class ModConfigTest {
         assertFalse(second.gifts);assertTrue(second.compost);
         assertTrue(Files.readString(file).contains("\"compost\": true"));
     }
+    @Test void chatAnnouncementsAreOnByDefaultAndAnOwnerCanMuteThem(@TempDir Path dir) throws Exception {
+        assertTrue(new ModConfig().chatAnnouncements);
+        Path file=dir.resolve("autonomous_villages.json");
+        // A file from before the switch existed gains it, switched on.
+        Files.writeString(file,"{\"gifts\": true}");
+        assertTrue(ModConfig.load(dir).chatAnnouncements);
+        assertTrue(Files.readString(file).contains("\"chatAnnouncements\": true"));
+        Files.writeString(file,Files.readString(file).replace("\"chatAnnouncements\": true","\"chatAnnouncements\": false"));
+        var muted=ModConfig.load(dir);
+        assertFalse(muted.chatAnnouncements);assertTrue(muted.morningNews);
+        assertTrue(Files.readString(file).contains("\"chatAnnouncements\": false"));
+        assertFalse(ModConfig.load(dir).chatAnnouncements);
+    }
 }

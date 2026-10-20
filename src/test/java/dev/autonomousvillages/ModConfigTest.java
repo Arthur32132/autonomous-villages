@@ -35,6 +35,17 @@ class ModConfigTest {
         assertTrue(Files.readString(file).contains("\"chatAnnouncements\": false"));
         assertFalse(ModConfig.load(dir).chatAnnouncements);
     }
+    @Test void caravansAreOnByDefaultAndAnOwnersFalseSurvivesARestart(@TempDir Path dir) throws Exception {
+        assertTrue(new ModConfig().caravans);
+        assertTrue(ModConfig.load(dir,w->fail(w)).caravans);
+        Path file=dir.resolve("autonomous_villages.json");
+        assertTrue(Files.readString(file).contains("\"caravans\": true"));
+        Files.writeString(file,Files.readString(file).replace("\"caravans\": true","\"caravans\": false"));
+        var off=ModConfig.load(dir,w->fail(w));
+        assertFalse(off.caravans);assertTrue(off.lifeEvents);
+        assertTrue(Files.readString(file).contains("\"caravans\": false"));
+        assertFalse(ModConfig.load(dir,w->fail(w)).caravans);
+    }
     @Test void anUnreadableFileIsLeftByteForByteWithACopyBesideItAndDefaultsInMemory(@TempDir Path dir) throws Exception {
         Path file=dir.resolve("autonomous_villages.json"),copy=dir.resolve("autonomous_villages.json.broken");
         // A dangling comma used to rewrite the file with every switch the owner had turned off switched back on.

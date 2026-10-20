@@ -67,6 +67,8 @@ public final class ModConfig {
     public boolean landmarkGoods=true;
     /** A fair every seventh day once there is a market (bell, music, a wandering trader); a feast at the tavern when a building is finished; a lullaby for a birth, a lantern glow on the night watch, a bell stroke for news. */
     public boolean lifeEvents=true;
+    /** Once a day a merchant caravan at the bell swaps the store's surplus for the wool, logs and iron the village cannot get itself (with lifeEvents on). */
+    public boolean caravans=true;
     /** The material the build lacks most is posted as a request to players on the notice board; filling it is rewarded from the store. */
     public boolean requests=true;
     /** Village news in the chat of players nearby (at most one line per village every 5 seconds); off keeps the chronicle but mutes the chat. */

@@ -59,6 +59,8 @@ public final class VillageState {
     public Map<String,Long> goodsDays=new LinkedHashMap<>();
     /** The game day of the last fair. */
     public long fairDay=-1;
+    /** The game day the last merchant caravan came. */
+    public long caravanDay=-1;
     /** The open request to players, if any, and the game time before which no new one is posted. */
     public Request request;
     public long nextRequest;
@@ -150,6 +152,7 @@ public final class VillageState {
         if(mineEntrance==null||mineStatus==null||!Set.of(MINE_DIGGING,MINE_FINISHED,MINE_BLOCKED).contains(mineStatus))mineStatus=MINE_DIGGING;
         mineFailures=Math.clamp(mineFailures,0,16);mineRetryAt=Math.max(0,mineRetryAt);
         completedShelters=Math.clamp(completedShelters,0,256);lastBirth=Math.max(0,lastBirth);lastGolem=Math.max(0,lastGolem);
+        caravanDay=Math.max(-1,caravanDay);
     }
     /** Woods and fields just outside the footprint where residents may still fell trees and walk. */
     static final int OUTSKIRTS=48;

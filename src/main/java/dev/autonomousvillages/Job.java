@@ -30,7 +30,11 @@ abstract class Job {
     String failure="";
     /** Why the last route ended without reaching its goal, as the library reported it. */
     String navReason="";
+    /** Ticks this job waited for the library to plan a route; they do not count against its time limit. */
+    long planWait;
     Job(Worker w,String status){this.w=w;this.v=w.v;this.started=v.level.getGameTime();this.status=status;}
+    /** A job outside any world, for tests of its route bookkeeping. */
+    Job(String status){this.w=null;this.v=null;this.started=0;this.status=status;}
 
     abstract String kind();
     /** The block or place the job is about; used for reservations and display. */
@@ -52,10 +56,14 @@ abstract class Job {
     Villager body(){return w.body();}
     long now(){return v.level.getGameTime();}
     boolean fail(String reason){failure=navReason.isEmpty()?reason:reason+" ("+navReason+")";status=reason;return false;}
+    /** How a finished route ended: the library's reason when it fell short, nothing once it reached its goal. */
     void noteRoute(NavigationTask nav){
-        if(nav!=null&&nav.completion().isDone()&&nav.status()!=NavigationStatus.SUCCESS)
-            try{navReason=nav.completion().join().reason();}catch(RuntimeException ignored){navReason="cancelled";}
+        if(nav==null||!nav.completion().isDone())return;
+        if(nav.status()==NavigationStatus.SUCCESS){clearRoute();return;}
+        try{navReason=Objects.requireNonNullElse(nav.completion().join().reason(),"failed");}catch(RuntimeException ignored){navReason="cancelled";}
     }
+    /** A route that starts or arrives leaves no reason behind: an old failure belongs to another stand or target. */
+    void clearRoute(){navReason="";}
 
     /**
      * A block no route reaches is remembered for the whole village (UnreachableMemory), so jobs stop
@@ -88,9 +96,11 @@ abstract class Job {
      */
     final class Progress {
         double best=Double.MAX_VALUE;long since=Long.MIN_VALUE;int computing;
-        void reset(){best=Double.MAX_VALUE;since=now();computing=0;}
+        /** Given up because the library never finished planning the route, not because the body got stuck. */
+        boolean planning;
+        void reset(){best=Double.MAX_VALUE;since=now();computing=0;planning=false;}
         boolean stalled(Vec3 goal,NavigationTask nav){
-            if(nav.status()==NavigationStatus.COMPUTING){since=now();return ++computing>2000;}
+            if(nav.status()==NavigationStatus.COMPUTING){since=now();return planning=++computing>2000;}
             double d=body().position().distanceToSqr(goal);
             if(d<best-1){best=d;since=now();}
             return now()-since>300;
@@ -105,7 +115,7 @@ abstract class Job {
         final Set<BlockPos> rejected=new HashSet<>();
         NavigationTask nav;
         BlockPos stand;
-        int attempts;
+        final NavHygiene.Attempts attempts=new NavHygiene.Attempts();
         final Progress progress=new Progress();
         /** A new route starts with a clean reason: the old one belonged to another target. */
         Approach(BlockPos target,double reach,boolean sight){this.target=target;this.reach=reach;this.sight=sight;navReason="";}
@@ -118,21 +128,23 @@ abstract class Job {
                     nav.cancel(); // no closer for a while: treat this stand as unreachable
                 }
                 boolean success=nav.status()==NavigationStatus.SUCCESS;noteRoute(nav);nav=null;
-                if(arrived())return State.ARRIVED;
+                if(progress.planning)navReason="planning_timeout";
+                if(arrived())return arrive();
                 if(stand!=null)rejected.add(stand);
-                if(!success&&++attempts>=4)return State.FAILED;
+                if(!success&&attempts.failed())return State.FAILED;
             }
-            if(arrived())return State.ARRIVED;
-            if(attempts>=6)return State.FAILED;
+            if(arrived())return arrive();
+            if(attempts.exhausted())return State.FAILED;
             stand=v.stand(target,body().position(),reach,sight,rejected);
             if(stand==null){if(navReason.isEmpty())navReason="no_stand";return State.FAILED;}
-            attempts++;progress.reset();
+            attempts.started();progress.reset();clearRoute();
             var feet=v.feetPosition(stand);
             boolean near=Math.max(Math.abs(feet.x-body().getX()),Math.abs(feet.z-body().getZ()))<=10;
             nav=bot().navigator().goTo(new NavigationGoal.PositionGoal(feet,.35),near?NEAR:TRAVEL);
             return State.MOVING;
         }
-        private State finishEarly(){nav.cancel();nav=null;return State.ARRIVED;}
+        private State finishEarly(){nav.cancel();nav=null;return arrive();}
+        private State arrive(){clearRoute();return State.ARRIVED;}
         void cancel(){if(nav!=null&&!nav.completion().isDone())nav.cancel();nav=null;}
     }
 
@@ -147,14 +159,15 @@ abstract class Job {
         Walk(Vec3 point,double radius){this(point,radius,TRAVEL);}
         Walk(Vec3 point,double radius,NavigationPolicy policy){this.point=point;this.radius=radius;this.policy=policy;navReason="";}
         Approach.State tick(){
-            if(body().position().distanceToSqr(point)<=radius*radius){cancel();return Approach.State.ARRIVED;}
+            if(body().position().distanceToSqr(point)<=radius*radius){cancel();clearRoute();return Approach.State.ARRIVED;}
             if(nav!=null&&!nav.completion().isDone()){
                 if(!progress.stalled(point,nav))return Approach.State.MOVING;
                 nav.cancel();
             }
             noteRoute(nav);
+            if(nav!=null&&progress.planning)navReason="planning_timeout";
             if(nav!=null&&nav.status()!=NavigationStatus.SUCCESS&&++attempts>=3)return Approach.State.FAILED;
-            progress.reset();
+            progress.reset();clearRoute();
             nav=bot().navigator().goTo(new NavigationGoal.PositionGoal(point,Math.max(.35,radius*.5)),policy);
             return Approach.State.MOVING;
         }
@@ -166,7 +179,7 @@ abstract class Job {
         enum State { WORKING, DONE, FAILED }
         final BlockPos target;
         MiningTask mining;
-        long collectUntil;
+        long brokeAt,collectUntil;
         String error="";
         Harvest(BlockPos target){this.target=target;}
         State tick(){
@@ -174,13 +187,14 @@ abstract class Job {
             if(mining!=null){
                 if(!mining.completion().isDone())return State.WORKING;
                 boolean ok=mining.status()==MiningStatus.SUCCESS;
-                if(!ok){error=mining.completion().join().reason();mining=null;return State.FAILED;}
-                mining=null;collectUntil=now()+60;
+                if(!ok){error=mining.completion().join().reason();mining=null;stopPickup();return State.FAILED;}
+                mining=null;brokeAt=now();collectUntil=now()+60;
             }
-            if(collect(target,6)&&now()<collectUntil)return State.WORKING;
-            return State.DONE;
+            // Fresh drops are on their pickup delay: the harvest waits a little for them even when none shows yet.
+            if(Gathering.keepCollecting(collect(target,6),now(),brokeAt,collectUntil))return State.WORKING;
+            stopPickup();return State.DONE;
         }
-        void cancel(){if(mining!=null&&!mining.completion().isDone())mining.cancel();mining=null;}
+        void cancel(){if(mining!=null&&!mining.completion().isDone())mining.cancel();mining=null;stopPickup();}
     }
 
     record Need(java.util.function.Predicate<net.minecraft.world.item.ItemStack> test,int amount,String label){}
@@ -243,14 +257,23 @@ abstract class Job {
     }
 
     NavigationTask pickupWalk;
-    /** Picks up nearby drops; returns true while there is still something worth walking to. */
+    long pickupRouteAt=-NavHygiene.PICKUP_REROUTE;
+    /**
+     * Picks up nearby drops; returns true while there is still something worth walking to or waiting for.
+     * Fresh drops on their pickup delay count, drops the bag has no room for do not.
+     */
     boolean collect(BlockPos around,double radius){
         w.pickup();
-        var drops=v.level.getEntitiesOfClass(ItemEntity.class,new net.minecraft.world.phys.AABB(around).inflate(radius),e->e.isAlive()&&!e.hasPickUpDelay());
+        var bag=w.bag();
+        var drops=v.level.getEntitiesOfClass(ItemEntity.class,new net.minecraft.world.phys.AABB(around).inflate(radius),
+                e->e.isAlive()&&NavHygiene.pending(e.hasPickUpDelay(),e.getAge())&&NavHygiene.fits(bag,e.getItem()));
         var nearest=drops.stream().min(Comparator.comparingDouble(e->e.distanceToSqr(body()))).orElse(null);
         if(nearest==null)return false;
-        if(pickupWalk==null||pickupWalk.completion().isDone())
+        if(w.reach().intersects(nearest.getBoundingBox()))return true; // in reach already: its delay ends without a route
+        if((pickupWalk==null||pickupWalk.completion().isDone())&&NavHygiene.mayReroute(now(),pickupRouteAt)){
+            pickupRouteAt=now();
             pickupWalk=bot().navigator().goTo(new NavigationGoal.PositionGoal(nearest.position(),.6),TRAVEL);
+        }
         return true;
     }
     void stopPickup(){if(pickupWalk!=null&&!pickupWalk.completion().isDone())pickupWalk.cancel();pickupWalk=null;}

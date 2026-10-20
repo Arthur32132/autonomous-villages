@@ -174,9 +174,9 @@ final class VillagePlanner {
         }
         return false;
     }
-    /** One resident puts up the board: nobody else fetches or makes a sign while another carries one. */
+    /** One resident puts up the board: nobody else fetches or makes a sign while another carries one; an unloaded one carries nothing here. */
     private boolean boardCarried(Worker w){
-        return v.workers.values().stream().anyMatch(o->o!=w&&(o.has(x->x.is(ItemTags.SIGNS))||o.job instanceof FetchJob f&&f.status.endsWith("табличка")));
+        return v.workers.values().stream().anyMatch(o->o!=w&&o.active()&&(o.has(x->x.is(ItemTags.SIGNS))||o.job instanceof FetchJob f&&f.status.endsWith("табличка")));
     }
     /** Another worker is already making or placing this store block. */
     private boolean busy(Worker w,VillageCrafting.Recipe recipe,Block block){

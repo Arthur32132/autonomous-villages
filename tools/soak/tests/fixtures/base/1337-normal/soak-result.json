@@ -1,0 +1,37 @@
+{
+  "completed": true,
+  "reason": "completed",
+  "seed": "1337",
+  "difficulty": "normal",
+  "label": "1337-normal",
+  "days": 3.0,
+  "requestedTps": 100.0,
+  "realSeconds": 2400.5,
+  "village": "120, 70, -40",
+  "claimed": true,
+  "gameTicks": 72000,
+  "gameDays": 3.0,
+  "avgTps": 99.1,
+  "start": {
+    "villagers": 19,
+    "beds": 5
+  },
+  "end": {
+    "villagers": 20,
+    "beds": 6,
+    "initialSurvivors": 17
+  },
+  "outcome": {
+    "births": 3,
+    "deaths": 2,
+    "netVillagers": 1,
+    "newBeds": 1,
+    "builtBlocks": 26,
+    "logsChange": -12,
+    "farmlandChange": 3,
+    "peakVillagers": 20,
+    "minVillagers": 17,
+    "idleSamples": 40,
+    "score": 22.6
+  }
+}

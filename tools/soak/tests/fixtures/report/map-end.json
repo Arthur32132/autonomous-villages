@@ -1,0 +1,38 @@
+{
+  "minX": 100,
+  "minZ": 200,
+  "width": 3,
+  "depth": 2,
+  "palette": [
+    "grass_block",
+    "dirt_path",
+    "oak_planks",
+    "white_bed"
+  ],
+  "cells": "0,2,1,0,0,3,",
+  "heights": "64,64,64,63,65,64,",
+  "villagers": [
+    [
+      101.5,
+      200.5,
+      false
+    ],
+    [
+      102.2,
+      201.1,
+      true
+    ]
+  ],
+  "bell": [
+    101,
+    201
+  ],
+  "projects": [
+    [
+      102,
+      200,
+      "house small_5x5",
+      false
+    ]
+  ]
+}

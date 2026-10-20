@@ -54,11 +54,13 @@ final class HerdJob extends Job {
             if(sheep==null)return fed>0?false:fail("рядом нет взрослых овец");
         }
         if(body().distanceToSqr(sheep)>6.25){
-            if(walk==null||walk.point.distanceToSqr(sheep.position())>9){
-                if(walk!=null&&++retargets>MAX_RETARGETS)return fed>0?false:fail("не подойти к овце");
-                walk=new Walk(sheep.position(),1.8);
-            }
-            if(walk.tick()==Approach.State.FAILED){sheep=null;return fed>0?false:fail("не подойти к овце");}
+            if(walk!=null&&walk.point.distanceToSqr(sheep.position())>9){walk.cancel();walk=null;retargets++;}
+            if(retargets>MAX_RETARGETS)return fed>0?false:fail("не подойти к овце");
+            if(walk==null)walk=new Walk(sheep.position(),1.8);
+            var route=walk.tick();
+            if(route==Approach.State.FAILED){sheep=null;return fed>0?false:fail("не подойти к овце");}
+            // At the walk's end yet out of reach of a sheep that drifted: a new walk, counted like any re-target.
+            if(route==Approach.State.ARRIVED){walk=null;retargets++;}
             return true;
         }
         if(!Supplies.consume(bot(),Items.WHEAT,1))return false;

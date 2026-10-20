@@ -2,6 +2,7 @@ package dev.autonomousvillages;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.*;
+import java.util.function.Predicate;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.Bootstrap;
@@ -41,6 +42,33 @@ class GatheringTest {
         assertEquals(new SmeltJob.Batch(0,0),SmeltJob.batch(64,16,0,8,4,56,SmeltJob.COAL_BURN));
     }
 
+    static int burn(Item i){return i==Items.COAL||i==Items.CHARCOAL?SmeltJob.COAL_BURN:SmeltJob.WOOD_BURN;}
+    @Test void oneFuelKindIsFetchedForTheBatch(){
+        // Mixed wood: the slot takes one species, so the one that smelts the most; enough of one beats more of a mix.
+        assertEquals(Items.OAK_PLANKS,SmeltJob.fuelKind(Map.of(Items.OAK_PLANKS,6,Items.BIRCH_PLANKS,5),null,16,GatheringTest::burn));
+        assertEquals(Items.BIRCH_PLANKS,SmeltJob.fuelKind(Map.of(Items.OAK_PLANKS,10,Items.BIRCH_PLANKS,11),null,16,GatheringTest::burn));
+        // Coal and charcoal are two kinds: the one there is more of.
+        assertEquals(Items.CHARCOAL,SmeltJob.fuelKind(Map.of(Items.COAL,1,Items.CHARCOAL,2),null,16,GatheringTest::burn));
+        // Coal before planks when both cover the batch, planks when coal is short, whatever coal there is without planks.
+        assertEquals(Items.COAL,SmeltJob.fuelKind(Map.of(Items.COAL,2,Items.OAK_PLANKS,20),null,16,GatheringTest::burn));
+        assertEquals(Items.OAK_PLANKS,SmeltJob.fuelKind(Map.of(Items.COAL,1,Items.OAK_PLANKS,20),null,16,GatheringTest::burn));
+        assertEquals(Items.COAL,SmeltJob.fuelKind(Map.of(Items.COAL,1),null,16,GatheringTest::burn));
+        // Fuel already in the slot decides; nothing to burn is no kind.
+        assertEquals(Items.SPRUCE_PLANKS,SmeltJob.fuelKind(Map.of(Items.COAL,5),Items.SPRUCE_PLANKS,16,GatheringTest::burn));
+        assertNull(SmeltJob.fuelKind(Map.of(),null,16,GatheringTest::burn));
+    }
+    @Test void theFetchedFuelIsLoadedAndLogsLast(){
+        Predicate<Item> log=i->i==Items.OAK_LOG;
+        // Planks left from another job next to the fetched coal: the coal goes in.
+        assertEquals(Items.COAL,SmeltJob.loadKind(Map.of(Items.COAL,2,Items.OAK_PLANKS,3),Items.COAL,16,GatheringTest::burn,log));
+        // Carried logs are building material: they burn only when nothing else does.
+        assertEquals(Items.COAL,SmeltJob.loadKind(Map.of(Items.COAL,1,Items.OAK_LOG,5),Items.COAL,16,GatheringTest::burn,log));
+        assertEquals(Items.OAK_LOG,SmeltJob.loadKind(Map.of(Items.OAK_LOG,5),Items.COAL,16,GatheringTest::burn,log));
+        // The fetched kind ran short: the kind that smelts the most.
+        assertEquals(Items.OAK_PLANKS,SmeltJob.loadKind(Map.of(Items.COAL,1,Items.OAK_PLANKS,9),Items.COAL,16,GatheringTest::burn,log));
+        assertNull(SmeltJob.loadKind(Map.of(),null,16,GatheringTest::burn,log));
+    }
+
     record Spot(double x,double z){}
     static double apart(Spot a,Spot b){return (a.x()-b.x())*(a.x()-b.x())+(a.z()-b.z())*(a.z()-b.z());}
     @Test void secondSheepIsTheMateOfTheFirst(){
@@ -72,25 +100,31 @@ class GatheringTest {
     }
 
     @Test void coherentRecipesNeedPlanksOfOneWood(){
+        // affordable() checks the chosen wood with covered() against per-item counts of store and bag.
         Map<Item,Integer> mixed=Map.of(Items.OAK_PLANKS,3,Items.SPRUCE_PLANKS,3),none=Map.of();
         // Six mixed planks make no door, and without logs it is not affordable.
         var wood=CraftJob.wood(6,mixed,none);
         assertEquals(0,wood.planks());assertEquals(2,wood.logs());
         assertFalse(wood.covered(mixed,none));
-        // Logs of one wood are cut on the spot.
-        Map<Item,Integer> birch=Map.of(Items.BIRCH_LOG,2,Items.OAK_LOG,1);
+        // Logs of one wood are cut on the spot; one log each of two woods is not enough.
+        Map<Item,Integer> birch=Map.of(Items.BIRCH_LOG,2,Items.OAK_LOG,1),split=Map.of(Items.BIRCH_LOG,1,Items.OAK_LOG,1);
         wood=CraftJob.wood(6,mixed,birch);
         assertEquals(Items.BIRCH_LOG,wood.log());assertTrue(wood.covered(mixed,birch));
-        assertFalse(CraftJob.wood(6,mixed,Map.of(Items.BIRCH_LOG,1,Items.OAK_LOG,1)).covered(mixed,Map.of(Items.BIRCH_LOG,1,Items.OAK_LOG,1)));
+        assertFalse(CraftJob.wood(6,mixed,split).covered(mixed,split));
         // Planks of one wood are used as they are.
         Map<Item,Integer> oak=Map.of(Items.OAK_PLANKS,6,Items.SPRUCE_PLANKS,2);
         wood=CraftJob.wood(6,oak,none);
         assertEquals(Items.OAK_PLANKS,wood.plank());assertEquals(0,wood.logs());assertTrue(wood.covered(oak,none));
-        // A chest takes mixed planks.
-        wood=CraftJob.mixed(6,6);
+        // A chest takes mixed planks, and logs of any kind for the rest.
+        wood=CraftJob.mixed(6,CraftJob.Wood.count(mixed,null));
         assertNull(wood.plank());assertEquals(6,wood.planks());assertTrue(wood.covered(mixed,none));
         wood=CraftJob.mixed(8,6);
-        assertEquals(6,wood.planks());assertEquals(1,wood.logs());assertTrue(wood.covered(mixed,birch));
+        assertEquals(6,wood.planks());assertEquals(1,wood.logs());assertTrue(wood.covered(mixed,birch));assertFalse(wood.covered(mixed,none));
+    }
+    @Test void theCraftCountsPlanksOfOneWood(){
+        // Five oak and four spruce planks in the bag: a door sees five.
+        assertEquals(5,CraftJob.sameWood(Map.of(Items.OAK_PLANKS,5,Items.SPRUCE_PLANKS,4)));
+        assertEquals(0,CraftJob.sameWood(Map.of()));
     }
 
     @Test void collectingOutlastsThePickupDelay(){

@@ -58,6 +58,8 @@ final class ChopJob extends Job {
             }
             case CUT->{
                 var state=cut.tick();
+                // The log is down while its drops are still collected: record the felling now, or an interruption orphans the trunk.
+                if(!ForestWork.felling(v,base)&&v.level.hasChunkAt(cut.target)&&!v.level.getBlockState(cut.target).is(BlockTags.LOGS)){next();ForestWork.started(v,base,logs);}
                 if(state==Harvest.State.WORKING)return true;
                 if(state==Harvest.State.FAILED)return fail("не срубить: "+cut.error);
                 felled++;lastBreak=now();startFall();

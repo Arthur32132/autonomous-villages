@@ -53,5 +53,8 @@ final class LightningRodJob extends Job {
         StormFeature.rodPlaced(v,site,tower,true);
         return false;
     }
-    @Override void stop(){if(fetch!=null)fetch.cancel();if(craft!=null)craft.stop();if(approach!=null)approach.cancel();}
+    @Override void stop(){
+        if(fetch!=null)fetch.cancel();if(craft!=null)craft.stop();if(approach!=null)approach.cancel();
+        if(!failure.isEmpty())StormFeature.rodFailed(v);
+    }
 }

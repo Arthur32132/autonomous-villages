@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.Vec3;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -49,6 +50,10 @@ class StormFeatureTest {
         // The middle of a railing side, the cell nearest the lookout's middle, chosen the same way every time.
         assertEquals(new BlockPos(0,5,2),site);
         assertNull(StormFeature.rodSite(List.of(new BlockPos(0,0,0)),p->false),"nothing solid, no site");
+        // Every bolt within 128 blocks lands on the rod, and its hit box takes in the lookout (Projects.lookout:
+        // base+(1,5,1)) where the night watch waits: the storm keeps the watch indoors.
+        var strike=StormFeature.strikeBox(Vec3.atBottomCenterOf(site.above()));
+        assertTrue(strike.contains(Vec3.atBottomCenterOf(new BlockPos(1,5,1))),"the lookout is under the rod's bolts");
     }
     @Test void onAPitchedBarnRoofTheRodGoesOnTheRidgeAtTheGableABuilderReaches(){
         // Ridge planks at 5 along x from -1 to 7, stairs at 4 below the eaves on both long sides.
@@ -81,6 +86,20 @@ class StormFeatureTest {
         assertEquals(0,StormFeature.copperToSmelt(1,1),"not enough ore: nothing is smelted for the rod");
         assertEquals(0,StormFeature.copperToSmelt(3,10));
     }
+    @Test void aFailedRodAttemptWaitsTwiceAsLongUpToADay(){
+        long d=StormFeature.ROD_RETRY;
+        for(long want:new long[]{2400,4800,9600,19200,24000,24000}){d=StormFeature.backoff(d);assertEquals(want,d);}
+    }
+
+    @Test void aResidentLastSeenInTheStrikeAndGoneSinceWasStruck(){
+        UUID near=UUID.randomUUID(),alive=UUID.randomUUID(),far=UUID.randomUUID();
+        var seen=new LinkedHashMap<UUID,Vec3>();
+        seen.put(near,new Vec3(2.4,64,-2.9));seen.put(alive,new Vec3(0.5,64,0.5));seen.put(far,new Vec3(6.5,64,0.5));
+        var strike=StormFeature.strikeBox(new Vec3(0.5,65,0.5));
+        Set<UUID> gone=Set.of(near,far);
+        assertEquals(List.of(near),StormFeature.vanished(seen,strike,gone::contains),"turned into a witch: gone from the world, never listed by the bolt");
+        assertEquals(List.of(),StormFeature.vanished(Map.of(),strike,gone::contains));
+    }
 
     @Test void theStormLineIsWrittenOncePerStormWhenEveryoneShelteredAndNobodyWasStruck(){
         var log=new StormFeature.StormLog();
@@ -98,5 +117,12 @@ class StormFeatureTest {
         assertNull(log.end(),"between storms nothing is counted");
         log.begin();log.sheltered(a);
         assertEquals(StormFeature.SHELTERED,log.end(),"a new storm starts clean");
+        log.begin();log.sheltered(a);log.exposed(true);
+        assertNull(log.end(),"someone still under the open sky at the end");
+        log.begin();log.sheltered(a);log.exposed(true);log.exposed(false);
+        assertEquals(StormFeature.SHELTERED,log.end(),"only the latest pass counts: everyone got in");
+        log.begin();log.sheltered(a);log.exposed(true);log.end();
+        log.begin();log.sheltered(b);
+        assertEquals(StormFeature.SHELTERED,log.end(),"the last storm's stragglers do not spoil the next");
     }
 }

@@ -5,11 +5,13 @@ import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.LightningRodBlock;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Гроза: lightning turns a villager into a witch, so residents caught under the open sky go under a village roof
@@ -19,6 +21,9 @@ import net.minecraft.world.phys.AABB;
  * Thunder darkens the sky enough for {@link Worker#hiding()}: the night routine ends work and sends residents home,
  * vanilla walks them back out by day, and those it leaves under the sky are taken into a house ({@link ShelterJob},
  * a night job the routine keeps). Under a bright sky {@link StormShelterJob} does it through the planner instead.
+ * The rod draws every bolt within 128 blocks onto the tower, whose lookout is the watch's first stop, so no
+ * round is walked under thunder. On Normal and Hard a bolt's stray sparks can still catch the oak railing (or the
+ * barn's ridge) beside the rod; rain usually puts them out, and nobody repairs what burns.
  */
 final class StormFeature implements Features.Feature {
     static final String KEY="storm";
@@ -28,6 +33,8 @@ final class StormFeature implements Features.Feature {
     static final int ROD_COPPER=3;
     /** A rod found gone is made again only after a day: a player who took it may have had a reason. */
     static final long REBUILD_AFTER=24_000;
+    /** Pause after a rod job; each failed attempt doubles it up to a day, so an unreachable roof is not climbed for every minute. */
+    static final long ROD_RETRY=1200,ROD_RETRY_MAX=24_000;
     /** Shelter searches per pass at most; each reads a few hundred cells. */
     static final int SEARCHES=3;
     static final String SHELTERED="Гроза прошла, все укрылись";
@@ -42,9 +49,11 @@ final class StormFeature implements Features.Feature {
     private static final class Storm {
         final StormLog log=new StormLog();
         final Set<Job> started=Collections.newSetFromMap(new WeakHashMap<>());
+        /** Where each active resident stood at the last strike scan: a resident turned witch is gone before the bolt lists it. */
+        final Map<UUID,Vec3> seen=new HashMap<>();
         BlockPos rodSite;
         boolean tower;
-        long nextRodTry=Long.MIN_VALUE;
+        long nextRodTry=Long.MIN_VALUE,rodDelay=ROD_RETRY;
     }
     private static final Map<Village,Storm> STORMS=new WeakHashMap<>();
     private static Storm storm(Village v){return STORMS.computeIfAbsent(v,k->new Storm());}
@@ -59,9 +68,9 @@ final class StormFeature implements Features.Feature {
         if(time%20!=13)return;
         boolean night=Worker.nightRestWindow(v.level.getOverworldClockTime(),false);
         // At nightfall those sheltered by day go to their beds as on any night.
-        if(night)for(var w:List.copyOf(v.workers.values()))if(w.job instanceof ShelterJob&&s.started.contains(w.job))w.endJob();
+        if(night)for(var w:List.copyOf(v.workers.values()))if(w.active()&&w.job instanceof ShelterJob&&s.started.contains(w.job))w.endJob();
         if(thunder){s.log.begin();shelter(v,s,night);}
-        else{String line=s.log.end();if(line!=null)v.chronicle.announce(line);}
+        else{s.seen.clear();String line=s.log.end();if(line!=null)v.chronicle.announce(line);}
         if(time%200==113)watchRod(v,s,v.level.getGameTime());
     }
 
@@ -81,25 +90,29 @@ final class StormFeature implements Features.Feature {
 
     // --- shelter -------------------------------------------------------------------------------------
     private static void shelter(Village v,Storm s,boolean night){
-        int searches=0;
+        int searches=0;boolean exposed=false;
         for(var w:List.copyOf(v.workers.values())){
             if(!w.active())continue;
-            Job job=w.job;
-            if(job instanceof ShelterJob||job instanceof StormShelterJob||job instanceof HomeJob){s.log.sheltered(w.id);continue;}
-            if(job!=null&&(job.atomic()||Worker.nightJob(job)))continue;
-            var body=w.body();
-            if(body.isSleeping()||body.isBaby()||!w.ready("storm")||!outdoors(v,body.blockPosition()))continue;
+            // The rod draws the bolts onto the tower and its lookout, the round's first stop: the watch waits indoors.
+            if(w.job instanceof PatrolJob)w.endJob();
+            if(v.guard(w.id))w.cooldown("patrol",600);
+            Job job=w.job;var body=w.body();
+            // On the way in already, asleep, or a child (vanilla minds those).
+            if(job instanceof ShelterJob||job instanceof StormShelterJob||job instanceof HomeJob||body.isSleeping()||body.isBaby())continue;
+            if(!outdoors(v,body.blockPosition()))continue;
             boolean hiding=w.hiding();
             // At night vanilla takes them to bed; on a dark day the routine ends work itself, and the bright
             // social and trade hours belong to vanilla, which would end a shelter at once.
-            if(hiding?night||job!=null:busyHour(w))continue;
-            if(searches++>=SEARCHES)break;
+            boolean left=job!=null&&(job.atomic()||Worker.nightJob(job))||!w.ready("storm")||(hiding?night||job!=null||!w.ready("shelter"):busyHour(w));
+            if(left||searches>=SEARCHES){exposed=true;continue;}
+            searches++;
             Job shelter=hiding?ShelterJob.find(w):StormShelterJob.find(w);
-            if(shelter==null){w.cooldown("storm",600);continue;}
+            if(shelter==null){w.cooldown("storm",600);exposed=true;continue;}
             if(job!=null)w.endJob();
             w.start(shelter);
-            if(w.job==shelter){s.started.add(shelter);s.log.sheltered(w.id);}
+            if(w.job==shelter){s.started.add(shelter);s.log.sheltered(w.id);}else exposed=true;
         }
+        s.log.exposed(exposed);
     }
     /** The hours the worker gives to vanilla (meeting and trade), when it ends any job that is not a night job. */
     private static boolean busyHour(Worker w){
@@ -116,28 +129,43 @@ final class StormFeature implements Features.Feature {
         return true;
     }
 
-    /** One storm's account: who went under a roof and whether lightning struck anyone; the chronicle line once per storm. */
+    /** One storm's account: whom this feature took under a roof, whether anyone stayed out, whether lightning struck anyone. */
     static final class StormLog {
-        private boolean active,struck;
+        private boolean active,struck,exposed;
         private final Set<UUID> sheltered=new HashSet<>(),hit=new HashSet<>();
-        void begin(){if(active)return;active=true;struck=false;sheltered.clear();hit.clear();}
+        void begin(){if(active)return;active=true;struck=exposed=false;sheltered.clear();hit.clear();}
         void sheltered(UUID id){if(active)sheltered.add(id);}
+        /** Whether an adult stood under the open sky, not on the way in, at the storm's latest pass. */
+        void exposed(boolean any){if(active)exposed=any;}
         /** True the first time this resident is reported struck in the storm. */
         boolean struck(UUID id){struck=true;return hit.add(id);}
-        /** The line for the chronicle as the storm ends: only once, only when someone sheltered and nobody was struck. */
+        /** The line for the chronicle as the storm ends: only once, only when someone sheltered, nobody stayed out and nobody was struck. */
         String end(){
             if(!active)return null;
             active=false;
-            return !struck&&!sheltered.isEmpty()?SHELTERED:null;
+            return !struck&&!exposed&&!sheltered.isEmpty()?SHELTERED:null;
         }
     }
     /** A bolt that hit a resident (it becomes a witch) is told once; it also spoils the storm's line. */
     private static void watchStrikes(Village v,Storm s){
         var area=VillageDiscovery.area(v.state,8);int y=v.state.center().getY();
         var box=new AABB(area.minX,y-48,area.minZ,area.maxX,y+64,area.maxZ);
-        for(var bolt:v.level.getEntitiesOfClass(LightningBolt.class,box,e->true))
-            for(var e:bolt.getHitEntities().filter(e->v.state.residents.contains(e.getUUID())).toList())
-                if(s.log.struck(e.getUUID()))v.chronicle.announce("Молния ударила в жителя: "+v.presentation.personName(e.getUUID()));
+        for(var bolt:v.level.getEntitiesOfClass(LightningBolt.class,box,e->true)){
+            // On Peaceful the bolt only burns and lists the villager; elsewhere the witch replaces it at once, unlisted.
+            var hit=new LinkedHashSet<UUID>();
+            bolt.getHitEntities().map(Entity::getUUID).filter(v.state.residents::contains).forEach(hit::add);
+            hit.addAll(vanished(s.seen,strikeBox(bolt.position()),id->{var e=v.level.getEntity(id);return e==null||!e.isAlive();}));
+            for(UUID id:hit)if(s.log.struck(id))v.chronicle.announce("Молния ударила в жителя: "+v.presentation.personName(id));
+        }
+        s.seen.clear();
+        for(var w:v.workers.values())if(w.active())s.seen.put(w.id,w.body().position());
+    }
+    /** The box a bolt standing at this point hits, as {@link LightningBolt#tick} measures it. */
+    static AABB strikeBox(Vec3 bolt){return new AABB(bolt.x-3,bolt.y-3,bolt.z-3,bolt.x+3,bolt.y+9,bolt.z+3);}
+    /** Residents last seen in the strike (a block of slack for the body and two ticks of walking) whose body is gone since. */
+    static List<UUID> vanished(Map<UUID,Vec3> seen,AABB strike,Predicate<UUID> gone){
+        var box=strike.inflate(1);
+        return seen.entrySet().stream().filter(e->box.contains(e.getValue())&&gone.test(e.getKey())).map(Map.Entry::getKey).toList();
     }
 
     // --- the lightning rod ---------------------------------------------------------------------------
@@ -163,11 +191,15 @@ final class StormFeature implements Features.Feature {
                 s.nextRodTry=now+2400;
                 return new SmeltJob(w,snap.furnace(),RAW_COPPER,smelt,"медь для громоотвода");
             }
-            if(v.index.tables.isEmpty())return null;
+            if(v.index.tables.isEmpty()){s.nextRodTry=now+600;return null;}
         }
-        s.nextRodTry=now+1200;
+        s.nextRodTry=now+ROD_RETRY;
         return new LightningRodJob(w,site,s.tower);
     }
+    /** The pause after another failed attempt. */
+    static long backoff(long delay){return Math.min(delay*2,ROD_RETRY_MAX);}
+    /** A rod job failed: the next try waits twice as long as the last, a day at most. */
+    static void rodFailed(Village v){var s=storm(v);s.rodDelay=backoff(s.rodDelay);s.nextRodTry=v.level.getGameTime()+s.rodDelay;}
     /** Every ten seconds: is the rod still there, and if one is wanted, where it goes. */
     private static void watchRod(Village v,Storm s,long now){
         var st=Features.load(v,KEY,State.class,State::new);
@@ -224,7 +256,7 @@ final class StormFeature implements Features.Feature {
     static void rodPlaced(Village v,BlockPos rod,boolean tower,boolean ours){
         var st=Features.load(v,KEY,State.class,State::new);
         st.built=true;st.rod=rod.asLong();st.missingSince=-1;Features.store(v,KEY,st);
-        storm(v).rodSite=null;
+        var s=storm(v);s.rodSite=null;s.rodDelay=ROD_RETRY;
         if(!ours)return;
         v.chronicle.add("lightningRods",1);
         v.chronicle.announce(tower?"Над вышкой поставлен громоотвод":"Над амбаром поставлен громоотвод");

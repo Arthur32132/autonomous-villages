@@ -1,5 +1,7 @@
 package dev.autonomousvillages;
 
+import java.util.HashMap;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.ItemTags;
@@ -70,10 +72,35 @@ final class FarmJob extends Job {
             body().swing(net.minecraft.world.InteractionHand.MAIN_HAND);
         }
     }
+    /** Water near soil, remembered per site for a minute: the planner asks it of every farm site (162 fluid reads each); tilling looks again. */
     static boolean watered(net.minecraft.world.level.Level level,BlockPos soil){
-        for(BlockPos p:BlockPos.betweenClosed(soil.offset(-4,0,-4),soil.offset(4,1,4)))if(level.getFluidState(p).is(FluidTags.WATER))return true;
-        return false;
+        Boolean known=WATER.get(soil.asLong(),level.getGameTime());
+        return known!=null?known:wateredNow(level,soil);
     }
-    private boolean watered(BlockPos soil){return watered(v.level,soil);}
+    static boolean wateredNow(net.minecraft.world.level.Level level,BlockPos soil){
+        boolean found=false;
+        for(BlockPos p:BlockPos.betweenClosed(soil.offset(-4,0,-4),soil.offset(4,1,4)))if(level.hasChunkAt(p)&&level.getFluidState(p).is(FluidTags.WATER)){found=true;break;}
+        WATER.put(soil.asLong(),level.getGameTime(),found);
+        return found;
+    }
+    static final WaterCache WATER=new WaterCache();
+    /** Answers per position for {@link #TTL} ticks; a bounded map, cleared of stale answers when it fills up. */
+    static final class WaterCache {
+        static final int TTL=1200,MAX=4096;
+        private record Answer(long tick,boolean watered){}
+        private final Map<Long,Answer> answers=new HashMap<>();
+        Boolean get(long pos,long now){
+            var a=answers.get(pos);
+            if(a==null)return null;
+            if(now<a.tick()||now-a.tick()>=TTL){answers.remove(pos);return null;}
+            return a.watered();
+        }
+        void put(long pos,long now,boolean watered){
+            if(answers.size()>=MAX&&!answers.containsKey(pos)){answers.values().removeIf(a->now<a.tick()||now-a.tick()>=TTL);if(answers.size()>=MAX)answers.clear();}
+            answers.put(pos,new Answer(now,watered));
+        }
+        int size(){return answers.size();}
+    }
+    private boolean watered(BlockPos soil){return wateredNow(v.level,soil);}
     @Override void stop(){if(approach!=null)approach.cancel();if(harvest!=null)harvest.cancel();}
 }

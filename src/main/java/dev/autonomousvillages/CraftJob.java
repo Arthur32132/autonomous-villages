@@ -48,29 +48,43 @@ final class CraftJob extends Job {
             else planks+=(sticks+3)/4*2;
         }
         if(planks>0){
-            Predicate<ItemStack> plank=VillageCrafting.PLANK,log=VillageCrafting.LOG;
-            if(recipe.coherent()){
-                Item wood=mostCommon(v,w,VillageCrafting.PLANK,planks);
-                if(wood!=null){Item chosen=wood;plank=s->s.is(chosen);}
-                else{
-                    Item trunk=mostCommon(v,w,VillageCrafting.LOG,1);
-                    if(trunk!=null){Item chosen=trunk;log=s->s.is(chosen);plank=s->false;}
-                }
-            }
-            int have=v.stock.count(plank)+(w==null?0:w.count(plank));
-            if(have>=planks)out.add(new Need(plank,planks,"доски"));
-            else{
-                out.add(new Need(log,(planks-have+3)/4,"брёвна"));
-                if(have>0)out.add(new Need(plank,have,"доски"));
-            }
+            var wood=recipe.coherent()?wood(planks,counts(v,w,VillageCrafting.PLANK),counts(v,w,VillageCrafting.LOG))
+                    :mixed(planks,v.stock.count(VillageCrafting.PLANK)+(w==null?0:w.count(VillageCrafting.PLANK)));
+            if(wood.logs()>0)out.add(new Need(wood.logTest(),wood.logs(),"брёвна"));
+            if(wood.planks()>0)out.add(new Need(wood.plankTest(),wood.planks(),"доски"));
         }
         return out;
     }
-    /** The item of a kind the village holds most of (store and bag), if at least {@code min}. */
-    private static Item mostCommon(Village v,Worker w,Predicate<ItemStack> kind,int min){
+    /** Planks of {@code plank} and logs of {@code log} to cut the rest from; a null kind is any kind. */
+    record Wood(Item plank,int planks,Item log,int logs){
+        Predicate<ItemStack> plankTest(){return plank==null?VillageCrafting.PLANK:s->s.is(plank);}
+        Predicate<ItemStack> logTest(){return log==null?VillageCrafting.LOG:s->s.is(log);}
+        /** True when the counted planks and logs (per item) cover it. */
+        boolean covered(Map<Item,Integer> plankCounts,Map<Item,Integer> logCounts){return count(plankCounts,plank)>=planks&&count(logCounts,log)>=logs;}
+        private static int count(Map<Item,Integer> counts,Item kind){return kind==null?counts.values().stream().mapToInt(Integer::intValue).sum():counts.getOrDefault(kind,0);}
+    }
+    /** Tools, chests and tables take any planks: what there is, and logs of any kind for the rest. */
+    static Wood mixed(int planks,int have){return have>=planks?new Wood(null,planks,null,0):new Wood(null,have,null,(planks-have+3)/4);}
+    /** A coherent recipe: planks of the one kind there is enough of, else logs of the kind there is most of; null kinds match nothing on hand. */
+    static Wood wood(int planks,Map<Item,Integer> plankCounts,Map<Item,Integer> logCounts){
+        Item kind=mostCommon(plankCounts,planks);
+        return kind!=null?new Wood(kind,planks,null,0):new Wood(null,0,mostCommon(logCounts,1),(planks+3)/4);
+    }
+    /** Items of a kind in the store and the bag, per item. */
+    private static Map<Item,Integer> counts(Village v,Worker w,Predicate<ItemStack> kind){
         var counts=new HashMap<Item,Integer>();
         for(var c:v.stock.chests())for(int i=0;i<c.getContainerSize();i++){var s=c.getItem(i);if(!s.isEmpty()&&kind.test(s))counts.merge(s.getItem(),s.getCount(),Integer::sum);}
         if(w!=null)for(var s:w.bag())if(!s.isEmpty()&&kind.test(s))counts.merge(s.getItem(),s.getCount(),Integer::sum);
+        return counts;
+    }
+    /** Planks of the one kind the bag holds most of. */
+    static int sameWood(List<ItemStack> bag){
+        var counts=new HashMap<Item,Integer>();
+        for(var s:bag)if(!s.isEmpty()&&VillageCrafting.PLANK.test(s))counts.merge(s.getItem(),s.getCount(),Integer::sum);
+        return counts.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+    }
+    /** The item there is most of, if at least {@code min}. */
+    static Item mostCommon(Map<Item,Integer> counts,int min){
         return counts.entrySet().stream().filter(e->e.getValue()>=min).max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
     }
     /** True when the store and the bag hold the raw materials for the crafts. */
@@ -108,7 +122,9 @@ final class CraftJob extends Job {
         int planksNeeded=symbols.getOrDefault('P',0)+(recipe.material()==VillageCrafting.PLANK?symbols.getOrDefault('M',0):0);
         int sticksNeeded=symbols.getOrDefault('S',0);
         boolean sticksShort=w.count(VillageCrafting.STICK)<sticksNeeded;
-        if(w.count(VillageCrafting.PLANK)<planksNeeded+(sticksShort?2:0)&&w.count(VillageCrafting.LOG)>0)
+        // A coherent recipe counts planks of one wood only, exactly as needs() did when it was found affordable.
+        int planksHave=recipe.coherent()?sameWood(w.bag()):w.count(VillageCrafting.PLANK);
+        if(planksHave<planksNeeded+(sticksShort?2:0)&&w.count(VillageCrafting.LOG)>0)
             return VillageCrafting.craft(bot(),v,VillageCrafting.PLANKS)||fail("не вышло: доски");
         if(sticksShort)return VillageCrafting.craft(bot(),v,VillageCrafting.STICKS)||fail("не вышло: палки");
         if(!VillageCrafting.craft(bot(),v,recipe))return fail("не вышло: "+recipe.label());

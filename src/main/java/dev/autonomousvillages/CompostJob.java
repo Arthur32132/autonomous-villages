@@ -85,8 +85,9 @@ final class CompostJob extends Job {
             body().swing(InteractionHand.MAIN_HAND);nextAction=now()+6;
             return true;
         }
-        // 3. Bone meal on the young crops.
+        // 3. Bone meal on the young crops. The next trip to the composter gets a fresh approach with all its attempts.
         if(w.count(BONE_MEAL)>0){
+            if(toComposter!=null){toComposter.cancel();toComposter=null;}
             if(crops.isEmpty()){
                 BlockPos from=body().blockPosition();
                 v.index.crops.stream().filter(p->young(v,p)&&v.canWork(p)).sorted(Comparator.comparingDouble(p->p.distSqr(from))).limit(8).forEach(crops::add);

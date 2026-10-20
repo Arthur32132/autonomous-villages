@@ -24,6 +24,7 @@ final class VillageIndex {
     static{var offsets=new ArrayList<BlockPos>();for(int x=-24;x<=24;x++)for(int z=-24;z<=24;z++)offsets.add(new BlockPos(x,0,z));
         offsets.sort(Comparator.comparingDouble(p->p.distSqr(BlockPos.ZERO)));NEAR=List.copyOf(offsets);}
     void tick(ServerLevel level, VillageState state, long time) {
+        if(time%200==0)ForestWork.prune(level,state);
         for(long packed:state.fellingTrees)trees.add(BlockPos.of(packed));
         if(time%100==0||residents.isEmpty())residents=state.residents.stream().map(level::getEntity).filter(Objects::nonNull).map(e->e.blockPosition()).toList();
         int minX=state.bounds==null?state.x-state.radius:state.bounds.minX,minZ=state.bounds==null?state.z-state.radius:state.bounds.minZ;
@@ -82,10 +83,24 @@ final class VillageIndex {
     }
     static boolean hazard(BlockState s){return s.is(Blocks.POWDER_SNOW)||s.is(Blocks.FIRE)||s.is(Blocks.SOUL_FIRE)||s.is(Blocks.LAVA)
             ||s.is(Blocks.MAGMA_BLOCK)||s.is(Blocks.CACTUS)||s.is(Blocks.SWEET_BERRY_BUSH)||s.is(Blocks.CAMPFIRE)||s.is(Blocks.SOUL_CAMPFIRE);}
+    /** Blocks people make: a log touching one is part of a build, not of a tree. */
+    static boolean crafted(BlockState s){
+        return s.is(BlockTags.PLANKS)||s.is(BlockTags.STAIRS)||s.is(BlockTags.SLABS)||s.is(BlockTags.DOORS)||s.is(BlockTags.TRAPDOORS)
+                ||s.is(BlockTags.FENCES)||s.is(BlockTags.FENCE_GATES)||s.is(BlockTags.BEDS)||s.is(BlockTags.ALL_SIGNS);
+    }
+    /** A log of a tree, not of a build: no planks, stairs, door or the like touches it. */
+    static boolean treeLog(BlockPos p,java.util.function.Predicate<BlockPos> log,java.util.function.Predicate<BlockPos> crafted){
+        if(!log.test(p))return false;
+        for(Direction d:Direction.values())if(crafted.test(p.relative(d)))return false;
+        return true;
+    }
+    static boolean treeLog(ServerLevel level,BlockPos p){
+        return treeLog(p,q->level.getBlockState(q).is(BlockTags.LOGS),q->level.hasChunkAt(q)&&crafted(level.getBlockState(q)));
+    }
     static boolean naturalLog(ServerLevel level, BlockPos p) {
-        if (!level.getBlockState(p).is(BlockTags.LOGS)) return false;
+        if (!treeLog(level, p)) return false;
         BlockPos base = p;
-        for (int i = 0; i < 12 && level.getBlockState(base.below()).is(BlockTags.LOGS); i++) base = base.below();
+        for (int i = 0; i < 12 && level.getBlockState(base.below()).is(BlockTags.LOGS); i++) { base = base.below(); if (!treeLog(level, base)) return false; }
         var ground = level.getBlockState(base.below());
         if (!VillageIndex.naturalSoil(ground) && !ground.is(Blocks.PODZOL)) return false;
         for (int dy = 1; dy <= 8; dy++) for (Direction d : Direction.Plane.HORIZONTAL)

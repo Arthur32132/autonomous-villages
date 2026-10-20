@@ -36,6 +36,7 @@ final class LifeEvents {
         Features.tick(v,time);
         if(!AutonomousVillagesMod.CONFIG.lifeEvents)return;
         if(time%10==4)watchLanterns();
+        if(time%200==173&&AutonomousVillagesMod.CONFIG.caravans)Caravan.tick(v);
         if(time%20!=11)return;
         long clock=v.level.getOverworldClockTime(),day=Math.floorDiv(clock,24000),hour=Math.floorMod(clock,24000);
         watchCompletions();

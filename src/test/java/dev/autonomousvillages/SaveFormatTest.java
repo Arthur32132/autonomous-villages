@@ -34,9 +34,9 @@ class SaveFormatTest {
             "mineStatus","mineFailures","mineRetryAt","completedShelters","bounds","buildings","capturedPieces","residentNames",
             "residentPositions","residentRoles","policy","lights","chronicle","lastBirth","productDays","lastGolem","newsDay",
             "newsTotals","newsResidents","graves","cemetery","nameplates","donations","donorNames","honoured","goodsDays","fairDay",
-            "request","nextRequest","noticeBoard","features");
+            "caravanDay","request","nextRequest","noticeBoard","features");
     /** Fields master 5781aae did not write: a master save must load with each at its default. */
-    static final Set<String> SINCE_MASTER=Set.of("mineStatus","mineFailures","mineRetryAt","noticeBoard","features");
+    static final Set<String> SINCE_MASTER=Set.of("mineStatus","mineFailures","mineRetryAt","noticeBoard","features","caravanDay");
 
     static UUID id(int n){return UUID.fromString("00000000-0000-4000-8000-0000000000"+String.format("%02d",n));}
     static long p(int x,int y,int z){return new BlockPos(x,y,z).asLong();}
@@ -105,7 +105,7 @@ class SaveFormatTest {
         assertEquals("{\"text\":\"Вера\"}",save.pendingReleases.get(id(7)).json);
         // What 0.3 added starts from its default.
         assertEquals(VillageState.MINE_DIGGING,s.mineStatus);assertEquals(0,s.mineFailures);assertEquals(0,s.mineRetryAt);
-        assertNull(s.noticeBoard);assertTrue(s.features.isEmpty());
+        assertNull(s.noticeBoard);assertTrue(s.features.isEmpty());assertEquals(-1,s.caravanDay);
         var unwritten=new TreeSet<>(persistedFields());unwritten.removeAll(fixture.keySet());
         assertEquals(new TreeSet<>(SINCE_MASTER),unwritten,"a field master wrote is gone, or a new field is missing from SINCE_MASTER and its default check");
     }
@@ -139,7 +139,7 @@ class SaveFormatTest {
         s.graves.add(new VillageState.Grave("Лука","сторож",2));s.cemetery=p(-30,64,30);
         s.nameplates.put(p(9,64,-11),p(10,64,-10));
         s.donations.put(id(50),20L);s.donorNames.put(id(50),"Alex");s.honoured.add(id(50));
-        s.goodsDays.put("mill",3L);s.fairDay=5;
+        s.goodsDays.put("mill",3L);s.fairDay=5;s.caravanDay=6;
         s.request=new VillageState.Request();s.request.key="bed";s.request.amount=2;s.request.delivered=1;s.request.posted=24_000;s.nextRequest=50_000;
         s.noticeBoard=p(1,64,-1);
         s.features.put("orchard","{\"trees\":[1,2]}");s.features.put("campfire","{}");
@@ -195,6 +195,7 @@ class SaveFormatTest {
             new Corruption("mine failures 99",(s,r)->s.mineFailures=r.nextBoolean()?99:-3),
             new Corruption("mine retry before time began",(s,r)->s.mineRetryAt=r.nextBoolean()?-5:Long.MIN_VALUE),
             new Corruption("notice board outside",(s,r)->s.noticeBoard=outside(s,r)),
+            new Corruption("caravan before time began",(s,r)->s.caravanDay=r.nextBoolean()?-2-r.nextInt(100):Long.MIN_VALUE),
             new Corruption("40000-char feature",(s,r)->s.features.put("orchard","x".repeat(40_000))),
             new Corruption("null entries",(s,r)->some(r,List.of(()->s.residents.add(null),()->s.storage.add(null),()->s.furnaces.add(null),()->s.lights.add(null),
                     ()->s.plantedTrees.add(null),()->s.plantedCrops.add(null),()->s.fellingTrees.add(null),()->s.reforestation.add(null),()->s.capturedPieces.add(null),
@@ -244,7 +245,7 @@ class SaveFormatTest {
             assertTrue(s.donations.values().stream().allMatch(n->n>=0),label);
             assertTrue(s.request==null||s.request.key!=null&&s.request.amount>=1&&s.request.amount<=VillageRequests.MAX_AMOUNT&&s.request.delivered>=0,label);
             assertTrue(s.goodsDays.keySet().stream().allMatch(Landmarks::kind),label);
-            assertTrue(s.mineFailures>=0&&s.mineFailures<=16&&s.mineRetryAt>=0,label);
+            assertTrue(s.mineFailures>=0&&s.mineFailures<=16&&s.mineRetryAt>=0&&s.caravanDay>=-1,label);
             assertTrue(s.noticeBoard==null||s.contains(BlockPos.of(s.noticeBoard)),label);
             assertTrue(s.features.values().stream().allMatch(v->v.length()<=Features.MAX_STATE_CHARS),label);
             // The repaired village is written without a null entry and reads back as it was.

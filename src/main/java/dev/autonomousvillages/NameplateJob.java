@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.WallSignBlock;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 /**
@@ -73,21 +74,48 @@ final class NameplateJob extends Job {
         Collections.sort(out);
         return out;
     }
-    /** "Здесь живут" and up to three names; the last line counts the rest. */
+    /** "Здесь живут" and up to three names; the last line counts the rest, alone when the name and the count do not fit together. */
     static String[] lines(List<String> names){
         var lines=new String[]{"","","",""};
         if(names.isEmpty()){lines[0]="Дом";lines[1]="ждёт жильцов";return lines;}
         lines[0]=names.size()==1?"Здесь живёт":"Здесь живут";
-        for(int i=0;i<Math.min(3,names.size());i++)lines[i+1]=names.get(i);
-        if(names.size()>3)lines[3]=names.get(2)+" и ещё "+(names.size()-3);
+        for(int i=0;i<Math.min(3,names.size());i++)lines[i+1]=fit(names.get(i));
+        if(names.size()>3){String last=names.get(2)+" и ещё "+(names.size()-3);lines[3]=width(last)<=SIGN_WIDTH?last:"и ещё "+(names.size()-2);}
         return lines;
+    }
+    /** Width of a sign line in pixels: the renderer cuts anything past it. */
+    static final int SIGN_WIDTH=90;
+    /**
+     * Pixel width of a line in the sign font, on the generous side: Latin letters 6, narrow ones 3-5, a space 4, and every
+     * other letter, Cyrillic included, 7, so a Russian name is never cut by the renderer.
+     */
+    static int width(String text){
+        int px=0;
+        for(int i=0;i<text.length();i++){
+            char c=text.charAt(i);
+            px+=c==' '?4:".,:;!|'`il".indexOf(c)>=0?3:"It[]()*\"<>{}fk".indexOf(c)>=0?5:c=='@'||c=='~'?7:c<128?6:7;
+        }
+        return px;
+    }
+    /** The text as it fits on one sign line, cut with "…" when it is too wide. */
+    static String fit(String text){
+        if(width(text)<=SIGN_WIDTH)return text;
+        int end=text.length();
+        while(end>0&&width(text.substring(0,end).stripTrailing()+"…")>SIGN_WIDTH)end--;
+        return text.substring(0,end).stripTrailing()+"…";
+    }
+    /** True when the sign already shows these lines, so it is not rewritten and resent. */
+    static boolean unchanged(String[] lines,SignText text){
+        for(int i=0;i<lines.length;i++)if(!text.getMessage(i,false).getString().equals(lines[i]))return false;
+        return true;
     }
     static void write(Village v,BlockPos pos,TownBuilding b){
         if(!(v.level.getBlockEntity(pos) instanceof SignBlockEntity sign))return;
         var lines=lines(residents(v,b));
+        // SignText has no equals: comparing the objects rewrote every plate every thirty seconds.
+        if(unchanged(lines,sign.getFrontText()))return;
         var text=sign.getFrontText();
         for(int i=0;i<4;i++)text=text.setMessage(i,Component.literal(lines[i]));
-        if(text.equals(sign.getFrontText()))return;
         sign.setText(text,true);sign.setChanged();
         var state=v.level.getBlockState(pos);v.level.sendBlockUpdated(pos,state,state,3);
     }

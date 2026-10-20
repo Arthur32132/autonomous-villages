@@ -120,14 +120,15 @@ final class LandmarkGoods {
         int cooked=0;
         for(var e:KITCHEN.entrySet()){
             Item raw=e.getKey();
-            int n=Math.min(COOKS-cooked,cookable(raw,v.stock.count(s->s.is(raw))));
+            // Only as much as the store has room for: a full store leaves the meat raw.
+            int n=Math.min(Math.min(COOKS-cooked,cookable(raw,v.stock.count(s->s.is(raw)))),room(v,new ItemStack(e.getValue())));
             if(n<=0)continue;
             int fuel=(n+7)/8;
             if(v.stock.count(VillageCrafting.FUEL)<fuel)break;
             v.stock.consume(VillageCrafting.FUEL,fuel);
             int took=v.stock.consume(s->s.is(raw),n);
-            var rest=v.stock.put(new ItemStack(e.getValue(),took));
-            cooked+=took-rest.getCount();
+            store(v,tavern,Blocks.BREWING_STAND,new ItemStack(e.getValue(),took));
+            cooked+=took;
             if(cooked>=COOKS)break;
         }
         int brewed=0;
@@ -161,20 +162,25 @@ final class LandmarkGoods {
     /** Loaves the mill bakes from the wheat above what the fields keep for themselves. */
     static int loaves(int wheat){return Math.clamp((wheat-WHEAT_KEPT)/3,0,MILL_BREAD);}
     static void mill(Village v,TownBuilding mill){
-        int n=loaves(v.stock.count(VillageCrafting.WHEAT));
+        int n=Math.min(loaves(v.stock.count(VillageCrafting.WHEAT)),room(v,new ItemStack(Items.BREAD)));
         if(n<=0)return;
-        v.stock.consume(VillageCrafting.WHEAT,n*3);
-        var rest=v.stock.put(new ItemStack(Items.BREAD,n));
-        v.chronicle.add("milled",n-rest.getCount());
+        int took=v.stock.consume(VillageCrafting.WHEAT,n*3);n=took/3;
+        // Wheat short of a loaf goes back.
+        if(took%3>0)store(v,mill,Blocks.COMPOSTER,new ItemStack(Items.WHEAT,took%3));
+        if(n<=0)return;
+        store(v,mill,Blocks.COMPOSTER,new ItemStack(Items.BREAD,n));
+        v.chronicle.add("milled",n);
         show(v,mill,Blocks.COMPOSTER,SoundEvents.VILLAGER_WORK_FARMER);
     }
-    /** The morning's catch off the pier, while the water is still there: three cod and a salmon. */
+    /** The morning's catch off the pier, while the water is still there: three cod and a salmon, what the store has room for. */
     static void dock(Village v,TownBuilding dock){
-        boolean water=dock.blocks.stream().anyMatch(p->v.level.getFluidState(p.position().below()).is(net.minecraft.tags.FluidTags.WATER));
+        boolean water=dock.blocks.stream().anyMatch(p->v.level.hasChunkAt(p.position())&&v.level.getFluidState(p.position().below()).is(net.minecraft.tags.FluidTags.WATER));
         if(!water)return;
-        var rest=v.stock.put(new ItemStack(Items.COD,3));
-        rest.grow(v.stock.put(new ItemStack(Items.SALMON,1)).getCount());
-        v.chronicle.add("fished",4);
+        int cod=Math.min(3,room(v,new ItemStack(Items.COD))),salmon=Math.min(1,room(v,new ItemStack(Items.SALMON)));
+        if(cod+salmon<=0)return;
+        if(cod>0)store(v,dock,Blocks.BARREL,new ItemStack(Items.COD,cod));
+        if(salmon>0)store(v,dock,Blocks.BARREL,new ItemStack(Items.SALMON,salmon));
+        v.chronicle.add("fished",cod+salmon);
         show(v,dock,Blocks.BARREL,SoundEvents.FISHING_BOBBER_SPLASH);
     }
 
@@ -184,9 +190,37 @@ final class LandmarkGoods {
         for(var p:b.blocks)if(p.block().is(Blocks.BARREL)&&v.level.getBlockEntity(p.position()) instanceof BarrelBlockEntity barrel)out.add(barrel);
         return out;
     }
+    /** Room the store's chests have for more of these goods, filling partial stacks first as VillageStock.put does. */
+    static int room(List<ItemStack> slots,ItemStack goods){
+        int n=0;
+        for(var slot:slots)n+=slot.isEmpty()?goods.getMaxStackSize():ItemStack.isSameItemSameComponents(slot,goods)?Math.max(0,slot.getMaxStackSize()-slot.getCount()):0;
+        return n;
+    }
+    private static int room(Village v,ItemStack goods){
+        var slots=new ArrayList<ItemStack>();
+        for(var chest:v.stock.chests())for(int i=0;i<chest.getContainerSize();i++)slots.add(chest.getItem(i));
+        return room(slots,goods);
+    }
+    /** Goods go into the store; what does not fit is handed to {@code spill}, never thrown away. Returns what was stored. */
+    static int keep(ItemStack goods,java.util.function.UnaryOperator<ItemStack> store,java.util.function.Consumer<ItemStack> spill){
+        var rest=store.apply(goods);
+        if(!rest.isEmpty())spill.accept(rest.copy());
+        return goods.getCount()-rest.getCount();
+    }
+    /** Into the store, or set down at the building's workstation when the chests filled up meanwhile. */
+    private static void store(Village v,TownBuilding b,Block station,ItemStack goods){
+        keep(goods,v.stock::put,rest->{
+            BlockPos at=station(v,b,station);
+            var item=new net.minecraft.world.entity.item.ItemEntity(v.level,at.getX()+.5,at.getY()+1.1,at.getZ()+.5,rest);
+            item.setDefaultPickUpDelay();v.level.addFreshEntity(item);
+        });
+    }
+    private static BlockPos station(Village v,TownBuilding b,Block station){
+        return b.blocks.stream().map(TownBuilding.Plan::position).filter(p->v.level.hasChunkAt(p)&&v.level.getBlockState(p).is(station)).findFirst().orElse(BlockPos.of(b.origin));
+    }
     /** Sparks and a sound at the building's workstation, for whoever is near. */
     private static void show(Village v,TownBuilding b,Block station,SoundEvent sound){
-        BlockPos at=b.blocks.stream().map(TownBuilding.Plan::position).filter(p->v.level.getBlockState(p).is(station)).findFirst().orElse(BlockPos.of(b.origin));
+        BlockPos at=station(v,b,station);
         v.level.playSound(null,at,sound,SoundSource.BLOCKS,1f,1f);
         v.level.sendParticles(ParticleTypes.HAPPY_VILLAGER,at.getX()+.5,at.getY()+1.2,at.getZ()+.5,6,.4,.3,.4,0);
     }

@@ -133,7 +133,9 @@ final class Worker {
             }
         }
         if(job!=null){
-            boolean timedOut=now()-job.started>job.timeLimit();
+            // Waiting for the library to plan a route is not the job's own time (WORKLOG: half the day at busy times).
+            if(b.navigator().status()==NavigationStatus.COMPUTING)job.planWait++;
+            boolean timedOut=NavHygiene.overdue(now()-job.started,job.planWait,job.timeLimit());
             boolean running=!timedOut&&job.tick();
             status=job.status;
             if(!running){if(timedOut)job.failure="не уложился во время";endJob();}
@@ -168,15 +170,14 @@ final class Worker {
     }
     void endJob(){
         if(job==null)return;
-        job.stop();
+        job.stop();job.stopPickup();
         if(!job.failure.isEmpty()){
             lastFailure=job.failure;
-            if(job.target()!=null)v.rejected.put(job.target().asLong(),now()+600);
+            if(job.target()!=null)NavHygiene.reject(v.rejected,job.target().asLong(),now()+600);
             cooldown(job.kind(),200);
             // Repeated route failures from one spot mean the worker itself is stuck, not the target.
             // Any job whose route failed counts ("нет на складе: палки (unreachable)" too), and shuffling a block or two still is one spot.
-            if(job.failure.startsWith("не подойти")||job.failure.startsWith("не нашёл дорогу")||job.failure.startsWith("не дойти")||job.failure.contains("уложился")
-                    ||job.failure.endsWith("(unreachable)")||job.failure.contains("(stuck")){
+            if(NavHygiene.stuck(job.failure,now()-job.started,job.planWait,job.timeLimit())){
                 stuckCount=nearStuckSpot()?stuckCount+1:1;if(stuckCount==1)stuckAt=body().blockPosition().asLong();
                 // The targets it could not reach were fine; it is the resident that is stuck, so the store stays open to the others.
                 if(stuckCount==3){AutonomousVillagesMod.LOG.info("TRAPPED {} {} at {}: {}",v.state.name,v.presentation.personName(id),body().position(),surroundings());v.stock.unreachable.forgetBy(id);}
@@ -216,17 +217,25 @@ final class Worker {
     boolean hiding(){return nightRest()||v.alarm()&&!armed();}
 
     // --- inventory -------------------------------------------------------------------------
-    List<ItemStack> bag(){return bot().inventory().snapshot().slots();}
+    /** Empty while the bot is not loaded, so planners can look at every worker. */
+    List<ItemStack> bag(){var b=bot();return b==null?List.of():b.inventory().snapshot().slots();}
     int count(Predicate<ItemStack> test){return Supplies.count(bag(),test);}
-    boolean has(Predicate<ItemStack> test){return Supplies.find(bot(),test)>=0;}
+    boolean has(Predicate<ItemStack> test){var b=bot();return b!=null&&Supplies.find(b,test)>=0;}
     boolean hasTool(net.minecraft.tags.TagKey<net.minecraft.world.item.Item> tag){return has(s->s.is(tag)&&Supplies.usable(s));}
     int freeSlots(){return (int)bag().stream().filter(ItemStack::isEmpty).count();}
+    /** Where loose items are picked up from. */
+    AABB reach(){return body().getBoundingBox().inflate(1.4,.7,1.4);}
     /** Picks up loose items next to the body. */
     void pickup(){
-        var b=bot();
-        for(ItemEntity item:v.level.getEntitiesOfClass(ItemEntity.class,b.entity().getBoundingBox().inflate(1.4,.7,1.4),i->i.isAlive()&&!i.hasPickUpDelay())){
+        var b=bot();if(b==null)return;
+        List<ItemStack> bag=null;
+        for(ItemEntity item:v.level.getEntitiesOfClass(ItemEntity.class,reach(),i->i.isAlive()&&!i.hasPickUpDelay())){
+            if(bag==null)bag=bag();
+            // Inserting stops every route of the bot even when nothing fits: an item the bag has no room for stays where it lies.
+            if(!NavHygiene.fits(bag,item.getItem()))continue;
             ItemStack rest=b.inventory().insert(item.getItem());
             if(rest.isEmpty())item.discard();else item.setItem(rest);
+            bag=null;
         }
     }
     /** Items a worker keeps instead of handing them to the store: the best tool of each kind and a little food. */
@@ -267,6 +276,8 @@ final class Worker {
     private void restRecovery(){
         var e=body();
         if(e.getHealth()>=e.getMaxHealth()||now()-lastRestHeal<400||job!=null&&!(job instanceof HomeJob)&&!(job instanceof PatrolJob))return;
+        // Only while idle or arrived: eating from the bag cancels the walk home or the patrol walk.
+        if(!NavHygiene.mayHeal(bot().navigator().status(),fleeing||fighting(null)))return;
         var food=e.getInventory();
         for(int slot=0;slot<food.getContainerSize();slot++)if(Supplies.food(food.getItem(slot))){
             food.removeItem(slot,1);e.heal(2);lastRestHeal=now();return;
@@ -314,6 +325,8 @@ final class Worker {
         v.level.sendParticles(net.minecraft.core.particles.ParticleTypes.HAPPY_VILLAGER,e.getX(),e.getY()+2.1,e.getZ(),4,.3,.2,.3,0);
     }
     private long fleeStarted;
+    /** How far the threat was when the current flight was planned. */
+    private double fleeDistance;
     private boolean danger(){
         var e=body();
         Monster enemy=v.level.getEntitiesOfClass(Monster.class,e.getBoundingBox().inflate(12),m->m.isAlive()&&threat(m)&&e.hasLineOfSight(m))
@@ -337,6 +350,8 @@ final class Worker {
         if(!(enemy instanceof Creeper)&&armed()&&(e.getHealth()>=14||v.guard(id)&&e.getHealth()>=8||cornered)){defend(enemy);return true;}
         // Keep running along the current route: planning a new one makes the body stand still.
         if(fleeing&&flight!=null&&now()-fleeSince<300&&flight.tick()==Job.Approach.State.MOVING)return true;
+        // The flight ended with the threat still in view: a new one only after a short pause, or at once when it closed in.
+        if(fleeing&&flight!=null&&!NavHygiene.replanFlight(now(),fleeSince,e.distanceTo(enemy),fleeDistance)){status="убегает от угрозы";return true;}
         if(job!=null){job.stop();job=null;v.reservations.release(id);}
         bot().stopAll();
         Vec3 away=e.position().subtract(enemy.position());double length=Math.max(.001,Math.hypot(away.x,away.z));
@@ -346,7 +361,7 @@ final class Worker {
         // Running blind into the dark can end in powder snow or off a cliff: without a bed to run to, run to the bell.
         if(refuge==null&&!v.safeFeet(BlockPos.containing(point)))point=v.feetPosition(v.meetingPoint());
         if(!fleeing)fleeStarted=now();
-        flight=new HomeJob(this).new Walk(point,1.5);fleeing=true;fleeSince=now();released=false;
+        flight=new HomeJob(this).new Walk(point,1.5);fleeing=true;fleeSince=now();fleeDistance=e.distanceTo(enemy);released=false;
         flight.tick();status="убегает от угрозы";
         return true;
     }

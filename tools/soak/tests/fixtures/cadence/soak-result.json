@@ -1,0 +1,105 @@
+{
+  "completed": true,
+  "reason": "completed",
+  "seed": "42",
+  "difficulty": "normal",
+  "days": 0.5,
+  "gameTicks": 12000,
+  "start": {
+    "villagers": 6,
+    "beds": 4
+  },
+  "end": {
+    "villagers": 6,
+    "beds": 5
+  },
+  "outcome": {
+    "births": 0,
+    "deaths": 0,
+    "netVillagers": 0,
+    "newBeds": 1,
+    "builtBlocks": 12,
+    "logsChange": -8,
+    "farmlandChange": 0,
+    "peakVillagers": 6,
+    "minVillagers": 6,
+    "idleSamples": 0,
+    "score": 11.2,
+    "changeShare": 0.4,
+    "longestStallMinutes": 5.0,
+    "stallsOver5Minutes": 1,
+    "dayChangeShare": 0.571,
+    "longestDayStallMinutes": 2.0,
+    "dayStallsOver5Minutes": 0,
+    "firstProjectDay": 0.4,
+    "routeWaitShare": 0.25,
+    "features": {
+      "campfire": {
+        "on": true,
+        "recorded": 1,
+        "observed": 1
+      },
+      "orchard": {
+        "on": true,
+        "recorded": 4,
+        "observed": 3,
+        "saplings": 2,
+        "trees": 1
+      },
+      "heraldry": {
+        "on": true,
+        "recorded": 0,
+        "observed": 0,
+        "bannersInArea": 0
+      },
+      "storm": {
+        "on": false,
+        "recorded": 0,
+        "observed": 0
+      },
+      "mastery": {
+        "on": true,
+        "recorded": 1,
+        "observed": 1
+      },
+      "livestock": {
+        "on": true,
+        "observed": 7,
+        "cows": 3,
+        "chickens": 4
+      }
+    }
+  },
+  "routeByJob": {
+    "chop": {
+      "route": 12,
+      "walk": 36,
+      "stuck": 0,
+      "work": 0
+    },
+    "none": {
+      "route": 0,
+      "walk": 0,
+      "stuck": 0,
+      "work": 72
+    },
+    "craft": {
+      "route": 12,
+      "walk": 12,
+      "stuck": 0,
+      "work": 0
+    },
+    "build": {
+      "route": 36,
+      "walk": 12,
+      "stuck": 0,
+      "work": 24
+    },
+    "deposit": {
+      "route": 0,
+      "walk": 12,
+      "stuck": 12,
+      "work": 0
+    }
+  }
+}

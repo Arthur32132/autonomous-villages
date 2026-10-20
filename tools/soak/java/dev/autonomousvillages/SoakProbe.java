@@ -27,12 +27,15 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import net.minecraft.world.entity.ai.village.poi.PoiTypes;
+import net.minecraft.world.entity.animal.chicken.Chicken;
+import net.minecraft.world.entity.animal.cow.Cow;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.*;
+import net.minecraft.world.level.block.entity.BannerBlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
@@ -53,6 +56,10 @@ public final class SoakProbe implements ModInitializer {
     static final Gson LINE=new GsonBuilder().disableHtmlEscaping().serializeSpecialFloatingPointValues().create();
     /** Blocks that only appear because somebody built them; their growth is construction progress. */
     static final List<String> BUILT=List.of("planks","cobblestone","doors","lights","chests","crafting_tables","furnaces","fences","stairs","slabs","glass","paths","beds","wool","bells");
+    /** Chronicle totals that show in the world; their sum is progress.visible (same list as digest.py VISIBLE and the README). */
+    static final List<String> VISIBLE=List.of("placed","trees","mined","harvested","torches","paths","lamps","lanterns","flowers","nameplates","graves","spareBeds","hazards");
+    /** Route buckets by navigator status: COMPUTING waits for a route, RUNNING walks, STUCK, anything else works. */
+    static final String[] ROUTE={"route","walk","stuck","work"};
 
     enum Stage { FIND, LOAD, WAIT_VILLAGERS, RUN, DONE }
     static Properties config=new Properties();
@@ -76,6 +83,12 @@ public final class SoakProbe implements ModInitializer {
     static final JsonArray births=new JsonArray(),deaths=new JsonArray();
     static final Map<UUID,Vec3> lastPos=new HashMap<>();
     static final Map<String,Long> idleByJob=new TreeMap<>();
+    static final Map<String,long[]> routeByJob=new TreeMap<>();
+    static final List<Boolean> changes=new ArrayList<>(),nights=new ArrayList<>();
+    static JsonObject lastProgress;
+    static Double firstProjectDay;
+    static int routeTicks=100,startCompleted;
+    static boolean routesFailed;
     static Writer timeline;
 
     @Override public void onInitialize(){
@@ -153,6 +166,8 @@ public final class SoakProbe implements ModInitializer {
         for(var v:villagers()){seen.add(v.getUUID());initial.add(v.getUUID());lastPos.put(v.getUUID(),v.position());}
         startVillagers=initial.size();startBeds=beds(PoiManager.Occupancy.ANY);
         startCensus=census();lastCensus=startCensus;
+        routeTicks=Math.max(1,intConfig("routeTicks",100));
+        try{lastProgress=progress(modView(),startBeds,0);startCompleted=lastProgress==null?0:lastProgress.get("projectsCompleted").getAsInt();}catch(RuntimeException error){log("start progress failed: "+error);}
         writeMap("map-start.json");
         startGame=level.getGameTime();lastSampleGame=startGame;runNanos=System.nanoTime();lastSampleNanos=runNanos;
         try{timeline=Files.newBufferedWriter(Path.of(config.getProperty("timeline","soak-timeline.jsonl")),StandardCharsets.UTF_8);}catch(IOException error){throw new UncheckedIOException(error);}
@@ -161,6 +176,7 @@ public final class SoakProbe implements ModInitializer {
     }
     static void run(){
         long elapsed=level.getGameTime()-startGame;
+        if(elapsed>0&&elapsed%routeTicks==0)routes();
         if(elapsed>0&&elapsed%intConfig("sampleTicks",1200)==0)sample();
         if(elapsed>0&&elapsed%intConfig("censusTicks",6000)==0)lastCensus=census();
         // Frames for a timelapse of the village (tools/soak/map.py --gif), twice a game day.
@@ -217,8 +233,9 @@ public final class SoakProbe implements ModInitializer {
         line.addProperty("tps",Math.round(tps*10)/10.0);line.addProperty("mspt",Math.round(server.getAverageTickTimeNanos()/1e4)/100.0);
         line.addProperty("villagers",villagers.size());line.addProperty("adults",adults);line.addProperty("babies",babies);
         line.addProperty("sleeping",sleeping);line.addProperty("idle",idle);
-        line.addProperty("beds",beds(PoiManager.Occupancy.ANY));line.addProperty("births",births.size());line.addProperty("deaths",deaths.size());
-        line.add("mod",modView());
+        int beds=beds(PoiManager.Occupancy.ANY);
+        line.addProperty("beds",beds);line.addProperty("births",births.size());line.addProperty("deaths",deaths.size());
+        var mod=modView();line.add("mod",mod);
         var m=dev.navigationai.NavigationAiMod.runtime(server).metrics();
         var nav=new JsonObject();
         nav.addProperty("snapshots",m.snapshots());nav.addProperty("snapshotMs",Math.round(m.averageSnapshotMillis()*100)/100.0);
@@ -227,9 +244,145 @@ public final class SoakProbe implements ModInitializer {
         nav.addProperty("backpressure",m.backpressureDeferrals());nav.addProperty("nodeBudget",m.nodeBudgetDeferrals());nav.addProperty("replans",m.replans());
         nav.addProperty("queued",m.queuedSearches());nav.addProperty("active",m.activeSearches());nav.addProperty("botTickMs",Math.round(m.averageTickMillis()*100)/100.0);
         line.add("nav",nav);
+        // Visible progress against the previous sample and the route tally so far (README "Видимые изменения", "Маршруты").
+        var progress=progress(mod,beds,births.size());
+        boolean changed=progress!=null&&lastProgress!=null&&!progress.equals(lastProgress);
+        if(progress!=null){
+            line.add("progress",progress);
+            if(firstProjectDay==null&&progress.get("projectsCompleted").getAsInt()>startCompleted)firstProjectDay=line.get("day").getAsDouble();
+            lastProgress=progress;
+        }
+        changes.add(changed);nights.add(line.get("night").getAsBoolean());line.addProperty("changed",changed);line.add("routeByJob",routeJson());
+        try{line.addProperty("saveFailed",AutonomousVillagesMod.runtime(server).persistenceWriteFailed());}catch(RuntimeException ignored){}
         try{timeline.write(LINE.toJson(line));timeline.write('\n');timeline.flush();}catch(IOException error){throw new UncheckedIOException(error);}
         log("day="+line.get("day")+" tps="+line.get("tps")+" villagers="+villagers.size()+" beds="+line.get("beds")+" births="+births.size()+" deaths="+deaths.size()+" idle="+idle);
     }
+    /** Visible-progress numbers from the mod view, or null without a village; digest.py applies the same formulas to older timelines. */
+    static JsonObject progress(JsonObject mod,int beds,int born){
+        try{
+            if(mod==null||!mod.has("projectBlocks"))return null;
+            String blocks=mod.get("projectBlocks").getAsString();
+            var out=new JsonObject();
+            out.addProperty("projectBlocks",Integer.parseInt(blocks.substring(0,blocks.indexOf('/')).trim()));
+            out.addProperty("projectsCompleted",mod.get("projectsCompleted").getAsInt());
+            out.addProperty("beds",beds);out.addProperty("births",born);
+            long visible=0;var chronicle=mod.get("chronicle");
+            if(chronicle!=null&&chronicle.isJsonObject())for(var k:VISIBLE){var n=chronicle.getAsJsonObject().get(k);if(n!=null&&n.isJsonPrimitive())visible+=n.getAsLong();}
+            out.addProperty("visible",visible);
+            return out;
+        }catch(RuntimeException error){log("progress failed: "+error);return null;}
+    }
+    /** Every routeTicks each worker with a body counts once under its job kind and navigator status; no world reads. */
+    static void routes(){
+        try{
+            var village=village();if(village==null)return;
+            for(var w:village.workers.values()){
+                var b=w.bot();if(b==null)continue;
+                routeByJob.computeIfAbsent(w.job==null?"none":w.job.kind(),k->new long[ROUTE.length])[routeBucket(String.valueOf(b.navigator().status()))]++;
+            }
+        }catch(RuntimeException error){if(!routesFailed){routesFailed=true;log("routes failed: "+error);}}
+    }
+    static int routeBucket(String status){return switch(status){case "COMPUTING"->0;case "RUNNING"->1;case "STUCK"->2;default->3;};}
+    static JsonObject routeJson(){
+        var out=new JsonObject();
+        routeByJob.forEach((kind,n)->{var row=new JsonObject();for(int i=0;i<ROUTE.length;i++)row.addProperty(ROUTE[i],n[i]);out.add(kind,row);});
+        return out;
+    }
+    /** Daytime samples only: a night sample's change counts for the next daytime sample (digest.py cadence() does the same). */
+    static List<Boolean> daytime(List<Boolean> changes,List<Boolean> nights){
+        var out=new ArrayList<Boolean>();boolean pending=false;
+        for(int i=0;i<changes.size();i++){pending|=changes.get(i);if(!nights.get(i)){out.add(pending);pending=false;}}
+        return out;
+    }
+    /** Share of samples with a visible change and the stalls between them in real minutes at 20 TPS; digest.py cadence() is the same. */
+    static void cadence(JsonObject out,List<Boolean> changes,double minutesPerSample,String share,String longestKey,String over5Key){
+        int changed=0,run=0,longest=0,over5=0;
+        for(boolean c:changes){
+            if(c){changed++;if(run>0&&run*minutesPerSample>=5)over5++;run=0;}else longest=Math.max(longest,++run);
+        }
+        if(run>0&&run*minutesPerSample>=5)over5++;
+        out.addProperty(share,changes.isEmpty()?0:Math.round(changed*1000.0/changes.size())/1000.0);
+        out.addProperty(longestKey,Math.round(longest*minutesPerSample*10)/10.0);
+        out.addProperty(over5Key,over5);
+    }
+    /** The content features at the end: switch, what the village recorded in VillageState.features and what stands in the world. */
+    static JsonObject features(Village village){
+        var out=new JsonObject();
+        for(var f:Features.ALL){
+            var row=new JsonObject();
+            try{
+                row.addProperty("on",f.enabled());
+                String json=village.state.features==null?null:village.state.features.get(f.key());
+                var parsed=json==null?null:JsonParser.parseString(json);
+                observe(village,f.key(),parsed!=null&&parsed.isJsonObject()?parsed.getAsJsonObject():new JsonObject(),row);
+            }catch(RuntimeException error){row.addProperty("error",error.toString());}
+            out.add(f.key(),row);
+        }
+        return out;
+    }
+    static void observe(Village village,String key,JsonObject state,JsonObject row){
+        switch(key){
+            case "campfire"->{
+                row.addProperty("recorded",positions(state,"fire").size());
+                row.addProperty("observed",near(village.meetingPoint(),12,6,s->s.getBlock() instanceof CampfireBlock));
+            }
+            case "orchard"->{
+                var trees=positions(state,"trees");row.addProperty("recorded",trees.size());
+                int saplings=count(trees,s->s.getBlock() instanceof SaplingBlock),grown=count(trees,s->s.is(BlockTags.LOGS));
+                row.addProperty("observed",saplings+grown);row.addProperty("saplings",saplings);row.addProperty("trees",grown);
+            }
+            case "heraldry"->{
+                var raised=positions(state,"raised");row.addProperty("recorded",raised.size());
+                row.addProperty("observed",count(raised,s->s.getBlock() instanceof AbstractBannerBlock));
+                int banners=0;
+                for(int cx=minX>>4;cx<=maxX>>4;cx++)for(int cz=minZ>>4;cz<=maxZ>>4;cz++){
+                    var chunk=level.getChunkSource().getChunkNow(cx,cz);if(chunk==null)continue;
+                    for(var entity:chunk.getBlockEntities().values())if(entity instanceof BannerBlockEntity&&inArea(entity.getBlockPos()))banners++;
+                }
+                row.addProperty("bannersInArea",banners);
+            }
+            case "storm"->{
+                var rod=state.has("built")&&state.get("built").getAsBoolean()?positions(state,"rod"):List.<BlockPos>of();
+                row.addProperty("recorded",rod.size());row.addProperty("observed",count(rod,s->s.getBlock() instanceof LightningRodBlock));
+            }
+            case "mastery"->{
+                int titled=0,present=0;var ranks=state.get("ranks");
+                if(ranks!=null&&ranks.isJsonObject())for(var e:ranks.getAsJsonObject().entrySet()){
+                    if(!e.getValue().isJsonObject()||e.getValue().getAsJsonObject().isEmpty())continue;
+                    titled++;
+                    try{if(village.workers.containsKey(UUID.fromString(e.getKey())))present++;}catch(IllegalArgumentException ignored){}
+                }
+                row.addProperty("recorded",titled);row.addProperty("observed",present);
+            }
+            case "livestock"->{
+                int cows=level.getEntitiesOfClass(Cow.class,area(),Entity::isAlive).size(),chickens=level.getEntitiesOfClass(Chicken.class,area(),Entity::isAlive).size();
+                row.addProperty("observed",cows+chickens);row.addProperty("cows",cows);row.addProperty("chickens",chickens);
+            }
+            default->{}
+        }
+    }
+    /** Packed block positions under a state field: a number, an array of numbers or an object of numbers. */
+    static List<BlockPos> positions(JsonObject state,String field){
+        var out=new ArrayList<BlockPos>();var e=state.get(field);
+        if(e==null||e.isJsonNull())return out;
+        var items=new ArrayList<JsonElement>();
+        if(e.isJsonArray())e.getAsJsonArray().forEach(items::add);else if(e.isJsonObject())e.getAsJsonObject().entrySet().forEach(x->items.add(x.getValue()));else items.add(e);
+        for(var x:items)if(x.isJsonPrimitive()&&x.getAsJsonPrimitive().isNumber())out.add(BlockPos.of(x.getAsLong()));
+        return out;
+    }
+    static int count(List<BlockPos> positions,java.util.function.Predicate<BlockState> test){
+        int n=0;for(var p:positions)if(level.hasChunkAt(p)&&test.test(level.getBlockState(p)))n++;
+        return n;
+    }
+    static int near(BlockPos c,int r,int dy,java.util.function.Predicate<BlockState> test){
+        int n=0;var cursor=new BlockPos.MutableBlockPos();
+        for(int x=-r;x<=r;x++)for(int z=-r;z<=r;z++){
+            if(!level.hasChunkAt(cursor.set(c.getX()+x,c.getY(),c.getZ()+z)))continue;
+            for(int y=-dy;y<=dy;y++)if(test.test(level.getBlockState(cursor.set(c.getX()+x,c.getY()+y,c.getZ()+z))))n++;
+        }
+        return n;
+    }
+
     /** Implementation-specific view of the mod. Kept in one place so a rewrite only touches this method. */
     static Map<UUID,String> jobs(){
         var out=new HashMap<UUID,String>();var village=village();if(village==null)return out;
@@ -430,8 +583,18 @@ public final class SoakProbe implements ModInitializer {
                 // One comparable number; the formula is documented in tools/soak/README.md.
                 double score=10*Math.max(0,end.get("beds").getAsInt()-startBeds)+20*births.size()+built/10.0-25*deaths.size();
                 outcome.addProperty("score",Math.round(score*10)/10.0);
+                // Additive telemetry (README "Видимые изменения", "Маршруты по видам работ", "Новые механики").
+                double minutes=intConfig("sampleTicks",1200)/1200.0;
+                cadence(outcome,changes,minutes,"changeShare","longestStallMinutes","stallsOver5Minutes");
+                cadence(outcome,daytime(changes,nights),minutes,"dayChangeShare","longestDayStallMinutes","dayStallsOver5Minutes");
+                if(firstProjectDay!=null)outcome.addProperty("firstProjectDay",firstProjectDay);
+                long[] all=new long[ROUTE.length];for(var n:routeByJob.values())for(int i=0;i<all.length;i++)all[i]+=n[i];
+                long counted=Arrays.stream(all).sum();
+                if(counted>0)outcome.addProperty("routeWaitShare",Math.round(all[0]*1000.0/counted)/1000.0);
+                try{var village=village();if(village!=null)outcome.add("features",features(village));}catch(RuntimeException error){outcome.addProperty("featuresError",error.toString());}
                 summary.add("outcome",outcome);summary.add("blocksDelta",blocks);summary.add("chestStockDelta",stock);
                 summary.add("idleByJob",GSON.toJsonTree(idleByJob));
+                summary.add("routeByJob",routeJson());
                 summary.add("births",births);summary.add("deaths",deaths);
                 summary.add("modFinal",modView());
                 try{summary.addProperty("modStatus",AutonomousVillagesMod.runtime(server).status(null));}catch(RuntimeException ignored){}
